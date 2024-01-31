@@ -464,11 +464,11 @@ def main():
     with open(filename, 'r') as file:
         seed = json.load(file)
 
-    # dwa_trajectory, dwa_computational_time = dwa_sim(seed)   
-    # print(f"DWA average computational time: {sum(dwa_computational_time) / len(dwa_computational_time)}\n")
+    dwa_trajectory, dwa_computational_time = dwa_sim(seed)   
+    print(f"DWA average computational time: {sum(dwa_computational_time) / len(dwa_computational_time)}\n")
 
-    # mpc_trajectory, mpc_computational_time = mpc_sim(seed)
-    # print(f"MPC average computational time: {sum(mpc_computational_time) / len(mpc_computational_time)}\n")
+    mpc_trajectory, mpc_computational_time = mpc_sim(seed)
+    print(f"MPC average computational time: {sum(mpc_computational_time) / len(mpc_computational_time)}\n")
 
     c3bf_trajectory, c3bf_computational_time = c3bf_sim(seed)
     print(f"C3BF average computational time: {sum(c3bf_computational_time) / len(c3bf_computational_time)}\n")

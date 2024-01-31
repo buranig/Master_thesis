@@ -128,6 +128,7 @@ class ModelPredictiveControl:
         self.predicted_trajectory = predicted_trajectory
         self.reached_goal = [False]*robot_num
         self.computational_time = []
+        self.old_time = [time.time()]*robot_num
 
     def plant_model(self, prev_state, dt, pedal, steering):
         """
@@ -472,7 +473,9 @@ class ModelPredictiveControl:
                             tol = 1e-1)
         
         u1 = u_solution.x
-        x1 = self.plant_model(x1, dt, u1[0], u1[1])
+        x1 = self.plant_model(x1, time.time() - self.old_time[i], u1[0], u1[1])
+        print(time.time() - self.old_time[i]) 
+        self.old_time[i] = time.time() 
         x[:, i] = x1
         u[:, i] = u1
         predicted_state = np.array([x1])

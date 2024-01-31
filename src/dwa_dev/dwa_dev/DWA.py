@@ -428,7 +428,7 @@ class DWA_algorithm():
                 else:
                     # If goal is not reached, update the robot's state
                     time_prev = time.time()
-                    x, u, self.predicted_trajectory = self.update_robot_state(x, u, dt, self.targets, self.dilated_traj, self.predicted_trajectory, i)
+                    x, u, self.predicted_trajectory, self.old_time[i] = self.update_robot_state(x, u, dt, self.targets, self.dilated_traj, self.predicted_trajectory, i, self.old_time[i])
                     self.computational_time.append(time.time()-time_prev)
                     
             # print(f"Speed of robot {i}: {x[3, i]}")

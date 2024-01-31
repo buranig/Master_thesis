@@ -392,6 +392,7 @@ class DWA_algorithm():
         self.ax = ax
         self.reached_goal = [False]*robot_num
         self.computational_time = []
+        self.old_time = [time.time()]*robot_num
 
     def run_dwa(self, x, u, break_flag):
         for i in range(robot_num):
@@ -401,11 +402,11 @@ class DWA_algorithm():
                 self.paths[i].pop(0)
                 if not self.paths[i]:
                     print("Path complete")
-                    return
+                    return x, u, True
                 self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
 
             t_prev = time.time()
-            x, u, self.predicted_trajectory = self.update_robot_state(x, u, dt, self.targets, self.dilated_traj, self.predicted_trajectory, i)
+            x, u, self.predicted_trajectory, self.old_time[i] = self.update_robot_state(x, u, dt, self.targets, self.dilated_traj, self.predicted_trajectory, i, self.old_time[i])
             self.computational_time.append(time.time()-t_prev)
 
             if check_goal_reached(x, self.targets, i):
@@ -439,7 +440,7 @@ class DWA_algorithm():
                 break_flag = True
         return x, u, break_flag
     
-    def update_robot_state(self, x, u, dt, targets, dilated_traj, predicted_trajectory, i):
+    def update_robot_state(self, x, u, dt, targets, dilated_traj, predicted_trajectory, i, old_time):
         """
         Update the state of a robot based on its current state, control input, and environment information.
 
@@ -468,12 +469,13 @@ class DWA_algorithm():
         if check_collision_bool:
             if any([utils.dist([x1[0], x1[1]], [x[0, idx], x[1, idx]]) < WB for idx in range(robot_num) if idx != i]): raise Exception('Collision')
 
-        x1 = motion(x1, u1, dt)
+        print(time.time()-old_time)
+        x1 = motion(x1, u1, dt=time.time()-old_time)
         x[:, i] = x1
         u[:, i] = u1
         predicted_trajectory[i] = predicted_trajectory1
 
-        return x, u, predicted_trajectory
+        return x, u, predicted_trajectory, time.time()
     
     def dwa_control(self, x, goal, ob):
         """

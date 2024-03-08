@@ -11,7 +11,7 @@ from shapely import distance
 from shapely.plotting import plot_polygon
 import time
 
-path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
+path = pathlib.Path('/home/jaume/thesis_ws/src/bumper_cars/params.json')
 # Opening JSON file
 with open(path, 'r') as openfile:
     # Reading from json file
@@ -62,10 +62,10 @@ np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k'}
 
-with open('/home/giacomo/thesis_ws/src/trajectories.json', 'r') as file:
+with open('/home/jaume/thesis_ws/src/trajectories.json', 'r') as file:
     data = json.load(file)
 
-with open('/home/giacomo/thesis_ws/src/seeds/seed_1.json', 'r') as file:
+with open('/home/jaume/thesis_ws/src/seeds/seed_1.json', 'r') as file:
     seed = json.load(file)
 
 def motion(x, u, dt):
@@ -147,12 +147,12 @@ def calc_dynamic_window():
     Returns:
         list: Dynamic window [min_throttle, max_throttle, min_steer, max_steer].
     """
-    
+
     Vs = [min_acc, max_acc,
           -max_steer, max_steer]
-    
+
     dw = [Vs[0], Vs[1], Vs[2], Vs[3]]
-    
+
     return dw
 
 def predict_trajectory(x_init, a, delta):
@@ -204,10 +204,10 @@ def calc_obstacle_cost(trajectory, ob):
     if ob:
         for obstacle in ob:
             if dilated.intersects(obstacle):
-                return 100000 # collision        
+                return 100000 # collision
             elif distance(dilated, obstacle) < min_distance:
                 min_distance = distance(dilated, obstacle)
-                
+
         return 1/distance(dilated, obstacle)
     else:
         return 0.0
@@ -249,9 +249,8 @@ def calc_to_goal_heading_cost(trajectory, goal):
     dy = goal[1] - trajectory[-1, 1]
 
     # either using the angle difference or the distance --> if we want to use the angle difference, we need to normalize the angle before taking the difference
-    error_angle = normalize_angle(math.atan2(dy, dx))
-    cost_angle = error_angle - normalize_angle(trajectory[-1, 2])
-    cost = abs(math.atan2(math.sin(cost_angle), math.cos(cost_angle)))
+    error_angle = math.atan2(dy, dx)
+    cost = abs(error_angle - normalize_angle(trajectory[-1, 2]))
 
     return cost
 
@@ -270,7 +269,7 @@ def plot_arrow(x, y, yaw, length=0.5, width=0.1):  # pragma: no cover
               head_length=width, head_width=width)
     plt.plot(x, y)
 
-def plot_robot(x, y, yaw, i):  
+def plot_robot(x, y, yaw, i):
     """
     Plot the robot.
 
@@ -447,7 +446,7 @@ class DWA_algorithm():
                 if not self.paths[i]:
                     print("Path complete")
                     return x, u, True
-                
+
                 self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
 
             t_prev = time.time()
@@ -460,7 +459,7 @@ class DWA_algorithm():
             if show_animation:
                 plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
         return x, u, break_flag
-    
+
     def go_to_goal(self, x, u, break_flag):
         """
         Moves the robots towards their respective goals.
@@ -476,7 +475,7 @@ class DWA_algorithm():
         """
         for i in range(self.robot_num):
             # Step 9: Check if the distance between the current position and the target is less than 5
-            if not self.reached_goal[i]:                
+            if not self.reached_goal[i]:
                 # If goal is reached, stop the robot
                 if check_goal_reached(x, self.targets, i, distance=3):
                     u[:, i] = np.zeros(2)
@@ -487,16 +486,16 @@ class DWA_algorithm():
                     time_prev = time.time()
                     x, u = self.update_robot_state(x, u, dt, i)
                     self.computational_time.append(time.time()-time_prev)
-                    
+
             # print(f"Speed of robot {i}: {x[3, i]}")
-            
+
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if show_animation:
                 plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
         if all(self.reached_goal):
                 break_flag = True
         return x, u, break_flag
-    
+
     def update_robot_state(self, x, u, dt, i):
         """
         Update the state of a robot based on its current state, control input, and environment information.
@@ -531,15 +530,15 @@ class DWA_algorithm():
         # Collision check
         if check_collision_bool:
             if any([utils.dist([x1[0], x1[1]], [x[0, idx], x[1, idx]]) < WB for idx in range(self.robot_num) if idx != i]): raise Exception('Collision')
-        
+
         x1 = motion(x1, u1, dt)
         x[:, i] = x1
         u[:, i] = u1
         self.predicted_trajectory[i] = predicted_trajectory1
         self.u_hist[i] = u_history
-        
+
         return x, u
-    
+
     def dwa_control(self, x, ob, i):
             """
             Dynamic Window Approach control.
@@ -560,7 +559,7 @@ class DWA_algorithm():
             dw = calc_dynamic_window()
             u, trajectory, u_history = self.calc_control_and_trajectory(x, dw, ob, i)
             return u, trajectory, u_history
-    
+
     def calc_control_and_trajectory(self, x, dw, ob, i):
             """
             Calculate the final input with the dynamic window.
@@ -578,7 +577,7 @@ class DWA_algorithm():
             best_u = [0.0, 0.0]
             best_trajectory = np.array([x])
             u_buf = self.u_hist[i]
-            goal = self.targets[i] 
+            goal = self.targets[i]
             trajectory_buf = self.predicted_trajectory[i]
 
             # evaluate all trajectory with sampled input in dynamic window
@@ -600,45 +599,50 @@ class DWA_algorithm():
 
                     to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory, goal)
                     speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
-                    if trajectory[-1, 3] <= 0.0:
-                        speed_cost = 10
-                    else:
-                        speed_cost = 0.0
+                    # if trajectory[-1, 3] <= 0.0:
+                    #     speed_cost = 5
+                    # else:
+                    #     speed_cost = 0.0
                     ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory, ob)
-                    # heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory, goal)
-                    final_cost = to_goal_cost + ob_cost + speed_cost # + heading_cost #+ speed_cost 
-                    
+                    heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory, goal)
+                    final_cost = to_goal_cost + ob_cost + speed_cost #+ heading_cost #+ speed_cost
+
                     # search minimum trajectory
                     if min_cost >= final_cost:
                         min_cost = final_cost
                         best_u = [a, delta]
                         best_trajectory = trajectory
                         u_history = [[a, delta] for _ in range(len(trajectory-1))]
-                        if abs(best_u[0]) < robot_stuck_flag_cons \
-                                and abs(x[2]) < robot_stuck_flag_cons:
-                            # to ensure the robot do not get stuck in
-                            # best v=0 m/s (in front of an obstacle) and
-                            # best omega=0 rad/s (heading to the goal with
-                            # angle difference of 0)
-                            best_u[1] = -max_steer
-                            best_trajectory = trajectory
-                            u_history = [delta]*len(trajectory)
+
+                        # Shouldn't get stuck anyways
+                        # if abs(best_u[0]) < robot_stuck_flag_cons \
+                        #         and abs(x[2]) < robot_stuck_flag_cons:
+                        #     # to ensure the robot do not get stuck in
+                        #     # best v=0 m/s (in front of an obstacle) and
+                        #     # best omega=0 rad/s (heading to the goal with
+                        #     # angle difference of 0)
+                        #     best_u[1] = -max_steer
+                        #     best_trajectory = trajectory
+                        #     u_history = [delta]*len(trajectory)
+
             # print(time.time()-old_time)
-            if len(u_buf) > 2:              
-                u_buf.pop(0)
-                trajectory_buf = trajectory_buf[1:]
+            # if len(u_buf) > 2:
+            #     u_buf.pop(0)
+            #     trajectory_buf = trajectory_buf[1:]
 
-                to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
-                # speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
-                ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory_buf, ob)
-                heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory_buf, goal)
-                final_cost = to_goal_cost + ob_cost + heading_cost #+ speed_cost 
+            #     to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
+            #     # speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
+            #     ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory_buf, ob)
+            #     heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory_buf, goal)
+            #     final_cost = to_goal_cost + ob_cost + heading_cost #+ speed_cost
 
-                if min_cost >= final_cost:
-                    min_cost = final_cost
-                    best_u = u_buf[0]
-                    best_trajectory = trajectory_buf
-                    u_history = u_buf
+            #     if min_cost >= final_cost:
+            #         min_cost = final_cost
+            #         best_u = u_buf[0]
+            #         best_trajectory = trajectory_buf
+            #         u_history = u_buf
+            # else:
+            #     print("AAAAAAAAAAAA")
             return best_u, best_trajectory, u_history
 
 def main():
@@ -659,11 +663,11 @@ def main():
     12. Print "Done" when the loop is finished.
     13. Plot the final trajectories if animation is enabled.
     """
-    
+
     print(__file__ + " start!!")
     iterations = 3000
     break_flag = False
-    
+
     x0, y, yaw, v, omega, model_type = utils.samplegrid(width_init, height_init, min_dist, robot_num, safety_init)
     x = np.array([x0, y, yaw, v])
     u = np.zeros((2, robot_num))
@@ -676,20 +680,20 @@ def main():
         predicted_trajectory[i] = np.full((int(predict_time/dt), 3), x[0:3,i])
 
     paths, targets, dilated_traj = initialize_paths_targets_dilated_traj(x)
-    
+
     fig = plt.figure(1, dpi=90, figsize=(10,10))
     ax = fig.add_subplot(111)
 
     u_hist = dict.fromkeys(range(robot_num),[[0,0] for _ in range(int(predict_time/dt))])
 
     dwa = DWA_algorithm(robot_num, paths, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist)
-        
+
     for z in range(iterations):
         plt.cla()
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-        
+
         for i in range(robot_num):
-            
+
             paths, targets = update_targets(paths, targets, x, i)
 
             x, u = dwa.update_robot_state(x, u, dt, i)
@@ -735,11 +739,11 @@ def main1():
     12. Print "Done" when the loop is finished.
     13. Plot the final trajectories if animation is enabled.
     """
-    
+
     print(__file__ + " start!!")
     iterations = 3000
     break_flag = False
-    
+
     # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
     initial_state = seed['initial_position']
     x0 = initial_state['x']
@@ -769,19 +773,19 @@ def main1():
     dilated_traj = []
     for i in range(robot_num):
         dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
-    
+
     fig = plt.figure(1, dpi=90, figsize=(10,10))
     ax = fig.add_subplot(111)
     u_hist = dict.fromkeys(range(robot_num),[[0,0] for _ in range(int(predict_time/dt))])
 
     dwa = DWA_algorithm(robot_num, paths, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist)
-    
+
     for z in range(iterations):
         plt.cla()
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-        
+
         for i in range(robot_num):
-            
+
             # Step 9: Check if the distance between the current position and the target is less than 5
             if utils.dist(point1=(x[0,i], x[1,i]), point2=targets[i]) < 5:
                 # Perform some action when the condition is met
@@ -834,11 +838,11 @@ def main_seed():
     12. Print "Done" when the loop is finished.
     13. Plot the final trajectories if animation is enabled.
     """
-    
+
     print(__file__ + " start!!")
     iterations = 3000
     break_flag = False
-    
+
     # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
     initial_state = seed['initial_position']
     x0 = initial_state['x']
@@ -868,21 +872,21 @@ def main_seed():
     dilated_traj = []
     for i in range(robot_num):
         dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
-    
+
     u_hist = dict.fromkeys(range(robot_num),[[0,0] for _ in range(int(predict_time/dt))])
     fig = plt.figure(1, dpi=90, figsize=(10,10))
     ax = fig.add_subplot(111)
-    
+
     # Step 7: Create an instance of the DWA_algorithm class
     dwa = DWA_algorithm(robot_num, paths, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist)
-    
+
     for z in range(iterations):
         plt.cla()
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-        
+
         x, u, break_flag = dwa.run_dwa(x, u, break_flag)
         trajectory = np.dstack([trajectory, x])
-            
+
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")
         plt.grid(True)
@@ -896,8 +900,8 @@ def main_seed():
         for i in range(robot_num):
             plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-r")
         plt.pause(0.0001)
-        plt.show()
-       
+        plt.show(block=True)
+
 if __name__ == '__main__':
     main_seed()
     # main()

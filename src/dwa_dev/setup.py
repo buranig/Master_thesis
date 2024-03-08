@@ -20,6 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'dwa = dwa_dev.DWA:main',
+            'generate_trajectories = dwa_dev.generate_trajectories:main'
         ],
     },
 )

@@ -92,9 +92,9 @@ class StateBufferNode(Node):
         response.updated = self.track_updated
         return response
     
-    def _get_traj_state(self, request, response) -> EnvState.Response:
+    def _get_traj_state(self, request, response) -> TrajState.Response:
         response.trajectories = self.chosen_traj
-        response.updated = self.updated_traj
+        response.updated = all(self.updated_traj)
         return response
     
 

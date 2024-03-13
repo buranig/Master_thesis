@@ -15,8 +15,9 @@ setup(
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
+        (os.path.join('share', package_name, 'config'), glob('config/*.json')),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools','planner','custom_message'],
     zip_safe=True,
     maintainer='giacomo',
     maintainer_email='buranig@stuent.ethz.ch',
@@ -25,8 +26,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'dwa = dwa_dev.DWA:main',
-            'generate_trajectories = dwa_dev.generate_trajectories:main'
+            'dwa = dwa_dev.DWA:main_ros',
+            'generate_trajectories = dwa_dev.generate_trajectories:main_ros'
         ],
     },
 )

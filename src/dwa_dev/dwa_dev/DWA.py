@@ -10,8 +10,12 @@ from shapely.geometry import Point, LineString
 from shapely import distance
 from shapely.plotting import plot_polygon
 import time
+import os
 
-path = pathlib.Path('/home/jaume/thesis_ws/src/bumper_cars/params.json')
+# Write directory
+dir_path = os.path.dirname(os.path.realpath(__file__))
+path = pathlib.Path(dir_path + '/../config/dwa_config.json')
+
 # Opening JSON file
 with open(path, 'r') as openfile:
     # Reading from json file
@@ -62,10 +66,10 @@ np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k'}
 
-with open('/home/jaume/thesis_ws/src/trajectories.json', 'r') as file:
+with open(dir_path + '/../../trajectories.json', 'r') as file:
     data = json.load(file)
 
-with open('/home/jaume/thesis_ws/src/seeds/seed_1.json', 'r') as file:
+with open(dir_path + '/../../seeds/seed_1.json', 'r') as file:
     seed = json.load(file)
 
 def motion(x, u, dt):
@@ -721,105 +725,6 @@ def main():
         plt.pause(0.0001)
         plt.show()
 
-def main1():
-    """
-    Main function that controls the execution of the program.
-
-    Steps:
-    1. Initialize the necessary variables and arrays.
-    2. Generate initial robot states and trajectories.
-    3. Initialize paths, targets, and dilated trajectories.
-    4. Start the main loop for a specified number of iterations.
-    5. Update targets and robot states for each robot.
-    6. Calculate the right input using the Dynamic Window Approach method.
-    7. Predict the future trajectory using the calculated input.
-    8. Check if the goal is reached for each robot.
-    9. Plot the robot trajectories and the map.
-    11. Break the loop if the goal is reached for any robot.
-    12. Print "Done" when the loop is finished.
-    13. Plot the final trajectories if animation is enabled.
-    """
-
-    print(__file__ + " start!!")
-    iterations = 3000
-    break_flag = False
-
-    # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
-    initial_state = seed['initial_position']
-    x0 = initial_state['x']
-    y = initial_state['y']
-    yaw = initial_state['yaw']
-    v = initial_state['v']
-
-    # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
-    u = np.zeros((2, robot_num))
-
-    trajectory = np.zeros((x.shape[0], robot_num, 1))
-    trajectory[:, :, 0] = x
-
-    predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 3]))
-    for i in range(robot_num):
-        predicted_trajectory[i] = np.full((int(predict_time/dt), 3), x[0:3,i])
-
-    # Step 4: Create paths for each robot
-    traj = seed['trajectories']
-    paths = [[Coordinate(x=traj[str(idx)][i][0], y=traj[str(idx)][i][1]) for i in range(len(traj[str(idx)]))] for idx in range(robot_num)]
-
-    # Step 5: Extract the target coordinates from the paths
-    targets = [[path[0].x, path[0].y] for path in paths]
-
-    # Step 6: Create dilated trajectories for each robot
-    dilated_traj = []
-    for i in range(robot_num):
-        dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
-
-    fig = plt.figure(1, dpi=90, figsize=(10,10))
-    ax = fig.add_subplot(111)
-    u_hist = dict.fromkeys(range(robot_num),[[0,0] for _ in range(int(predict_time/dt))])
-
-    dwa = DWA_algorithm(robot_num, paths, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist)
-
-    for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-
-        for i in range(robot_num):
-
-            # Step 9: Check if the distance between the current position and the target is less than 5
-            if utils.dist(point1=(x[0,i], x[1,i]), point2=targets[i]) < 5:
-                # Perform some action when the condition is met
-                paths[i].pop(0)
-                if not paths[i]:
-                    print("Path complete")
-                    return
-                targets[i] = (paths[i][0].x, paths[i][0].y)
-
-            x, u = dwa.update_robot_state(x, u, dt, i)
-
-            trajectory = np.dstack([trajectory, x])
-
-            if check_goal_reached(x, targets, i):
-                break_flag = True
-
-            if show_animation:
-                plot_robot_trajectory(x, u, dwa.predicted_trajectory, dilated_traj, targets, ax, i)
-
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
-
-        if break_flag:
-            break
-
-    print("Done")
-    if show_animation:
-        for i in range(robot_num):
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-r")
-        plt.pause(0.0001)
-        plt.show()
-
 def main_seed():
     """
     Main function that controls the execution of the program.
@@ -905,3 +810,94 @@ def main_seed():
 if __name__ == '__main__':
     main_seed()
     # main()
+
+# ROS Wrapper
+    
+import rclpy
+from rclpy.node import Node
+
+class TestParams(Node):
+    def __init__(self):
+        global max_steer, max_speed, min_speed, v_resolution, delta_resolution
+        global max_acc, min_acc, dt, predict_time, to_goal_cost_gain, speed_cost_gain
+        global obstacle_cost_gain, heading_cost_gain, robot_stuck_flag_cons, dilation_factor
+        global L, Lr, Lf, Cf, Cr, Iz, m, c_a, c_r1, WB, L_d, robot_num, safety_init
+        global width_init, height_init, min_dist, update_dist, timer_freq
+        global show_animation, check_collision_bool, add_noise, data, seed_bool, seed
+
+        super().__init__('dwa_dev')
+        self.declare_parameter('car_json', rclpy.Parameter.Type.STRING)
+        self.declare_parameter('traj_json', rclpy.Parameter.Type.STRING)
+        self.declare_parameter('seed', rclpy.Parameter.Type.BOOL)
+        self.declare_parameter('seed_json', rclpy.Parameter.Type.STRING)
+
+        dwa_path = self.get_parameter('car_json').value
+        traj_path = self.get_parameter('traj_json').value
+        seed_bool = self.get_parameter('seed').value
+        seed_path = self.get_parameter('seed_json').value
+
+        # Opening JSON file
+        with open(dwa_path, 'r') as openfile:
+            # Reading from json file
+            json_object = json.load(openfile)
+
+        with open(traj_path, 'r') as file:
+            data = json.load(file)
+
+
+        max_steer = json_object["DWA"]["max_steer"] # [rad] max steering angle
+        max_speed = json_object["DWA"]["max_speed"] # [m/s]
+        min_speed = json_object["DWA"]["min_speed"] # [m/s]
+        v_resolution = json_object["DWA"]["v_resolution"] # [m/s]
+        delta_resolution = math.radians(json_object["DWA"]["delta_resolution"])# [rad/s]
+        max_acc = json_object["DWA"]["max_acc"] # [m/ss]
+        min_acc = json_object["DWA"]["min_acc"] # [m/ss]
+        dt = json_object["Controller"]["dt"] # [s] Time tick for motion prediction
+        predict_time = json_object["DWA"]["predict_time"] # [s]
+        to_goal_cost_gain = json_object["DWA"]["to_goal_cost_gain"]
+        speed_cost_gain = json_object["DWA"]["speed_cost_gain"]
+        obstacle_cost_gain = json_object["DWA"]["obstacle_cost_gain"]
+        heading_cost_gain = json_object["DWA"]["heading_cost_gain"]
+        robot_stuck_flag_cons = json_object["DWA"]["robot_stuck_flag_cons"]
+        dilation_factor = json_object["DWA"]["dilation_factor"]
+        L = json_object["Car_model"]["L"]  # [m] Wheel base of vehicle
+        Lr = L / 2.0  # [m]
+        Lf = L - Lr
+        Cf = json_object["Car_model"]["Cf"]  # N/rad
+        Cr = json_object["Car_model"]["Cr"] # N/rad
+        Iz = json_object["Car_model"]["Iz"]  # kg/m2
+        m = json_object["Car_model"]["m"]  # kg
+        # Aerodynamic and friction coefficients
+        c_a = json_object["Car_model"]["c_a"]
+        c_r1 = json_object["Car_model"]["c_r1"]
+        WB = json_object["Controller"]["WB"] # Wheel base
+        L_d = json_object["Controller"]["L_d"]  # [m] look-ahead distance
+        robot_num = json_object["robot_num"]
+        safety_init = json_object["safety"]
+        width_init = json_object["width"]
+        height_init = json_object["height"]
+        min_dist = json_object["min_dist"]
+        update_dist = 2
+        # N=3
+
+        robot_num = json_object["robot_num"]
+        timer_freq = json_object["timer_freq"]
+
+        show_animation = True
+        check_collision_bool = False
+        add_noise = False
+
+        if seed_bool:
+            with open(seed_path, 'r') as file:
+                seed = json.load(file)
+            main_seed()
+        else:
+            main()
+
+
+def main_ros(args=None):
+    rclpy.init(args=args)
+    node = TestParams()
+    # rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()

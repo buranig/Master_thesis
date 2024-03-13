@@ -11,6 +11,7 @@ from shapely import distance
 from shapely.plotting import plot_polygon
 import time
 import os
+from matplotlib.animation import FuncAnimation
 
 # Write directory
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -785,7 +786,8 @@ def main_seed():
     # Step 7: Create an instance of the DWA_algorithm class
     dwa = DWA_algorithm(robot_num, paths, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist)
 
-    for z in range(iterations):
+    def update(frame):
+        nonlocal x, u, break_flag, trajectory
         plt.cla()
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
 
@@ -795,17 +797,21 @@ def main_seed():
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")
         plt.grid(True)
-        plt.pause(0.0001)
 
         if break_flag:
-            break
+            ani.event_source.stop()
+            print("Done")
+            if show_animation:
+                for i in range(robot_num):
+                    plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-r")
+                plt.show()
 
-    print("Done")
-    if show_animation:
-        for i in range(robot_num):
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-r")
-        plt.pause(0.0001)
-        plt.show(block=True)
+    # Set the number of frames based on the iterations
+    num_frames = iterations
+
+    # Create the animation
+    ani = FuncAnimation(fig, update, frames=num_frames, repeat=False)
+    plt.show()
 
 if __name__ == '__main__':
     main_seed()

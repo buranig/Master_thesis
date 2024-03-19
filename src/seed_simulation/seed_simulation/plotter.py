@@ -71,17 +71,6 @@ class Plotter:
         # plt.yscale('log')
         plt.xlabel("Number of Robots",fontdict={'size': fontsize, 'family': 'serif'})
         # plt.ylabel(fontdict={'size': fontsize, 'family': 'serif'})
-        plt.show()
-
-        # # Set plot labels and legend
-        # ax.set_ylabel(lab)
-        # ax.set_ylim(8 if affix == '' else None, None, auto=True)
-        # ax.legend(title='Wasserstein distance (ordered)',
-        #         ncol=round(np.max(df.iloc[:, -1].to_numpy() / 0.02)),
-        #         columnspacing=1.2)
-
-        # # Only set xlabel at the bottom
-        # axs[0].set_xlabel('')
 
 
     def plot(self, x, y, hue, title):
@@ -96,8 +85,8 @@ quantities = ['Path Length', 'Acceleration Usage', 'Steering Usage', 'Average Sp
 methods = ['MPC', 'LBP', 'CBF', 'C3BF', 'DWA']
 noises = [0.0, 0.1, 0.2, 0.4]
 
-data_plotter = Plotter(data)
-data_plotter.plot_bars("File Name", "Collision Number", "Method", "Collision number as a function of the seed file")
+# data_plotter = Plotter(data)
+# data_plotter.plot_bars("File Name", "Collision Number", None, "Collision number as a function of the seed file")
 # for idx in range(0,58):
 #     file_data = data.loc[data["File Name"] == "circular_seed_"+str(idx)+".json"]
 #     # plt.scatter(file_data["Robot Number"].iloc[0], max(file_data["Collision Number"]))
@@ -107,12 +96,59 @@ data_plotter.plot_bars("File Name", "Collision Number", "Method", "Collision num
 
 for method in methods:
     for quantity in quantities:
+        plt.close()
         mpc_data = data.loc[data["Method"] == method]
         mpc_plotter = Plotter(mpc_data)
         mpc_plotter.plot_bars("Robot Number", quantity, 'Noise Scaling', quantity+" vs Number of robots " + '(Method: ' + method + ')')
+        savepath = "/home/giacomo/Documenti/Thesis report/results/"
+        if quantity == 'Collision Number':
+            pre = "collision_"
+        elif quantity == 'Solver Failure':
+            pre = "failure_"
+        elif quantity == 'Avg Computational Time':
+            pre = "comp_"
+        elif quantity == 'Average Speed':
+            pre = "speed_"
+        elif quantity == 'Steering Usage':
+            pre = "steer_"
+        elif quantity == 'Acceleration Usage':
+            pre = "acc_"
+        elif quantity == 'Path Length':
+            pre = "path_"
+        plt.savefig(savepath + pre + "vs_robot_" + method + "_hue_noise"+ ".pdf")
+        plt.show(block=False)
+        plt.pause(1)
+        plt.close()
+        # plt.savefig('Figure1.svg')
 
 for noise in noises:
     for quantity in quantities:
+        plt.close()
         mpc_data = data.loc[data["Noise Scaling"] == noise]
         mpc_plotter = Plotter(mpc_data)
         mpc_plotter.plot_bars("Robot Number", quantity, 'Method', quantity+" vs Number of robots " + '(Noise Scaling Parameter: ' + str(noise) + ')')
+
+        if quantity == 'Collision Number':
+            pre = "collision_"
+        elif quantity == 'Solver Failure':
+            pre = "failure_"
+        elif quantity == 'Avg Computational Time':
+            pre = "comp_"
+        elif quantity == 'Average Speed':
+            pre = "speed_"
+        elif quantity == 'Steering Usage':
+            pre = "steer_"
+        elif quantity == 'Acceleration Usage':
+            pre = "acc_"
+        elif quantity == 'Path Length':
+            pre = "path_"
+        
+        if noise == 0.0:
+            noise_str = "Noise0"
+        elif noise == 0.1:
+            noise_str = "Noise1"
+        elif noise == 0.2:
+            noise_str = "Noise2"
+        elif noise == 0.4:
+            noise_str = "Noise3"
+        plt.savefig(savepath + pre + "vs_robot_" + noise_str + "_hue_method"+ ".pdf")

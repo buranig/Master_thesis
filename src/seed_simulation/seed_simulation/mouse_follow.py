@@ -28,7 +28,7 @@ dt = json_object["Controller"]["dt"] # [s] Time tick for motion prediction
 predict_time = json_object["LBP"]["predict_time"] # [s]
 dilation_factor = json_object["LBP"]["dilation_factor"]
 
-robot_num = json_object["robot_num"]
+# robot_num = json_object["robot_num"]
 width_init = json_object["width"]
 height_init = json_object["height"]
 
@@ -53,7 +53,7 @@ def onclick(event):
 
 coords = [(0,0)]
 
-def main_lbp(seed):
+def main_lbp(seed, robot_num):
     """
     This function runs the main loop for the LBP algorithm.
     It initializes the necessary variables, updates the robot state, and plots the robot trajectory.
@@ -109,7 +109,7 @@ def main_lbp(seed):
     # ax = fig.add_subplot(111)
     
     lbp = LBP.LBP_algorithm(predicted_trajectory, paths, targets, dilated_traj,
-                        predicted_trajectory, ax, u_hist)
+                        predicted_trajectory, ax, u_hist, robot_num=robot_num)
     
     for z in range(iterations):
         plt.cla()
@@ -143,7 +143,7 @@ def main_lbp(seed):
         plt.pause(0.0001)
         plt.show()
 
-def main_dwa(seed):
+def main_dwa(seed, robot_num):
     """
     Main function that controls the execution of the program.
 
@@ -234,7 +234,7 @@ def main_dwa(seed):
         plt.pause(0.0001)
         plt.show()
 
-def main_mpc(seed):
+def main_mpc(seed, robot_num):
     """
     Main function for controlling multiple robots using Model Predictive Control (MPC).
 
@@ -275,7 +275,7 @@ def main_mpc(seed):
     x = np.array([x0, y, yaw, v])
 
     # MPC initialization
-    mpc = MPC.ModelPredictiveControl([], [], x=x)
+    mpc = MPC.ModelPredictiveControl([], [], x=x, robot_num=robot_num)
 
     num_inputs = 2
     u = np.zeros([mpc.horizon*num_inputs, robot_num])
@@ -339,7 +339,7 @@ def main_mpc(seed):
         plt.pause(0.0001)
         plt.show()
 
-def main_c3bf(seed):
+def main_c3bf(seed, robot_num):
     """
     Main function for controlling multiple robots using Model Predictive Control (MPC).
 
@@ -390,7 +390,7 @@ def main_c3bf(seed):
     # Step 5: Extract the target coordinates from the paths
     targets = [[path[0].x, path[0].y] for path in paths]
 
-    c3bf = C3BF.C3BF_algorithm(targets, paths)
+    c3bf = C3BF.C3BF_algorithm(targets, paths, robot_num=robot_num)
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
         plt.cla()
@@ -421,7 +421,7 @@ def main_c3bf(seed):
         plt.pause(0.0001)
         plt.show()
 
-def main_cbf(seed):
+def main_cbf(seed, robot_num):
     """
     Main function for controlling multiple robots using Model Predictive Control (MPC).
 
@@ -472,7 +472,7 @@ def main_cbf(seed):
     # Step 5: Extract the target coordinates from the paths
     targets = [[path[0].x, path[0].y] for path in paths]
 
-    cbf = CBF.CBF_algorithm(targets, paths)
+    cbf = CBF.CBF_algorithm(targets, paths, robot_num=robot_num)
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
         plt.cla()
@@ -480,8 +480,8 @@ def main_cbf(seed):
             'key_release_event',
             lambda event: [exit(0) if event.key == 'escape' else None])
         
-        x, u, break_flag = cbf.run_cbf(x, break_flag)
-        trajectory = np.dstack([trajectory, np.concatenate((x,u))])
+        x, break_flag = cbf.run_cbf(x, break_flag)
+        trajectory = np.dstack([trajectory, np.concatenate((x,cbf.dxu))])
         cbf.targets[0] = (coords[-1][0], coords[-1][1])
 
         plt.plot(coords[-1][0], coords[-1][1], 'k', marker='o', markersize=20)
@@ -505,12 +505,15 @@ def main_cbf(seed):
 
 if __name__ == '__main__':
      # Load the seed from a file
-    filename = '/home/giacomo/thesis_ws/src/seed_1.json'
+    filename = '/home/giacomo/thesis_ws/src/seeds/seed_1.json'
     # filename = '/home/giacomo/thesis_ws/src/circular_seed_0.json'
     with open(filename, 'r') as file:
         seed = json.load(file)
-    # main_lbp(seed)
-    # main_dwa(seed)
-    # main_mpc(seed)
-    main_c3bf(seed)
-    # main_cbf(seed)  
+
+    robot_num = seed['robot_num']
+
+    # main_lbp(seed, robot_num)
+    # main_dwa(seed, robot_num)
+    # main_mpc(seed, robot_num)
+    # main_c3bf(seed, robot_num)
+    main_cbf(seed, robot_num)  

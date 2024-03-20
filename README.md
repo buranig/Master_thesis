@@ -1,3 +1,8 @@
+
+# ⚠️
+
+⚠️ To run anything, you must run ```bash setup.sh && colcon build && source install/setup.bash``` from the home directory. ⚠️
+
 # Collision Avoidance for Bumper Cars
 
 ## Overview

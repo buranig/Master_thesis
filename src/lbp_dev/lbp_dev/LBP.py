@@ -45,47 +45,24 @@ safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
 min_dist = json_object["min_dist"]
+to_goal_stop_distance = json_object["to_goal_stop_distance"]
 update_dist = 2
 N=3
 
-show_animation = True
+show_animation = json_object["show_animation"]
+boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_init/2])
 check_collision_bool = False
-add_noise = False
+add_noise = json_object["add_noise"]
+noise_scale_param = json_object["noise_scale_param"]
 np.random.seed(1)
 
-color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k'}
+color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
 
 with open('/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP.json', 'r') as file:
     data = json.load(file)
 
-with open('/home/giacomo/thesis_ws/src/seeds/seed_1.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_11.json', 'r') as file:
     seed = json.load(file)
-
-def motion(x, u, dt):
-    """
-    Motion model for a vehicle.
-
-    Args:
-        x (list): Initial state [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)].
-        u (list): Control inputs [throttle, delta].
-        dt (float): Time step (s).
-
-    Returns:
-        list: Updated state [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)].
-    """
-    delta = u[1]
-    delta = np.clip(delta, -max_steer, max_steer)
-    throttle = u[0]
-    throttle = np.clip(throttle, -max_acc, max_acc)
-
-    x[0] = x[0] + x[3] * math.cos(x[2]) * dt
-    x[1] = x[1] + x[3] * math.sin(x[2]) * dt
-    x[2] = x[2] + x[3] / L * math.tan(delta) * dt
-    x[3] = x[3] + throttle * dt
-    x[2] = normalize_angle(x[2])
-    x[3] = np.clip(x[3], min_speed, max_speed)
-
-    return x
 
 def normalize_angle(angle):
     """
@@ -146,7 +123,7 @@ def predict_trajectory(x_init, a, delta):
     trajectory = np.array(x)
     time = 0
     while time < predict_time:
-        x = motion(x, [a, delta], dt)
+        x = utils.motion(x, [a, delta], dt)
         trajectory = np.vstack((trajectory, x))
         time += dt
     return trajectory
@@ -240,7 +217,7 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
     
     #TODO: this section has a small bug due to popping elements from the buffer, it gets to a point where there 
     # are no more elements in the buffer to use
-    if len(u_buf) > 2:
+    if len(u_buf) > 4:
         u_buf.pop(0)
     
         trajectory_buf = trajectory_buf[1:]
@@ -256,6 +233,17 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
             best_u = [0, u_buf[1]]
             best_trajectory = trajectory_buf
             u_history = u_buf
+
+    elif min_cost == np.inf:
+        # emergency stop
+        print("Emergency stop")
+        if x[3]>0:
+            best_u = [min_acc, 0]
+        else:
+            best_u = [max_acc, 0]
+        best_trajectory = np.array([x[0:3], x[0:3]])
+        u_history = [min_acc, 0]
+
 
     return best_u, best_trajectory, u_history
 
@@ -293,7 +281,7 @@ def calc_obstacle_cost(trajectory, ob):
     if ob:
         for obstacle in ob:
             if dilated.intersects(obstacle):
-                return 100000 # collision        
+                return np.inf # collision        
             elif distance(dilated, obstacle) < min_distance:
                 min_distance = distance(dilated, obstacle)
                 
@@ -443,21 +431,24 @@ def update_robot_state(x, u, dt, targets, dilated_traj, u_hist, predicted_trajec
     x1 = x[:, i]
     ob = [dilated_traj[idx] for idx in range(len(dilated_traj)) if idx != i]
     if add_noise:
-        noise = np.concatenate([np.random.normal(0, 0.21, 2).reshape(1, 2), np.random.normal(0, np.radians(5), 1).reshape(1,1), np.zeros((1,1))], axis=1)
+        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(1, 2), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=1)
         noisy_pos = x1 + noise[0]
         u1, predicted_trajectory1, u_history = lbp_control(noisy_pos, targets[i], ob, u_hist[i], predicted_trajectory[i])
-        plt.plot(noisy_pos[0], noisy_pos[1], "x"+color_dict[i], markersize=10)
+        plt.plot(noisy_pos[0], noisy_pos[1], "x", color=color_dict[i], markersize=10)
     else:
         u1, predicted_trajectory1, u_history = lbp_control(x1, targets[i], ob, u_hist[i], predicted_trajectory[i])
     dilated_traj[i] = LineString(zip(predicted_trajectory1[:, 0], predicted_trajectory1[:, 1])).buffer(dilation_factor, cap_style=3)
    
-   # Collision check
+    # Collision check
     if check_collision_bool:
         if any([utils.dist([x1[0], x1[1]], [x[0, idx], x[1, idx]]) < WB for idx in range(robot_num) if idx != i]): raise Exception('Collision')
-    
-    x1 = motion(x1, u1, dt)
+
+    x1 = utils.motion(x1, u1, dt)
     x[:, i] = x1
     u[:, i] = u1
+
+    # u, x = self.check_collision(x, u, i)
+
     predicted_trajectory[i] = predicted_trajectory1
     u_hist[i] = u_history
 
@@ -474,10 +465,10 @@ def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax,
         targets (list): List of target points.
 
     """
-    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-"+color_dict[i])
+    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-", color=color_dict[i])
     plot_polygon(dilated_traj[i], ax=ax, add_points=False, alpha=0.5, color=color_dict[i])
     # plt.plot(x[0, i], x[1, i], "xr")
-    plt.plot(targets[i][0], targets[i][1], "x"+color_dict[i])
+    plt.plot(targets[i][0], targets[i][1], "x", color=color_dict[i])
     plot_robot(x[0, i], x[1, i], x[2, i], i)
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
     plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
@@ -501,7 +492,7 @@ def check_goal_reached(x, targets, i, distance=0.5):
     return False
 
 class LBP_algorithm():
-    def __init__(self, trajectories, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist):
+    def __init__(self, trajectories, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist, robot_num=robot_num):
         self.trajectories = trajectories
         self.paths = paths
         self.targets = targets
@@ -509,11 +500,12 @@ class LBP_algorithm():
         self.predicted_trajectory = predicted_trajectory
         self.ax = ax
         self.u_hist = u_hist
+        self.robot_num = robot_num
         self.reached_goal = [False]*robot_num
         self.computational_time = []
 
     def run_lbp(self, x, u, break_flag):
-        for i in range(robot_num):
+        for i in range(self.robot_num):
             
             # self.paths, self.targets = update_targets(self.paths, self.targets, x, i)
             if utils.dist(point1=(x[0,i], x[1,i]), point2=self.targets[i]) < update_dist:
@@ -537,11 +529,11 @@ class LBP_algorithm():
         return x, u, break_flag
     
     def go_to_goal(self, x, u, break_flag):
-        for i in range(robot_num):
+        for i in range(self.robot_num):
             # Step 9: Check if the distance between the current position and the target is less than 5
-            if not self.reached_goal[i]:                
+            if not self.reached_goal[i]:        
                 # If goal is reached, stop the robot
-                if check_goal_reached(x, self.targets, i, distance=1):
+                if check_goal_reached(x, self.targets, i, distance=to_goal_stop_distance):
                     u[:, i] = np.zeros(2)
                     x[3, i] = 0
                     self.reached_goal[i] = True
@@ -550,6 +542,10 @@ class LBP_algorithm():
                     x, u, self.predicted_trajectory, self.u_hist = update_robot_state(x, u, dt, self.targets, self.dilated_traj, self.u_hist, self.predicted_trajectory, i)
                     self.computational_time.append(time.time()-t_prev)
 
+                u, x = self.check_collision(x, u, i) 
+            
+            # else:
+            #     print(u[:, i])
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if all(self.reached_goal):
                 break_flag = True
@@ -557,6 +553,41 @@ class LBP_algorithm():
             if show_animation:
                 plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
         return x, u, break_flag
+    
+    def check_collision(self, x, u, i):
+        """
+        Checks for collision between the robot at index i and other robots.
+
+        Args:
+            x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
+            i (int): Index of the robot to check collision for.
+
+        Raises:
+            Exception: If collision is detected.
+
+        """
+        if x[0,i]>=boundary_points[1]-WB/2 or x[0,i]<=boundary_points[0]+WB/2 or x[1,i]>=boundary_points[3]-WB or x[1,i]<=boundary_points[2]+WB/2:
+            if check_collision_bool:
+                raise Exception('Collision')
+            else:
+                print("Collision detected")
+                self.reached_goal[i] = True
+                u[:, i] = np.zeros(2)
+                x[3, i] = 0
+
+        for idx in range(self.robot_num):
+            if idx == i:
+                continue
+            if utils.dist([x[0,i], x[1,i]], [x[0, idx], x[1, idx]]) <= WB/2:
+                if check_collision_bool:
+                    raise Exception('Collision')
+                else:
+                    print("Collision detected")
+                    self.reached_goal[i] = True
+                    u[:, i] = np.zeros(2)
+                    x[3, i] = 0
+        
+        return u, x
 
 def main():
     """
@@ -797,6 +828,7 @@ def main_seed():
     yaw = initial_state['yaw']
     v = initial_state['v']
 
+    assert robot_num == len(seed['initial_position']['x']), "The number of robots in the seed file does not match the number of robots in the seed file"
     # Step 3: Create an array x with the initial values
     x = np.array([x0, y, yaw, v])
     u = np.zeros((2, robot_num))
@@ -831,7 +863,8 @@ def main_seed():
         plt.cla()
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
         
-        x, u, break_flag = lbp.run_lbp(x, u, break_flag)
+        # x, u, break_flag = lbp.run_lbp(x, u, break_flag)
+        x, u, break_flag = lbp.go_to_goal(x, u, break_flag)
 
         trajectory = np.dstack([trajectory, x])
 
@@ -851,7 +884,7 @@ def main_seed():
         plt.show()
 
 if __name__ == '__main__':
-    main1()
-    # main_seed()
+    # main1()
+    main_seed()
 
     

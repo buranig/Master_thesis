@@ -39,7 +39,7 @@ c_r1 = json_object["Car_model"]["c_r1"]
 WB = json_object["Controller"]["WB"] 
 L_d = json_object["Controller"]["L_d"] 
 
-debug = True
+debug = False
 
 def predict_trajectory(initial_state: State, target, linear=True):
     """

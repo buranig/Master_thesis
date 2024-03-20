@@ -21,8 +21,8 @@
     "C3BF":
         {
             "max_steer": 0.785398,
-            "max_acc": 100,
-            "min_acc": -100,
+            "max_acc": 5,
+            "min_acc": -5,
             "safety_radius": 1.5,
             "barrier_gain": 1, 
             "arena_gain": 50,
@@ -31,7 +31,7 @@
     "DWA":
         {
             "max_steer": 0.785398,
-            "max_speed": 2,
+            "max_speed": 2.0,
             "min_speed": -1.0,
             "max_acc": 2,
             "min_acc": -2,
@@ -57,7 +57,7 @@
             "v_resolution": 0.5,
             "delta_resolution": 15,
             "predict_time": 1.5,
-            "to_goal_cost_gain": 10,
+            "to_goal_cost_gain": 20,
             "speed_cost_gain": 1,
             "obstacle_cost_gain": 30,
             "heading_cost_gain": 1,
@@ -99,12 +99,16 @@
             "controller_type": "MPC",
             "cbf_type": "C3BF"
         },
-    "robot_num": 5,
+    "robot_num": 6,
     "safety": 10, 
     "min_dist": 3,
     "width": 30,
     "height": 30,
     "timer_freq": 0.01,
-    "plot_traj": false
+    "plot_traj": false,
+    "to_goal_stop_distance": 2.5,
+    "show_animation": true,
+    "add_noise": false,
+    "noise_scale_param": 0.4
     
 }

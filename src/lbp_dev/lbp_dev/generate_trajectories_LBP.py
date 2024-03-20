@@ -13,6 +13,7 @@ sys.path.append(str(path_planning_dir))
 from matplotlib import pyplot as plt
 import numpy as np
 import math
+from planner import utils as utils
 
 import lattice_motion_model as motion_model
 
@@ -113,30 +114,12 @@ def calc_trajectory(x_init, u, dt):
     traj = np.array(x)
     time = 0.0
     while time <= predict_time:
-        x = motion(x, u, dt)
+        x = utils.motion(x, u, dt)
         traj = np.vstack((traj, x))
         time += dt
         if x[3]>max_speed or x[3]<min_speed:
             print(x[3])
     return traj
-
-def motion(x, u, dt):
-    """
-    motion model
-    initial state [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)]
-    """
-    delta = u[1]
-    delta = np.clip(delta, -max_steer, max_steer)
-    throttle = u[0]
-
-    x[0] = x[0] + x[3] * math.cos(x[2]) * dt
-    x[1] = x[1] + x[3] * math.sin(x[2]) * dt
-    x[2] = x[2] + x[3] / L * math.tan(delta) * dt
-    x[2] = normalize_angle(x[2])
-    x[3] = x[3] + throttle * dt
-    x[3] = np.clip(x[3], min_speed, max_speed)
-
-    return x
 
 def normalize_angle(angle):
     """

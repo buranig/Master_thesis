@@ -54,15 +54,18 @@ safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
 min_dist = json_object["min_dist"]
+to_goal_stop_distance = json_object["to_goal_stop_distance"]
 update_dist = 2
 # N=3
 
 robot_num = json_object["robot_num"]
 timer_freq = json_object["timer_freq"]
 
-show_animation = True
+show_animation = json_object["show_animation"]
+boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_init/2])
 check_collision_bool = False
-add_noise = False
+add_noise = json_object["add_noise"]
+noise_scale_param = json_object["noise_scale_param"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k'}
@@ -72,32 +75,6 @@ with open(dir_path + '/../../trajectories.json', 'r') as file:
 
 with open(dir_path + '/../../seeds/seed_1.json', 'r') as file:
     seed = json.load(file)
-
-def motion(x, u, dt):
-    """
-    Motion model.
-
-    Args:
-        x (list): Current state [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)].
-        u (list): Control inputs (throttle, delta).
-        dt (float): Time tick for motion prediction.
-
-    Returns:
-        list: Updated state [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)].
-    """
-    delta = u[1]
-    delta = np.clip(delta, -max_steer, max_steer)
-    throttle = u[0]
-    throttle = np.clip(throttle, min_acc, max_acc)
-
-    x[0] = x[0] + x[3] * math.cos(x[2]) * dt
-    x[1] = x[1] + x[3] * math.sin(x[2]) * dt
-    x[2] = x[2] + x[3] / L * math.tan(delta) * dt
-    x[2] = normalize_angle(x[2])
-    x[3] = x[3] + throttle * dt
-    x[3] = np.clip(x[3], min_speed, max_speed)
-
-    return x
 
 def normalize_angle(angle):
     """
@@ -176,7 +153,7 @@ def predict_trajectory(x_init, a, delta):
     trajectory = np.array(x)
     time = 0
     while time < predict_time:
-        x = motion(x, [a, delta], dt)
+        x = utils.motion(x, [a, delta], dt)
         trajectory = np.vstack((trajectory, x))
         time += dt
     return trajectory
@@ -192,24 +169,28 @@ def calc_obstacle_cost(trajectory, ob):
     Returns:
         float: Obstacle cost.
     """
+    minxp = min(abs(width_init/2-trajectory[:, 0]))
+    minxn = min(abs(-width_init/2-trajectory[:, 0]))
+    minyp = min(abs(height_init/2-trajectory[:, 1]))
+    minyn = min(abs(-height_init/2-trajectory[:, 1]))
+    min_distance = min(minxp, minxn, minyp, minyn)
+
     line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
     dilated = line.buffer(dilation_factor, cap_style=3)
-
-    min_distance = np.inf
 
     x = trajectory[:, 0]
     y = trajectory[:, 1]
 
     # check if the trajectory is out of bounds
-    if any(element < -width_init/2+WB or element > width_init/2-WB for element in x):
+    if any(element < -width_init/2+WB/2 or element > width_init/2-WB/2 for element in x):
         return np.inf
-    if any(element < -height_init/2+WB or element > height_init/2-WB for element in y):
+    if any(element < -height_init/2+WB/2 or element > height_init/2-WB/2 for element in y):
         return np.inf
 
     if ob:
         for obstacle in ob:
             if dilated.intersects(obstacle):
-                return 100000 # collision
+                return np.inf # collision        
             elif distance(dilated, obstacle) < min_distance:
                 min_distance = distance(dilated, obstacle)
 
@@ -254,10 +235,11 @@ def calc_to_goal_heading_cost(trajectory, goal):
     dy = goal[1] - trajectory[-1, 1]
 
     # either using the angle difference or the distance --> if we want to use the angle difference, we need to normalize the angle before taking the difference
-    error_angle = math.atan2(dy, dx)
-    cost = abs(error_angle - normalize_angle(trajectory[-1, 2]))
+    error_angle = normalize_angle(math.atan2(dy, dx))
+    cost_angle = error_angle - normalize_angle(trajectory[-1, 2])
+    cost_angle = abs(cost_angle)
 
-    return cost
+    return cost_angle
 
 def plot_arrow(x, y, yaw, length=0.5, width=0.1):  # pragma: no cover
     """
@@ -358,10 +340,10 @@ def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax,
         targets (list): List of target points.
 
     """
-    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-"+color_dict[i])
+    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-", color=color_dict[i])
     plot_polygon(dilated_traj[i], ax=ax, add_points=False, alpha=0.5, color=color_dict[i])
     # plt.plot(x[0, i], x[1, i], "xr")
-    plt.plot(targets[i][0], targets[i][1], "x"+color_dict[i], markersize=15)
+    plt.plot(targets[i][0], targets[i][1], "x", color=color_dict[i], markersize=15)
     plot_robot(x[0, i], x[1, i], x[2, i], i)
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
     plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
@@ -482,7 +464,7 @@ class DWA_algorithm():
             # Step 9: Check if the distance between the current position and the target is less than 5
             if not self.reached_goal[i]:
                 # If goal is reached, stop the robot
-                if check_goal_reached(x, self.targets, i, distance=3):
+                if check_goal_reached(x, self.targets, i, distance=to_goal_stop_distance):
                     u[:, i] = np.zeros(2)
                     x[3, i] = 0
                     self.reached_goal[i] = True
@@ -524,21 +506,21 @@ class DWA_algorithm():
         x1 = x[:, i]
         ob = [self.dilated_traj[idx] for idx in range(len(self.dilated_traj)) if idx != i]
         if add_noise:
-            noise = np.concatenate([np.random.normal(0, 0.21, 2).reshape(1, 2), np.random.normal(0, np.radians(5), 1).reshape(1,1), np.zeros((1,1))], axis=1)
+            noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(1, 2), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=1)
             noisy_pos = x1 + noise[0]
             u1, predicted_trajectory1, u_history = self.dwa_control(noisy_pos, ob, i)
-            plt.plot(noisy_pos[0], noisy_pos[1], "x"+color_dict[i], markersize=10)
+            plt.plot(noisy_pos[0], noisy_pos[1], "x", color=color_dict[i], markersize=10)
         else:
             u1, predicted_trajectory1, u_history = self.dwa_control(x1, ob, i)
         self.dilated_traj[i] = LineString(zip(predicted_trajectory1[:, 0], predicted_trajectory1[:, 1])).buffer(dilation_factor, cap_style=3)
 
         # Collision check
-        if check_collision_bool:
-            if any([utils.dist([x1[0], x1[1]], [x[0, idx], x[1, idx]]) < WB for idx in range(self.robot_num) if idx != i]): raise Exception('Collision')
-
-        x1 = motion(x1, u1, dt)
+        x1 = utils.motion(x1, u1, dt)
         x[:, i] = x1
         u[:, i] = u1
+        
+        u, x = self.check_collision(x, u, i)
+        
         self.predicted_trajectory[i] = predicted_trajectory1
         self.u_hist[i] = u_history
 
@@ -586,7 +568,7 @@ class DWA_algorithm():
             trajectory_buf = self.predicted_trajectory[i]
 
             # evaluate all trajectory with sampled input in dynamic window
-            nearest = find_nearest(np.arange(min_speed, max_speed, v_resolution), x[3])
+            nearest = find_nearest(np.arange(min_speed, max_speed+v_resolution, v_resolution), x[3])
 
             for a in np.arange(dw[0], dw[1]+v_resolution, v_resolution):
                 for delta in np.arange(dw[2], dw[3]+delta_resolution, delta_resolution):
@@ -631,9 +613,9 @@ class DWA_algorithm():
                         #     u_history = [delta]*len(trajectory)
 
             # print(time.time()-old_time)
-            # if len(u_buf) > 2:
-            #     u_buf.pop(0)
-            #     trajectory_buf = trajectory_buf[1:]
+            if len(u_buf) > 4:              
+                u_buf.pop(0)
+                trajectory_buf = trajectory_buf[1:]
 
             #     to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
             #     # speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
@@ -641,14 +623,58 @@ class DWA_algorithm():
             #     heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory_buf, goal)
             #     final_cost = to_goal_cost + ob_cost + heading_cost #+ speed_cost
 
-            #     if min_cost >= final_cost:
-            #         min_cost = final_cost
-            #         best_u = u_buf[0]
-            #         best_trajectory = trajectory_buf
-            #         u_history = u_buf
-            # else:
-            #     print("AAAAAAAAAAAA")
+                if min_cost >= final_cost:
+                    min_cost = final_cost
+                    best_u = u_buf[0]
+                    best_trajectory = trajectory_buf
+                    u_history = u_buf
+
+            elif min_cost == np.inf:
+                # emergency stop
+                print("Emergency stop")
+                if x[3]>0:
+                    best_u = [min_acc, 0]
+                else:
+                    best_u = [max_acc, 0]
+                best_trajectory = np.array([x[0:3], x[0:3]])
+                u_history = [min_acc, 0]
+
             return best_u, best_trajectory, u_history
+    
+    def check_collision(self, x, u, i):
+        """
+        Checks for collision between the robot at index i and other robots.
+
+        Args:
+            x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
+            i (int): Index of the robot to check collision for.
+
+        Raises:
+            Exception: If collision is detected.
+
+        """
+        if x[0,i]>= boundary_points[1]-WB/2 or x[0,i]<= boundary_points[0]+WB/2 or x[1,i]>=boundary_points[3]-WB/2 or x[1,i]<=boundary_points[2]+WB/2:
+            if check_collision_bool:
+                raise Exception('Collision')
+            else:
+                print("Collision detected")
+                self.reached_goal[i] = True
+                u[:, i] = np.zeros(2)
+                x[3, i] = 0
+
+
+        for idx in range(self.robot_num):
+            if idx == i:
+                continue
+            if utils.dist([x[0,i], x[1,i]], [x[0, idx], x[1, idx]]) <= WB/2:
+                if check_collision_bool:
+                    raise Exception('Collision')
+                else:
+                    print("Collision detected")
+                    self.reached_goal[i] = True
+                    u[:, i] = np.zeros(2)
+                    x[3, i] = 0
+        return u, x
 
 def main():
     """

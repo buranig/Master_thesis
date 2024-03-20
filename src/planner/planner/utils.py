@@ -14,7 +14,7 @@ import json
 import time
 import matplotlib.pyplot as plt
 import math
-
+color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive'}
 
 # TODO: import all this parameters from a config file so that we can easily change them in one place
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
@@ -26,6 +26,8 @@ with open(path, 'r') as openfile:
 max_steer = json_object["CBF_simple"]["max_steer"]   # [rad] max steering angle
 max_speed = json_object["Car_model"]["max_speed"] # [m/s]
 min_speed = json_object["Car_model"]["min_speed"]  # [m/s]
+car_max_acc = json_object["Controller"]["max_acc"]
+car_min_acc = json_object["Controller"]["min_acc"]
 dt = json_object["Controller"]["dt"] 
 safety_init = json_object["safety"]
 width_init = json_object["width"]
@@ -42,6 +44,35 @@ m = json_object["Car_model"]["m"]  # kg
 c_a = json_object["Car_model"]["c_a"]
 c_r1 = json_object["Car_model"]["c_r1"]
 WB = json_object["Controller"]["WB"]
+
+def motion(x, u, dt):
+    """
+    Motion model for a robot.
+
+    Args:
+        x (list): Initial state of the robot [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)].
+        u (list): Control inputs [throttle, delta].
+        dt (float): Time step.
+
+    Returns:
+        list: Updated state of the robot.
+
+    """
+    delta = u[1]
+    delta = np.clip(delta, -max_steer, max_steer)
+    throttle = u[0]
+    throttle = np.clip(throttle, car_min_acc, car_max_acc)
+
+    x[0] = x[0] + x[3] * math.cos(x[2]) * dt
+    x[1] = x[1] + x[3] * math.sin(x[2]) * dt
+    x[2] = x[2] + x[3] / Lr * np.sin(np.arctan2(Lr/L * np.tan(delta),1)) * dt
+    # x[2] = x[2] + x[3] / L * math.tan(delta) * dt
+
+    x[2] = normalize_angle(x[2])
+    x[3] = x[3] + throttle * dt
+    x[3] = np.clip(x[3], min_speed, max_speed)
+
+    return x
 
 def linear_model_callback(initial_state: State, cmd: ControlInputs):
     """
@@ -218,9 +249,9 @@ def state_to_array(state: State):
 
     return array
 
-def plot_arrow(x, y, yaw, length=0.5, width=0.1):  # pragma: no cover
+def plot_arrow(x, y, yaw, length=0.5, width=0.1, color=None):  # pragma: no cover
         plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
-                head_length=width, head_width=width)
+                head_length=width, head_width=width, color=color)
         
 def plot_map(width=100, height=100):
         corner_x = [-width/2.0, width/2.0, width/2.0, -width/2.0, -width/2.0]
@@ -460,11 +491,21 @@ def create_seed(len_path=5):
     Generates a random path by creating a list of waypoints within the specified boundaries.
     """
     path = []
+    safety = 2
     while len(path)<len_path:
-        path.append([float(random.randint(-width_init/2, width_init/2)), float(random.randint(-height_init/2, height_init/2))])
+        path.append([float(random.randint(-width_init/2+safety, width_init/2-safety)), float(random.randint(-height_init/2+safety, height_init/2-safety))])
     return path
     
-def plot_robot(x, y, yaw):  # pragma: no cover
+def plot_robot(x, y, yaw, i): 
+    """
+    Plot the robot.
+
+    Args:
+        x (float): X-coordinate of the robot.
+        y (float): Y-coordinate of the robot.
+        yaw (float): Yaw angle of the robot.
+        i (int): Index of the robot.
+    """
     outline = np.array([[-L / 2, L / 2,
                             (L / 2), -L / 2,
                             -L / 2],
@@ -477,4 +518,4 @@ def plot_robot(x, y, yaw):  # pragma: no cover
     outline[0, :] += x
     outline[1, :] += y
     plt.plot(np.array(outline[0, :]).flatten(),
-                np.array(outline[1, :]).flatten(), "-k")
+                np.array(outline[1, :]).flatten(), color_dict[i], label="Robot " + str(i))

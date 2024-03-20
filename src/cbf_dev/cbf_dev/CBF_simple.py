@@ -26,6 +26,8 @@ max_speed = json_object["Car_model"]["max_speed"] # [m/s]
 min_speed = json_object["Car_model"]["min_speed"] # [m/s]
 max_acc = json_object["CBF_simple"]["max_acc"] 
 min_acc = json_object["CBF_simple"]["min_acc"] 
+car_max_acc = json_object["Controller"]["max_acc"]
+car_min_acc = json_object["Controller"]["min_acc"]
 dt = json_object["Controller"]["dt"]
 safety_radius = json_object["CBF_simple"]["safety_radius"]
 barrier_gain = json_object["CBF_simple"]["barrier_gain"]
@@ -40,41 +42,17 @@ safety_init = json_object["safety"]
 min_dist = json_object["min_dist"]
 width_init = json_object["width"]
 height_init = json_object["height"]
+to_goal_stop_distance = json_object["to_goal_stop_distance"]
 boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_init/2])
 check_collision_bool = False
-add_noise = False
+add_noise = json_object["add_noise"]
+noise_scale_param = json_object["noise_scale_param"]
+
 np.random.seed(1)
 
-color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_1.json', 'r') as file:
+color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
+with open('/home/giacomo/thesis_ws/src/seeds/seed_6.json', 'r') as file:
     data = json.load(file)
-
-def motion(x, u, dt):
-    """
-    Motion model for a robot.
-
-    Args:
-        x (list): Initial state of the robot [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)].
-        u (list): Control inputs [throttle, delta].
-        dt (float): Time step.
-
-    Returns:
-        list: Updated state of the robot.
-
-    """
-    delta = u[1]
-    delta = np.clip(delta, -max_steer, max_steer)
-    throttle = u[0]
-    throttle = np.clip(throttle, -max_acc, max_acc)
-
-    x[0] = x[0] + x[3] * math.cos(x[2]) * dt
-    x[1] = x[1] + x[3] * math.sin(x[2]) * dt
-    x[2] = x[2] + x[3] / L * math.tan(delta) * dt
-    x[2] = utils.normalize_angle(x[2])
-    x[3] = x[3] + throttle * dt
-    x[3] = np.clip(x[3], min_speed, max_speed)
-
-    return x
 
 def delta_to_beta(delta):
     """
@@ -239,10 +217,10 @@ class CBF_algorithm():
         for i in range(self.robot_num):
             t_prev = time.time()
             if add_noise:
-                noise = np.concatenate([np.random.normal(0, 0.3, 2).reshape(2, 1), np.random.normal(0, np.radians(5), 1).reshape(1,1), np.zeros((1,1))], axis=0)
+                noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
                 noisy_pos = x + noise
                 self.control_robot(i, noisy_pos)
-                plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x"+color_dict[i], markersize=10)
+                plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
             else:
                 self.control_robot(i, x)
 
@@ -257,26 +235,39 @@ class CBF_algorithm():
                     return x, break_flag
                 self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
 
-            x[:, i] = motion(x[:, i], self.dxu[:, i], dt)
+            x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
             plot_robot(x[0, i], x[1, i], x[2, i], i)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.plot(self.targets[i][0], self.targets[i][1], "x"+color_dict[i])
+            plt.plot(self.targets[i][0], self.targets[i][1], "x", color=color_dict[i])
         
         return x, break_flag
     
     def go_to_goal(self, x, break_flag):
         for i in range(self.robot_num):
-            t_prev = time.time()
-            self.control_robot(i, x)
-            self.computational_time.append((time.time() - t_prev))
+           
             # Step 9: Check if the distance between the current position and the target is less than 5
             if not self.reached_goal[i]:                
                 # If goal is reached, stop the robot
-                if check_goal_reached(x, self.targets, i, distance=2):
-                    self.reached_goal[i] = True
+                if add_noise: 
+                    noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
+                    noisy_pos = x + noise
+                    t_prev = time.time()
+                    self.control_robot(i, noisy_pos)
+                    self.computational_time.append((time.time() - t_prev))
+                    plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
                 else:
-                    x[:, i] = motion(x[:, i], self.dxu[:, i], dt)
+                    t_prev = time.time()
+                    self.control_robot(i, x)
+                    self.computational_time.append((time.time() - t_prev)) 
+                
+                # If goal is reached, stop the robot
+                if check_goal_reached(x, self.targets, i, distance=to_goal_stop_distance):
+                    self.reached_goal[i] = True
+                    self.dxu[:, i] = 0
+                    x[3,i] = 0
+                else:
+                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
                     
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if all(self.reached_goal):
@@ -309,7 +300,7 @@ class CBF_algorithm():
 
         cmd = ControlInputs()
 
-        self.check_collision(x, i)
+        x = self.check_collision(x, i)
         x1 = utils.array_to_state(x[:, i])
         cmd.throttle, cmd.delta = utils.pure_pursuit_steer_control(self.targets[i], x1)
         self.dxu[0, i], self.dxu[1, i] = cmd.throttle, cmd.delta
@@ -372,6 +363,9 @@ class CBF_algorithm():
         # Add the input constraint
         G = np.vstack([G, [[0, 1], [0, -1]]])
         H = np.vstack([H, delta_to_beta(max_steer), -delta_to_beta(-max_steer)])
+        # TODO: check whether to keep the following constraints
+        G = np.vstack([G, [[0, x[3,i]/Lr], [0, x[3,i]/Lr]]])
+        H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
         G = np.vstack([G, [[1, 0], [-1, 0]]])
         H = np.vstack([H, max_acc, -min_acc])
 
@@ -435,7 +429,6 @@ class CBF_algorithm():
             self.dxu[0,i] = np.clip(self.dxu[0,i], -min_acc, max_acc)
         self.dxu[1,i] = beta_to_delta(self.dxu[1,i])
 
-
     def check_collision(self, x, i):
         """
         Checks for collision between the robot at index i and other robots.
@@ -448,12 +441,27 @@ class CBF_algorithm():
             Exception: If collision is detected.
 
         """
+        if x[0,i]>=boundary_points[1]-WB/2 or x[0,i]<=boundary_points[0]+WB/2 or x[1,i]>=boundary_points[3]-WB/2 or x[1,i]<=boundary_points[2]+WB/2:
+            if check_collision_bool:
+                raise Exception('Collision')
+            else:
+                print("Collision detected")
+                self.reached_goal[i] = True
+                self.dxu[:, i] = 0
+                x[3,i] = 0.0
+
         for idx in range(self.robot_num):
             if idx == i:
                 continue
-            if check_collision_bool:
-                if utils.dist([x[0,i], x[1,i]], [x[0, idx], x[1, idx]]) < WB:
+            if utils.dist([x[0,i], x[1,i]], [x[0, idx], x[1, idx]]) <= WB/2:
+                if check_collision_bool:
                     raise Exception('Collision')
+                else:
+                    print("Collision detected")
+                    self.reached_goal[i] = True
+                    self.dxu[:, i] = 0
+                    x[3,i] = 0.0
+        return x
 
 def main(args=None):
     """
@@ -543,7 +551,7 @@ def main1(args=None):
     """
     # Step 1: Set the number of iterations
     iterations = 3000
-    fig = plt.figure(1, dpi=90, figsize=(20,10))
+    fig = plt.figure(1, dpi=90, figsize=(10,10))
     ax = fig.add_subplot(111)
     fontsize = 40
     plt.rcParams['font.family'] = ['serif']
@@ -559,9 +567,9 @@ def main1(args=None):
     v = initial_state['v']
 
     # Step 3: Create an array x with the initial values
-    x = np.array([[5.0, 5.0], [-2.0, 2.0], [0.0, 0.0], [0.0, 0.0]])
+    x = np.array([[-5.0, 5.0], [0.0, 0.0], [0.0, -np.pi], [0.0, 0.0]])
     u = np.array([[0, 0], [0, 0]])
-    targets = [[10, 2], [10, -2]]
+    targets = [[5.0, 0.0], [-5.0, 0.0]]
 
     # Step 4: Create paths for each robot
     traj = data['trajectories']
@@ -584,10 +592,10 @@ def main1(args=None):
         # plt.axis("equal")
         plt.xlabel("x [m]", fontdict={'size': fontsize, 'family': 'serif'})
         plt.ylabel("y [m]", fontdict={'size': fontsize, 'family': 'serif'})
-        plt.title('C3BF Corner Case', fontdict={'size': fontsize, 'family': 'serif'})
+        plt.title('CBF Corner Case', fontdict={'size': fontsize, 'family': 'serif'})
 
-        plt.xlim(0, 20)
-        plt.ylim(-5, 5)
+        # plt.xlim(0, 20)
+        # plt.ylim(-5, 5)
         plt.legend()
         plt.grid(True)
         plt.pause(0.0001)
@@ -720,7 +728,8 @@ def main_seed(args=None):
             'key_release_event',
             lambda event: [exit(0) if event.key == 'escape' else None])
         
-        x, break_flag = cbf.run_cbf(x, break_flag)
+        # x, break_flag = cbf.run_cbf(x, break_flag)
+        x, break_flag = cbf.go_to_goal(x, break_flag)
         
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")

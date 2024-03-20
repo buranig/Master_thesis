@@ -13,6 +13,14 @@ from shapely.geometry import Point, LineString
 import pandas as pd
 from data_process import DataProcessor
 import os
+import matplotlib
+
+matplotlib.use("Qt5Agg")
+mgr = plt.get_current_fig_manager()
+mgr.full_screen_toggle()
+py = mgr.canvas.height()
+px = mgr.canvas.width()+1000
+mgr.window.close()
 
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
 # Opening JSON file
@@ -20,16 +28,29 @@ with open(path, 'r') as openfile:
     # Reading from json file
     json_object = json.load(openfile)
 
-robot_num = json_object["robot_num"]
+# robot_num = json_object["robot_num"]
 width_init = json_object["width"]
 height_init = json_object["height"]
-show_animation = True
+show_animation = json_object["show_animation"]
+add_noise = json_object["add_noise"]
+noise_scale_param = json_object["noise_scale_param"]
 go_to_goal_bool = True
-iterations = 1000
+iterations = 700
 
-color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k'}
+color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
 
-def dwa_sim(seed):
+def mypause(interval):
+    backend = plt.rcParams['backend']
+    if backend in matplotlib.rcsetup.interactive_bk:
+        figManager = matplotlib._pylab_helpers.Gcf.get_active()
+        if figManager is not None:
+            canvas = figManager.canvas
+            if canvas.figure.stale:
+                canvas.draw()
+            canvas.start_event_loop(interval)
+            return
+
+def dwa_sim(seed, robot_num):
 
     dt = json_object["Controller"]["dt"] # [s] Time tick for motion prediction
     predict_time = json_object["DWA"]["predict_time"] # [s]
@@ -85,47 +106,60 @@ def dwa_sim(seed):
     for i in range(robot_num):
         dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
     
-    fig = plt.figure(1, dpi=90)
-    ax = fig.add_subplot(111)
+    if show_animation:
+        plt.ion()
+        fig = plt.figure(1, dpi=90)
+        figManager = plt.get_current_fig_manager()
+        figManager.window.move(px, 0)
+        # figManager.window.showMaximized()
+        # figManager.window.setFocus()
+        ax = fig.add_subplot(111)
+        plt.show(block=False)
+    else:
+        ax = None
     
     u_hist = dict.fromkeys(range(robot_num),[[0,0] for _ in range(int(predict_time/dt))])    
     # Step 7: Create an instance of the DWA_algorithm class
     dwa = DWA.DWA_algorithm(robot_num, paths, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist)
     
     for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
         
+        if show_animation:
+            plt.cla()
+            plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
+            
         if go_to_goal_bool:
             x, u, break_flag = dwa.go_to_goal(x, u, break_flag)
         else:
             x, u, break_flag = dwa.run_dwa(x, u, break_flag)
         trajectory = np.dstack([trajectory, np.concatenate((x,u))])
-            
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
+
+
+        if show_animation:  
+            utils.plot_map(width=width_init, height=height_init)
+            plt.axis("equal")
+            plt.grid(True)
+            # plt.pause(0.0001)
+            mypause(0.0001)
 
         if break_flag:
             break
     
-    # plt.close()
     print("Done")
     if show_animation:
         for i in range(robot_num):
             DWA.plot_robot(x[0, i], x[1, i], x[2, i], i)
             DWA.plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
             DWA.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-"+color_dict[i])
-        plt.pause(0.0001)
+            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
+        mypause(0.0001)
         plt.show(block=False)
-        plt.pause(3)
+        mypause(3)
         plt.close()
 
     return trajectory, dwa.computational_time
 
-def mpc_sim(seed):
+def mpc_sim(seed, robot_num):
     """
     Main function for controlling multiple robots using Model Predictive Control (MPC).
 
@@ -155,7 +189,7 @@ def mpc_sim(seed):
     v = initial_state['v']
     x = np.array([x0, y, yaw, v])
 
-    mpc = MPC.ModelPredictiveControl(obs_x=[], obs_y=[], x=x)
+    mpc = MPC.ModelPredictiveControl(obs_x=[], obs_y=[], x=x, robot_num=robot_num)
 
     num_inputs = 2
     u = np.zeros([mpc.horizon*num_inputs, robot_num])
@@ -178,10 +212,16 @@ def mpc_sim(seed):
         cx.append(x_buf)
         cy.append(y_buf)
         ref.append([cx[i][0], cy[i][0]])
-    
-    # input [throttle, steer (delta)]
-    fig = plt.figure(1, dpi=90)
-    ax = fig.add_subplot(111)
+
+    if show_animation:
+        plt.ion()
+        fig = plt.figure(1, dpi=90)
+        figManager = plt.get_current_fig_manager()
+        figManager.window.move(px, 0)
+        # figManager.window.showMaximized()
+        # figManager.window.setFocus()
+        ax = fig.add_subplot(111)
+        plt.show(block=False)
 
     # mpc = MPC_algorithm(cx, cy, ref, mpc, bounds, constraints, predicted_trajectory)
     mpc.cx = cx
@@ -189,9 +229,10 @@ def mpc_sim(seed):
     mpc.ref = ref
 
     for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect('key_release_event',
-                lambda event: [exit(0) if event.key == 'escape' else None])
+        if show_animation:
+            plt.cla()
+            plt.gcf().canvas.mpl_connect('key_release_event',
+                    lambda event: [exit(0) if event.key == 'escape' else None])
 
         if go_to_goal_bool:
             x, u, break_flag = mpc.go_to_goal(x, u, break_flag)
@@ -199,11 +240,12 @@ def mpc_sim(seed):
             x, u, break_flag = mpc.run_mpc(x, u, break_flag)
         trajectory = np.dstack([trajectory, np.concatenate((x,u[:2]))])
 
-        plt.title('MPC 2D')
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
+        if show_animation:
+            plt.title('MPC 2D')
+            utils.plot_map(width=width_init, height=height_init)
+            plt.axis("equal")
+            plt.grid(True)
+            mypause(0.0001)
 
         if break_flag:
             break
@@ -214,15 +256,15 @@ def mpc_sim(seed):
             MPC.plot_robot(x[0, i], x[1, i], x[2, i], i)
             MPC.plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
             MPC.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-"+color_dict[i])
-        plt.pause(0.0001)
+            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
+        mypause(0.0001)
         plt.show(block=False)
-        plt.pause(3)
+        mypause(3)
         plt.close()
 
     return trajectory, mpc.computational_time
 
-def c3bf_sim(seed):
+def c3bf_sim(seed, robot_num):
     """
     Main function for controlling multiple robots using Model Predictive Control (MPC).
 
@@ -256,6 +298,16 @@ def c3bf_sim(seed):
     x = np.array([x0, y, yaw, v])
     u = np.zeros((2, robot_num))
 
+    if show_animation:
+        plt.ion()
+        fig = plt.figure(1, dpi=90)
+        figManager = plt.get_current_fig_manager()
+        figManager.window.move(px, 0)
+        # figManager.window.showMaximized()
+        # figManager.window.setFocus()
+        ax = fig.add_subplot(111)
+        plt.show(block=False)
+
     trajectory = np.zeros((x.shape[0]+u.shape[0], robot_num, 1))
     trajectory[:, :, 0] = np.concatenate((x,u))
     
@@ -266,13 +318,14 @@ def c3bf_sim(seed):
     # Step 5: Extract the target coordinates from the paths
     targets = [[path[0].x, path[0].y] for path in paths]
 
-    c3bf = C3BF.C3BF_algorithm(targets, paths)
+    c3bf = C3BF.C3BF_algorithm(targets, paths, robot_num=robot_num)
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect(
-            'key_release_event',
-            lambda event: [exit(0) if event.key == 'escape' else None])
+        if show_animation:
+            plt.cla()
+            plt.gcf().canvas.mpl_connect(
+                'key_release_event',
+                lambda event: [exit(0) if event.key == 'escape' else None])
         
         if go_to_goal_bool:
             x, break_flag = c3bf.go_to_goal(x, break_flag)
@@ -280,10 +333,11 @@ def c3bf_sim(seed):
             x, break_flag = c3bf.run_3cbf(x, break_flag)
         trajectory = np.dstack([trajectory, np.concatenate((x, c3bf.dxu))])
         
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
+        if show_animation:
+            utils.plot_map(width=width_init, height=height_init)
+            plt.axis("equal")
+            plt.grid(True)
+            mypause(0.0001)
 
         if break_flag:
             break
@@ -294,15 +348,15 @@ def c3bf_sim(seed):
             C3BF.plot_robot(x[0, i], x[1, i], x[2, i], i)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-"+color_dict[i])
-        plt.pause(0.0001)
+            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
+        mypause(0.0001)
         plt.show(block=False)
-        plt.pause(3)
+        mypause(3)
         plt.close()
 
     return trajectory, c3bf.computational_time, c3bf.solver_failure
 
-def cbf_sim(seed):
+def cbf_sim(seed, robot_num):
     """
     Main function for controlling multiple robots using Model Predictive Control (MPC).
 
@@ -336,6 +390,16 @@ def cbf_sim(seed):
     x = np.array([x0, y, yaw, v])
     u = np.zeros((2, robot_num))
 
+    if show_animation:
+        plt.ion()
+        fig = plt.figure(1, dpi=90)
+        figManager = plt.get_current_fig_manager()
+        figManager.window.move(px, 0)
+        # figManager.window.showMaximized()
+        # figManager.window.setFocus()
+        ax = fig.add_subplot(111)
+        plt.show(block=False)
+
     trajectory = np.zeros((x.shape[0]+u.shape[0], robot_num, 1))
     trajectory[:, :, 0] = np.concatenate((x,u))
     
@@ -346,13 +410,14 @@ def cbf_sim(seed):
     # Step 5: Extract the target coordinates from the paths
     targets = [[path[0].x, path[0].y] for path in paths]
 
-    cbf = CBF.CBF_algorithm(targets, paths)
+    cbf = CBF.CBF_algorithm(targets, paths, robot_num=robot_num)
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect(
-            'key_release_event',
-            lambda event: [exit(0) if event.key == 'escape' else None])
+        if show_animation:
+            plt.cla()
+            plt.gcf().canvas.mpl_connect(
+                'key_release_event',
+                lambda event: [exit(0) if event.key == 'escape' else None])
         
         if go_to_goal_bool:
             x, break_flag = cbf.go_to_goal(x, break_flag)
@@ -361,10 +426,11 @@ def cbf_sim(seed):
             
         trajectory = np.dstack([trajectory, np.concatenate((x, cbf.dxu))])
         
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
+        if show_animation:
+            utils.plot_map(width=width_init, height=height_init)
+            plt.axis("equal")
+            plt.grid(True)
+            mypause(0.0001)
 
         if break_flag:
             break
@@ -375,15 +441,15 @@ def cbf_sim(seed):
             CBF.plot_robot(x[0, i], x[1, i], x[2, i], i)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-"+color_dict[i])
-        plt.pause(0.0001)
+            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
+        mypause(0.0001)
         plt.show(block=False)
-        plt.pause(3)
+        mypause(3)
         plt.close()
 
     return trajectory, cbf.computational_time, cbf.solver_failure
 
-def lbp_sim(seed):
+def lbp_sim(seed, robot_num):
     dt = json_object["Controller"]["dt"]
     predict_time = json_object["LBP"]["predict_time"] # [s]
     dilation_factor = json_object["LBP"]["dilation_factor"]
@@ -431,16 +497,30 @@ def lbp_sim(seed):
         dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
 
     u_hist = dict.fromkeys(range(robot_num),[0]*int(predict_time/dt))
-    fig = plt.figure(1, dpi=90)
-    ax = fig.add_subplot(111)
+
+    if show_animation:
+        plt.ion()
+        fig = plt.figure(1, dpi=90)
+        figManager = plt.get_current_fig_manager()
+        figManager.window.move(px, 0)
+        # figManager.window.showMaximized()
+        # figManager.window.setFocus()
+        ax = fig.add_subplot(111)
+        plt.show(block=False)
+    else: 
+        ax = None
     
     lbp = LBP.LBP_algorithm(predicted_trajectory, paths, targets, dilated_traj,
-                        predicted_trajectory, ax, u_hist)
+                        predicted_trajectory, ax, u_hist, robot_num=robot_num)
     
     for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-        
+        if z%100 == 0:
+            print(f"iteration: {z}")
+
+        if show_animation:
+            plt.cla()
+            plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
+            
         if go_to_goal_bool:
             x, u, break_flag = lbp.go_to_goal(x, u, break_flag)
         else:
@@ -448,10 +528,11 @@ def lbp_sim(seed):
             x, u, break_flag = lbp.run_lbp(x, u, break_flag)
         trajectory = np.dstack([trajectory, np.concatenate((x,u))])
 
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
+        if show_animation:
+            utils.plot_map(width=width_init, height=height_init)
+            plt.axis("equal")
+            plt.grid(True)
+            mypause(0.0001)
 
         if break_flag:
             break
@@ -462,10 +543,10 @@ def lbp_sim(seed):
             LBP.plot_robot(x[0, i], x[1, i], x[2, i], i)
             LBP.plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
             LBP.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-"+color_dict[i])
-        plt.pause(0.0001)
+            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
+        mypause(0.0001)
         plt.show(block=False)
-        plt.pause(3)
+        mypause(3)
         plt.close()
     
     return trajectory, lbp.computational_time
@@ -474,6 +555,7 @@ def main():
     # Load the seed from a file
     path = pathlib.Path('/home/giacomo/thesis_ws/src/seeds/')
     dir_list = os.listdir(path)
+    # dir_list = ['circular_seed_54.json', 'circular_seed_55.json', 'circular_seed_56.json']
 
     csv_file = '/home/giacomo/thesis_ws/src/seed_simulation/seed_simulation/seed_sim.csv'
     df = pd.read_csv(csv_file)
@@ -481,11 +563,7 @@ def main():
 
     # Analyze the results
     for filename in dir_list:
-
-        # if filename in list(df["File Name"]):
-        #     print(f"Skipping {filename} as it already exists in the csv file\n")
-        #     continue
-
+        
         if 'circular' not in filename:
             continue
 
@@ -494,41 +572,106 @@ def main():
             print(f"Loading seed from {seed_path}\n")
             seed = json.load(file)
 
-        data_process = DataProcessor(robot_num, file_name=filename)
+        robot_num = seed['robot_num']
 
-        dwa_trajectory, dwa_computational_time = dwa_sim(seed)   
-        print(f"DWA average computational time: {sum(dwa_computational_time) / len(dwa_computational_time)}\n")
-        dwa_data = data_process.post_process_simultation(dwa_trajectory, dwa_computational_time, method='DWA')
-
-        mpc_trajectory, mpc_computational_time = mpc_sim(seed)
-        print(f"MPC average computational time: {sum(mpc_computational_time) / len(mpc_computational_time)}\n")
-        mpc_data = data_process.post_process_simultation(mpc_trajectory, mpc_computational_time, method="MPC")
-
-        c3bf_trajectory, c3bf_computational_time, c3bf_solver_failure = c3bf_sim(seed)
-        print(f"C3BF average computational time: {sum(c3bf_computational_time) / len(c3bf_computational_time)}\n")
-        c3bf_data = data_process.post_process_simultation(c3bf_trajectory, c3bf_computational_time, method='C3BF', 
-                                                          solver_failure=c3bf_solver_failure)
-
-        cbf_trajectory, cbf_computational_time, cbf_solver_failure = cbf_sim(seed)
-        print(f"CBF average computational time: {sum(cbf_computational_time) / len(cbf_computational_time)}\n")
-        cbf_data = data_process.post_process_simultation(cbf_trajectory, cbf_computational_time, method="CBF", 
-                                                         solver_failure=cbf_solver_failure)
+        assert robot_num == len(seed['initial_position']['x']), "The number of robots in the seed file does not match the number of robots in the seed file"
         
-        lbp_trajectory, lbp_computational_time = lbp_sim(seed)
-        print(f"LBP average computational time: {sum(lbp_computational_time) / len(lbp_computational_time)}\n")
-        lbp_data = data_process.post_process_simultation(lbp_trajectory, lbp_computational_time, method="LBP")
+        data_process = DataProcessor(robot_num, file_name=filename, seed=seed)
+        data = []
 
-        data = [dwa_data, mpc_data, c3bf_data, cbf_data, lbp_data]
+        if filename in list(df["File Name"]):   
+            print(f"File {filename} already exists in the csv file, checking for single methods...\n")      
+            df_temp = df.loc[df["File Name"] == filename]
+            if 'DWA' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
+                dwa_trajectory, dwa_computational_time = dwa_sim(seed, robot_num)   
+                print(f"DWA average computational time: {sum(dwa_computational_time) / len(dwa_computational_time)}\n")
+                dwa_data = data_process.post_process_simultation(dwa_trajectory, dwa_computational_time, method='DWA')
+                data.append(dwa_data)
+                plt.close()
+            else: 
+                print(f"\tDWA already executed for {filename}, for noise scaling {noise_scale_param}.\n")
+
+            if 'MPC' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
+                mpc_trajectory, mpc_computational_time = mpc_sim(seed, robot_num)
+                print(f"MPC average computational time: {sum(mpc_computational_time) / len(mpc_computational_time)}\n")
+                mpc_data = data_process.post_process_simultation(mpc_trajectory, mpc_computational_time, method="MPC")
+                data.append(mpc_data)
+                plt.close()
+            else:
+                print(f"\tMPC already executed for {filename}, for noise scaling {noise_scale_param}.\n")
+            
+            if 'C3BF' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
+                c3bf_trajectory, c3bf_computational_time, c3bf_solver_failure = c3bf_sim(seed, robot_num)
+                print(f"C3BF average computational time: {sum(c3bf_computational_time) / len(c3bf_computational_time)}\n")
+                c3bf_data = data_process.post_process_simultation(c3bf_trajectory, c3bf_computational_time, method='C3BF', 
+                                                                solver_failure=c3bf_solver_failure)
+                data.append(c3bf_data)
+                plt.close()
+            else:
+                print(f"\tC3BF already executed for {filename}, for noise scaling {noise_scale_param}.\n")
+
+            if 'CBF' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
+                cbf_trajectory, cbf_computational_time, cbf_solver_failure = cbf_sim(seed, robot_num)
+                print(f"CBF average computational time: {sum(cbf_computational_time) / len(cbf_computational_time)}\n")
+                cbf_data = data_process.post_process_simultation(cbf_trajectory, cbf_computational_time, method="CBF", 
+                                                                solver_failure=cbf_solver_failure)
+                data.append(cbf_data)
+                plt.close()
+            else:
+                print(f"\tCBF already executed for {filename}, for noise scaling {noise_scale_param}.\n")
+
+            if 'LBP' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
+                lbp_trajectory, lbp_computational_time = lbp_sim(seed, robot_num)
+                print(f"LBP average computational time: {sum(lbp_computational_time) / len(lbp_computational_time)}\n")
+                lbp_data = data_process.post_process_simultation(lbp_trajectory, lbp_computational_time, method="LBP")
+                data.append(lbp_data)
+                plt.close()
+            else:
+                print(f"\tLBP already executed for {filename}, for noise scaling {noise_scale_param}.\n")
+
+        else:
+            print(f"File {filename}, for noise scaling {noise_scale_param} does not exist in the csv file, executing all methods...\n")
+            dwa_trajectory, dwa_computational_time = dwa_sim(seed, robot_num)   
+            print(f"DWA average computational time: {sum(dwa_computational_time) / len(dwa_computational_time)}\n")
+            dwa_data = data_process.post_process_simultation(dwa_trajectory, dwa_computational_time, method='DWA')
+            data.append(dwa_data)
+            plt.close()
+
+            mpc_trajectory, mpc_computational_time = mpc_sim(seed, robot_num)
+            print(f"MPC average computational time: {sum(mpc_computational_time) / len(mpc_computational_time)}\n")
+            mpc_data = data_process.post_process_simultation(mpc_trajectory, mpc_computational_time, method="MPC")
+            data.append(mpc_data)
+            plt.close()
+        
+            c3bf_trajectory, c3bf_computational_time, c3bf_solver_failure = c3bf_sim(seed, robot_num)
+            print(f"C3BF average computational time: {sum(c3bf_computational_time) / len(c3bf_computational_time)}\n")
+            c3bf_data = data_process.post_process_simultation(c3bf_trajectory, c3bf_computational_time, method='C3BF', 
+                                                            solver_failure=c3bf_solver_failure)
+            data.append(c3bf_data)
+            plt.close()
+
+            cbf_trajectory, cbf_computational_time, cbf_solver_failure = cbf_sim(seed, robot_num)
+            print(f"CBF average computational time: {sum(cbf_computational_time) / len(cbf_computational_time)}\n")
+            cbf_data = data_process.post_process_simultation(cbf_trajectory, cbf_computational_time, method="CBF", 
+                                                            solver_failure=cbf_solver_failure)
+            data.append(cbf_data)
+            plt.close()
+
+            lbp_trajectory, lbp_computational_time = lbp_sim(seed, robot_num)
+            print(f"LBP average computational time: {sum(lbp_computational_time) / len(lbp_computational_time)}\n")
+            lbp_data = data_process.post_process_simultation(lbp_trajectory, lbp_computational_time, method="LBP")
+            data.append(lbp_data)
+            plt.close()
+
         df1 = pd.DataFrame(data)
         frames = [df, df1]
         df = pd.concat(frames, ignore_index=True)
 
-    # Save the results to a csv file
-    df = data_process.remove_df_duplicates(df)
-    # df = pd.DataFrame(data)
-    df.to_csv(csv_file)
+        # Save the results to a csv file
+        df = data_process.remove_df_duplicates(df)
+        df.to_csv(csv_file)
 
-    print(f"Data saved to csv file: {csv_file}")
+        print(f"Saving File {filename} simulations to csv file: {csv_file}")
 
 if __name__ == '__main__':
     main()

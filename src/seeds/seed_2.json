@@ -1,4 +1,5 @@
-{
+{  
+   "robot_num": 5,
    "initial_position": {
       "x": [
          -10.0,

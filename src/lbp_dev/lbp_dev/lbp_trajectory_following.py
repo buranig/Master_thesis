@@ -5,6 +5,7 @@ import math
 from LBP import normalize_angle
 from shapely.geometry import Point, Polygon, LineString
 import matplotlib.pyplot as plt
+from planner import utils as utils
 
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
 # Opening JSON file
@@ -77,24 +78,6 @@ def interp0(x, xp, yp):
     else:
         raise TypeError('argument must be float, list, or ndarray')
 
-def motion(x, u, dt):
-    """
-    motion model
-    initial state [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)]
-    """
-    delta = u[1]
-    delta = np.clip(delta, -max_steer, max_steer)
-    throttle = u[0]
-
-    x[0] = x[0] + x[3] * math.cos(x[2]) * dt
-    x[1] = x[1] + x[3] * math.sin(x[2]) * dt
-    x[2] = x[2] + x[3] / L * math.tan(delta) * dt
-    x[3] = x[3] + throttle * dt
-    x[2] = normalize_angle(x[2])
-    x[3] = np.clip(x[3], min_speed, max_speed)
-
-    return x
-
 def plot_arrow(x, y, yaw, length=0.5, width=0.1):  # pragma: no cover
     plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
               head_length=width, head_width=width)
@@ -146,7 +129,7 @@ def main():
 
         # Apply control input to the kinematic bicycle model
         # TODO: Implement the kinematic bicycle model logic here
-        x = motion(x, u, dt)
+        x = utils.motion(x, u, dt)
 
         # Print the current state and control input
         print(f"Control Input: {u}")

@@ -39,21 +39,25 @@ safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
 min_dist = json_object["min_dist"]
+to_goal_stop_distance = json_object["to_goal_stop_distance"]
 
-show_animation = True
+show_animation = json_object["show_animation"]
 debug = False
+boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_init/2])
 check_collision_bool = False
-add_noise = False 
+add_noise = json_object["add_noise"]
+noise_scale_param = json_object["noise_scale_param"]
+
 np.random.seed(1)
 
-color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k'}
+color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
 
 # Simulator options.
 options = {}
 options['FIG_SIZE'] = [8,8]
 options['OBSTACLES'] = True
 
-with open('/home/giacomo/thesis_ws/src/seeds/seed_1.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_10.json', 'r') as file:
     seed = json.load(file)
 
 def normalize_angle(angle):
@@ -141,6 +145,7 @@ class ModelPredictiveControl:
         Returns:
             list: The next state of the system.
         """
+        pedal = np.clip(pedal, min_acc, max_acc)
         x_t = prev_state[0]
         y_t = prev_state[1]
         psi_t = prev_state[2]
@@ -459,11 +464,13 @@ class ModelPredictiveControl:
     
     def go_to_goal(self, x, u, break_flag):
         for i in range(self.robot_num):
+            self.check_collision(x, u, i)
             if not self.reached_goal[i]:                
                 # If goal is reached, stop the robot
-                if check_goal_reached(x, self.ref, i, distance=1.5):
+                if check_goal_reached(x, self.ref, i, distance=to_goal_stop_distance):
                     # u[:, i] = np.zeros(2)
                     x[3, i] = 0
+                    u[:,i] = 0
                     self.reached_goal[i] = True
                 else:
                     t_prev = time.time()
@@ -504,9 +511,9 @@ class ModelPredictiveControl:
         u1 = np.append(u1, u1[-2])  
 
         if add_noise:
-            noise = np.concatenate([np.random.normal(0, 0.3, 2).reshape(1, 2), np.random.normal(0, np.radians(5), 1).reshape(1,1), np.zeros((1,1))], axis=1)
+            noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(1, 2), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=1)
             noisy_pos = x1 + noise[0]
-            plt.plot(noisy_pos[0], noisy_pos[1], "x" + color_dict[i], markersize=10)
+            plt.plot(noisy_pos[0], noisy_pos[1], "x", color=color_dict[i], markersize=10)
             self.update_obstacles(i, noisy_pos, x, self.predicted_trajectory) 
             self.bounds, self.constraints = self.set_bounds_and_constraints()
             self.initial_state = noisy_pos
@@ -526,10 +533,14 @@ class ModelPredictiveControl:
                             tol = 1e-1)
                
         u1 = u_solution.x
-        x1 = self.plant_model(x1, dt, u1[0], u1[1])
+        if u1[0]>max_acc or u1[0]<min_acc:
+            print(f'Acceleration out of bounds: {u1[0]}')
+            u1[0] = np.clip(u1[0], min_acc, max_acc)
+        # x1 = self.plant_model(x1, dt, u1[0], u1[1])
+        x1 = utils.motion(x1, u1, dt)
         x[:, i] = x1
         u[:, i] = u1
-        
+       
         if add_noise:
             predicted_state = np.array([noisy_pos])
 
@@ -565,19 +576,49 @@ class ModelPredictiveControl:
         """
         self.x_obs = []
         self.y_obs = []
+
         for idx in range(self.robot_num):
             if idx == i:
                 continue
-            if check_collision_bool:
-                if dist([x1[0], x1[1]], [x[0, idx], x[1, idx]]) < 1:
-                    # if dist([x1[0], x1[1]], [predicted_trajectory[idx][0,0], predicted_trajectory[idx][0,1]]) < 1:
-                    raise Exception('Collision')
             
             next_robot_state = predicted_trajectory[idx]
             self.x_obs.append(next_robot_state[0:-1:5, 0])
             self.y_obs.append(next_robot_state[0:-1:5, 1])
         self.x_obs = [item for sublist in self.x_obs for item in sublist]
         self.y_obs = [item for sublist in self.y_obs for item in sublist]
+
+    def check_collision(self, x, u, i):
+        """
+        Checks for collision between the robot at index i and other robots.
+
+        Args:
+            x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
+            i (int): Index of the robot to check collision for.
+
+        Raises:
+            Exception: If collision is detected.
+
+        """
+        if x[0,i]>=boundary_points[1]-WB/2 or x[0,i]<=boundary_points[0]+WB/2 or x[1,i]>=boundary_points[3]-WB/2 or x[1,i]<=boundary_points[2]+WB/2:
+            if check_collision_bool:
+                raise Exception('Collision')
+            else:
+                print("Collision detected")
+                x[3, i] = 0
+                u[:,i] = 0
+                self.reached_goal[i] = True
+
+        for idx in range(self.robot_num):
+            if idx == i:
+                continue
+            if utils.dist([x[0,i], x[1,i]], [x[0, idx], x[1, idx]]) <= WB/2:
+                if check_collision_bool:
+                    raise Exception('Collision')
+                else:
+                    print("Collision detected")
+                    x[3, i] = 0
+                    u[:,i] = 0
+                    self.reached_goal[i] = True
 
 def check_goal_reached(x, targets, i, distance=0.5):
     """
@@ -746,17 +787,17 @@ def plot_robot(x, y, yaw, i):
                 np.array(outline[1, :]).flatten(), color_dict[i])
     
 def plot_robot_trajectory(x, u, cx, cy, predicted_trajectory, targets, i):
-    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-"+color_dict[i], label="Trajectory")
+    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-", color=color_dict[i], label="Trajectory")
     # plt.plot(x[0, i], x[1, i], "xr")
-    plt.plot(targets[i][0], targets[i][1], "x"+color_dict[i], label="Target")
-    plt.plot(cx[i], cy[i], "--"+color_dict[i], label="Course")
+    plt.plot(targets[i][0], targets[i][1], "x", color=color_dict[i], label="Target")
+    plt.plot(cx[i], cy[i], "--", color=color_dict[i], label="Course")
     plot_robot(x[0, i], x[1, i], x[2, i], i)
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
     plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
 
 def plot_robot_seed(x, u, predicted_trajectory, targets, i):
-    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-"+color_dict[i])
-    plt.plot(targets[i][0], targets[i][1], "x"+color_dict[i])
+    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-", color=color_dict[i])
+    plt.plot(targets[i][0], targets[i][1], "x", color=color_dict[i])
     plot_robot(x[0, i], x[1, i], x[2, i], i)
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
     plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
@@ -1168,7 +1209,8 @@ def main_seed():
         plt.gcf().canvas.mpl_connect('key_release_event',
                 lambda event: [exit(0) if event.key == 'escape' else None])
 
-        x, u, break_flag = mpc.run_mpc(x, u, break_flag)
+        # x, u, break_flag = mpc.run_mpc(x, u, break_flag)
+        x, u, break_flag = mpc.go_to_goal(x, u, break_flag)
         trajectory = np.dstack([trajectory, x])
 
         plt.title('MPC 2D')
@@ -1188,5 +1230,5 @@ def main_seed():
         plt.show()
 
 if __name__ == '__main__':
-    # main_seed()
-    main()
+    main_seed()
+    # main2()

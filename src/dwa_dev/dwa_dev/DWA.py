@@ -15,7 +15,7 @@ from matplotlib.animation import FuncAnimation
 
 # Write directory
 dir_path = os.path.dirname(os.path.realpath(__file__))
-path = pathlib.Path(dir_path + '/../config/dwa_config.json')
+path = pathlib.Path(dir_path + '/../../bumper_cars/params.json')
 
 # Opening JSON file
 with open(path, 'r') as openfile:
@@ -70,7 +70,7 @@ np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k'}
 
-with open(dir_path + '/../../trajectories.json', 'r') as file:
+with open(dir_path + '/../trajectories.json', 'r') as file:
     data = json.load(file)
 
 with open(dir_path + '/../../seeds/seed_1.json', 'r') as file:

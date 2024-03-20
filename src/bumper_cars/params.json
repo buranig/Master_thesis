@@ -99,7 +99,7 @@
             "controller_type": "MPC",
             "cbf_type": "C3BF"
         },
-    "robot_num": 6,
+    "robot_num": 5,
     "safety": 10, 
     "min_dist": 3,
     "width": 30,

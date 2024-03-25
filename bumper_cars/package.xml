@@ -26,6 +26,13 @@
   <depend>visualization_msgs</depend>
   <depend>tf2_ros</depend>
 
+  <!-- Custom dependencies -->
+  <depend>lar_msgs</depend>
+  <depend>lar_utils</depend>
+  <depend>dwa_dev</depend>
+  <depend>rosidl_default_generators</depend>
+
+  
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>

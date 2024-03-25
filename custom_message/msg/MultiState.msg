@@ -1,1 +1,0 @@
-custom_message/FullState[] multiple_state

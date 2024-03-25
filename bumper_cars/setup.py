@@ -1,4 +1,7 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
+
 
 package_name = 'bumper_cars'
 
@@ -10,8 +13,10 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'lar_msgs', 'lar_utils', 'rosidl_default_generators',  'dwa_dev'],
     zip_safe=True,
     maintainer='giacomo',
     maintainer_email='buranig@student.ethz.ch',
@@ -20,12 +25,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "controller = bumper_cars.controller:main",
-            "sensor = bumper_cars.sensor:main",
-            "model = bumper_cars.car_model:main",
-            "plotter = bumper_cars.plotter:main",
-            "converter = bumper_cars.converter:main",
-            "broadcaster = bumper_cars.broadcaster:main",
+            "collision_avoidance_ros2 = bumper_cars.collision_avoidance_ros2:main",
+            "state_buffer = bumper_cars.state_buffer:main",
         ],
     },
 )

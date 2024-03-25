@@ -17,6 +17,5 @@
   </export>
 
   <depend>rclpy</depend>
-  <depend>planner</depend>
-  <depend>custom_message</depend>
+  <depend>lar_utils</depend>
 </package>

@@ -1,0 +1,11 @@
+max_steer: 0.785398         # Maximal steering angle
+max_speed: 2                # Maximal speed
+min_speed: -1.0             # Minimal speed
+L: 1.0                      # Wheel base
+Cf: 320.0                   # Front tire stiffness coefficient
+Cr: 340.0                   # Rear tire stiffness coefficient
+Iz: 225.0                   # Vehicle moment of inertia
+m: 150.0                    # Vehicle mass
+c_a: 1.36                   # Drag coefficient
+c_r1: 0.01                  # Friction coefficient
+model_type: 'linear'        # Function used for state prediction ('linear'/'nonlinear')

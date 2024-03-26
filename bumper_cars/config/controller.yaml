@@ -82,8 +82,10 @@ Controller:
   min_acc: -5.0
   controller_type: MPC
   cbf_type: C3BF
+  safety: 10
+  add_noise: false
+  noise_scale: 0.4
 robot_num: 5
-safety: 10
 min_dist: 3
 width: 30
 height: 30
@@ -91,5 +93,3 @@ timer_freq: 0.01
 plot_traj: false
 to_goal_stop_distance: 2.5
 show_animation: true
-add_noise: false
-noise_scale_param: 0.4

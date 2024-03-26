@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+
 from bumper_cars.classes.Controller import Controller
 # from bumper_cars.include.Controller import Controller
 # from bumper_cars import Controller
@@ -49,8 +50,58 @@ class DWA_algorithm(Controller):
         calc_control_and_trajectory: Calculates the final input with the dynamic window.
     """
 
-    def __init__(self, controller_path, robot_num):
-        super().__init__(self, controller_path)
+    robot_num = None
+    targets = None
+    dilated_traj = None
+    predicted_trajectory = None
+    u_hist = None
+
+    max_steer = None
+    max_speed = None
+    min_speed = None
+    v_resolution = None
+    delta_resolution = None
+    max_acc = None
+    min_acc = None
+    dt = None
+    predict_time = None
+    to_goal_cost_gain = None
+    speed_cost_gain = None
+    obstacle_cost_gain = None
+    heading_cost_gain = None
+    robot_stuck_flag_cons = None
+    dilation_factor = None
+    L = None
+    Lr = None
+    Lf = None
+    Cf = None
+    Cr = None
+    Iz = None
+    m = None
+    
+    # Aerodynamic and friction coefficients
+    c_a = None
+    c_r1 = None
+    WB = None
+    L_d = None
+    safety_init = None
+    width_init = None
+    height_init = None
+    min_dist = None
+    to_goal_stop_distance = None
+    update_dist = None
+    
+    timer_freq = None
+
+    show_animation = None
+    boundary_points = None
+    check_collision_bool = None
+    add_noise = None
+    noise_scale_param = None
+    
+
+    def __init__(self, controller_path:str, robot_num = 1):
+        super().__init__(controller_path)
         self.robot_num = robot_num
         self.targets = None
         self.dilated_traj = None
@@ -91,7 +142,7 @@ class DWA_algorithm(Controller):
         self.WB = yaml_object["Controller"]["WB"] # Wheel base
         self.L_d = yaml_object["Controller"]["L_d"]  # [m] look-ahead distance
         self.robot_num = yaml_object["robot_num"]
-        self.safety_init = yaml_object["safety"]
+        self.safety_init = yaml_object["Controller"]["safety"]
         self.width_init = yaml_object["width"]
         self.height_init = yaml_object["height"]
         self.min_dist = yaml_object["min_dist"]
@@ -105,16 +156,16 @@ class DWA_algorithm(Controller):
         self.show_animation = yaml_object["show_animation"]
         self.boundary_points = np.array([-self.width_init/2, self.width_init/2, -self.height_init/2, self.height_init/2])
         self.check_collision_bool = False
-        self.add_noise = yaml_object["add_noise"]
-        self.noise_scale_param = yaml_object["noise_scale_param"]
+        self.add_noise = yaml_object["Controller"]["add_noise"]
+        self.noise_scale_param = yaml_object["Controller"]["noise_scale"]
         np.random.seed(1)
 
-        
+        # Read pre-computed trajectories
         dir_path = os.path.dirname(os.path.realpath(__file__))
         with open(dir_path + '/../config/trajectories.json', 'r') as file:
             self.trajs = json.load(file)
 
-    def run_dwa(self, x, u, break_flag):
+    def run_dwa(self, x, u, break_flag, i):
         """
         Runs the DWA algorithm.
 
@@ -122,6 +173,7 @@ class DWA_algorithm(Controller):
             x (numpy.ndarray): Current state of the robots.
             u (numpy.ndarray): Control input for the robots.
             break_flag (bool): Flag indicating if the algorithm should stop.
+            i (int): Robot to be controlled
 
         Returns:
             tuple: Updated state, control input, and break flag.

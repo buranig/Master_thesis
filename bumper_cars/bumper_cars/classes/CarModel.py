@@ -3,17 +3,23 @@
 import yaml
 import math
 import numpy as np
+import os
 from lar_utils.car_utils import normalize_angle
 from lar_msgs.msg import CarControlStamped, CarStateStamped as State
 
+class State:
+    x = y = v = yaw = omega = 0.0
 
 class CarModel:
-    def __init__(self, carModel_path, id = 1):
+    # Init state of car
+    state = State()
+    
+    def __init__(self, carModel_path = ''):
 
-        # Init state of car
-        self.state = State
-        self.id = id
-        self.id_string = '' if id == 1 else str(id)
+        # If path not provided, use known one
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        if carModel_path == '':
+            carModel_path = dir_path + '/../../config/carModel.yaml' 
 
         with open(carModel_path, 'r') as openfile:
             yaml_object = yaml.safe_load(openfile)
@@ -38,21 +44,23 @@ class CarModel:
         # Linear/nonlinear model
         model_type = yaml_object["model_type"]
         if model_type == 'linear':
-            self.step = self._linear_model_callback
+            self.next_state = self._linear_model_callback
         elif model_type == 'nonlinear':
-            self.step = self._nonlinear_model_callback
+            self.next_state = self._nonlinear_model_callback
         else:
             raise Exception("Wrong value for 'model_type'")
         
-    def update_state(self, msg : State):
-            self.state.x = msg.x
-            self.state.y = msg.y
-            self.state.v = msg.vel_x # TODO: Verify that msg.vel_y is just transversal one
-            self.state.yaw = msg.turn_angle
-            self.state.omega = msg.turn_rate
+    def set_state(self, car_state : State):
+            self.state.x = car_state.x
+            self.state.y = car_state.y
+            self.state.v = car_state.v
+            self.state.yaw = car_state.yaw
+            self.state.omega = car_state.omega
 
+    def step(self, cmd: CarControlStamped, dt: float)-> State:
+        return self.next_state(cmd, dt)
 
-    def _linear_model_callback(self, initial_state: State, cmd: CarControlStamped, dt: float) -> State:
+    def _linear_model_callback(self, cmd: CarControlStamped, dt: float) -> State:
         """
         Update the car state using a non-linear kinematic model.
 
@@ -69,36 +77,29 @@ class CarModel:
         """
         
         # Simulate given/current state
-        state = State
-        if initial_state is not None:
-            state.x = initial_state.x
-            state.y = initial_state.y
-            state.v = initial_state.v
-            state.yaw = initial_state.yaw
-            state.omega = initial_state.omega
-        else:
-            state.x = self.state.x
-            state.y = self.state.y
-            state.v = self.state.v
-            state.yaw = self.state.yaw
-            state.omega = self.state.omega
+        state = State()
+        state.x = self.state.x
+        state.y = self.state.y
+        state.v = self.state.v
+        state.yaw = self.state.yaw
+        state.omega = self.state.omega
 
         # Ensure feasible inputs
         cmd.steering = np.clip(cmd.steering, -self.max_steer, self.max_steer)
 
         # State update
-        state.x = initial_state.x + initial_state.v * np.cos(initial_state.yaw) * dt
-        state.y = initial_state.y + initial_state.v * np.sin(initial_state.yaw) * dt
+        state.x = self.state.x + self.state.v * np.cos(self.state.yaw) * dt
+        state.y = self.state.y + self.state.v * np.sin(self.state.yaw) * dt
 
-        state.v = initial_state.v + cmd.throttle * dt
+        state.v = self.state.v + cmd.throttle * dt
         state.v = np.clip(state.v, self.min_speed, self.max_speed)
 
-        state.yaw = initial_state.yaw + initial_state.v / self.L * np.tan(cmd.steering) * dt
+        state.yaw = self.state.yaw + self.state.v / self.L * np.tan(cmd.steering) * dt
         state.yaw = normalize_angle(state.yaw)
 
         return state
     
-    def _nonlinear_model_callback(self, initial_state: State, cmd:CarControlStamped, dt: float) -> State:
+    def _nonlinear_model_callback(self, cmd:CarControlStamped, dt: float) -> State:
         """
         Update the car state using a nonlinear dynamic model.
 
@@ -115,19 +116,12 @@ class CarModel:
         """
 
         # Simulate given/current state
-        state = State
-        if initial_state is not None:
-            state.x = initial_state.x
-            state.y = initial_state.y
-            state.v = initial_state.v
-            state.yaw = initial_state.yaw
-            state.omega = initial_state.omega
-        else:
-            state.x = self.state.x
-            state.y = self.state.y
-            state.v = self.state.v
-            state.yaw = self.state.yaw
-            state.omega = self.state.omega
+        state = State()
+        state.x = self.state.x
+        state.y = self.state.y
+        state.v = self.state.v
+        state.yaw = self.state.yaw
+        state.omega = self.state.omega
 
         # Ensure feasible inputs
         cmd.steering = np.clip(cmd.steering, -self.max_steer, self.max_steer)

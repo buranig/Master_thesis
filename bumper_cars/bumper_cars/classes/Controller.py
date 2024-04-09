@@ -5,8 +5,8 @@ import numpy as np
 from typing import List
 
 # import car model
-from bumper_cars.classes.CarModel import CarModel
-from lar_msgs.msg import CarControlStamped
+from bumper_cars.classes.CarModel import CarModel, State
+from lar_msgs.msg import CarControlStamped, CarStateStamped
 
 class Controller:
     """
@@ -17,8 +17,7 @@ class Controller:
     controller algorithms based on the specified controller type.
     """
 
-    # Initialize global parameters
-
+    # Initialize class public parameters
     dt = 0.0
     L_d = 0.0
     max_acc = 0.0
@@ -28,8 +27,10 @@ class Controller:
     add_noise = 0.0
     noise_scale = 0.0
 
+    # car_model = None
 
-    def __init__(self, controller_path :str):
+
+    def __init__(self, controller_path :str, car_path = ''):
         
         with open(controller_path, 'r') as openfile:
             yaml_object = yaml.safe_load(openfile)
@@ -44,17 +45,19 @@ class Controller:
         self.add_noise = yaml_object["Controller"]["add_noise"]
         self.noise_scale = yaml_object["Controller"]["noise_scale"]
 
+        self.car_model = CarModel(car_path)
 
+    def simulate_input(self, car_cmd: CarControlStamped) -> State:
+        return self.car_model.step(car_cmd, self.L_d)
 
-
-    def compute_cmd(self, car_list : List[CarModel]) -> CarControlStamped:
-        try:
-            self.controller.compute_cmd(car_list)
-        except:    
-            raise Exception("Hereditary function doesn't implement 'compute_cmd'")
+    def set_state(self, state: State) -> None:
+        self.car_model.set_state(state)
+    
+    def set_goal(self, goal: State) -> None:
+        raise Exception("Hereditary function doesn't implement 'set_goal'")
+    
+    def compute_cmd(self, car_list : List[CarStateStamped]) -> CarControlStamped:
+        raise Exception("Hereditary function doesn't implement 'compute_cmd'")
     
     def _add_noise(self, car_list : List[CarModel]) -> List[CarModel]:
-        try:
-            self.controller._add_noise(car_list)
-        except:
-            raise Exception("Hereditary function doesn't implement '_add_noise'")
+        raise Exception("Hereditary function doesn't implement '_add_noise'")

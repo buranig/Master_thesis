@@ -4,6 +4,12 @@
 import rclpy
 import yaml
 from rclpy.node import Node
+import numpy as np
+from bumper_cars.classes.CarModel import CarModel, State
+from lar_utils import car_utils as utils
+
+# Plot goal in Rviz
+from visualization_msgs.msg import Marker
 
 # import control models
 # from planner import utils
@@ -26,7 +32,7 @@ controller_map = {
 }
 
 
-from lar_msgs.msg import CarControlStamped
+from lar_msgs.msg import CarControlStamped, CarStateStamped
 from lar_msgs.srv import EnvState, CarCommand
 
 
@@ -59,8 +65,7 @@ class CollisionAvoidance(Node):
         self.cmd_req.car = self.car_i - 1
 
         self.publisher_ = self.create_publisher(CarControlStamped, '/sim/car'+self.car_str+'/set/control', 10)
-
-        
+        self.goal_publisher_ = self.create_publisher(Marker, '/vis/trace', 10)
 
     def state_request(self):
         self.future = self.state_cli.call_async(self.state_req)
@@ -71,18 +76,68 @@ class CollisionAvoidance(Node):
         self.cmd_future = self.cmd_cli.call_async(self.cmd_req)
         rclpy.spin_until_future_complete(self, self.cmd_future)
         return self.cmd_future.result()
-        
 
-    def run(self):        
+
+    def run(self):
         while rclpy.ok():
-            # set_comm = CarControlStamped()
-
-            des_action = self.cmd_request()
+            # Update the current state of the car
             curr_state = self.state_request()
-            
-            
-            self.publisher_.publish(des_action.cmd)
+            curr_car = curr_state.env_state[self.car_i - 1] # Select desired car
+            updated_state = carStateStamped_to_State(curr_car)
+            self.algorithm.set_state(updated_state)
+
+            # Compute desired action and equivalent goal
+            des_action = self.cmd_request()
+            next_state = self.algorithm.simulate_input(des_action.cmd)
+
+            # Set next state as a goal for the CA algorithm
+            self.algorithm.set_goal(next_state)
+
+            # Compute safe control input
+            safe_cmd = self.algorithm.compute_cmd(curr_state.env_state)
+            print("DESIRED ACTION")
+            print("Throttle: " + str(des_action.cmd.throttle) + " - Steering: " + str(des_action.cmd.steering))
+            print("ACTUAL ACTION")
+            print("Throttle: " + str(safe_cmd.throttle) + " - Steering: " + str(safe_cmd.steering))
+            # Send command to car
+            self.publisher_.publish(safe_cmd)
+            self.goal_marker(next_state)
+
+    def goal_marker(self, next_state):
+        marker = Marker()
+        marker.header.frame_id = 'world'  # Set the frame of reference
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = "goal" + self.car_str
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+        marker.pose.position.x = next_state.x  # Set the position
+        marker.pose.position.y = next_state.y
+        marker.pose.position.z = 0.0
+        marker.pose.orientation.x = 0.0
+        marker.pose.orientation.y = 0.0
+        marker.pose.orientation.z = 0.0
+        marker.pose.orientation.w = 1.0
+        marker.scale.x = 0.2  # Set the scale
+        marker.scale.y = 0.2
+        marker.scale.z = 0.2
+        marker.color.a = 1.0  # Set the color and transparency
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+
+        # Publish the marker
+        self.goal_publisher_.publish(marker)
         
+        
+def carStateStamped_to_State(curr_car: CarStateStamped) -> State:
+    car_state = State()
+    car_state.x = curr_car.pos_x
+    car_state.y = curr_car.pos_y
+    car_state.yaw = utils.normalize_angle(curr_car.turn_angle) #turn angle is with respect to the car, not wheel
+    car_state.omega = curr_car.turn_rate
+    car_state.v = utils.longitudinal_velocity(curr_car.vel_x, curr_car.vel_y, car_state.omega)
+    return car_state
+
 
 def main(args=None):
     rclpy.init(args=args)

@@ -5,7 +5,7 @@ import math
 import numpy as np
 import os
 from lar_utils.car_utils import normalize_angle
-from lar_msgs.msg import CarControlStamped, CarStateStamped as State
+from lar_msgs.msg import CarControlStamped
 
 class State:
     x = y = v = yaw = omega = 0.0
@@ -57,10 +57,11 @@ class CarModel:
             self.state.yaw = car_state.yaw
             self.state.omega = car_state.omega
 
-    def step(self, cmd: CarControlStamped, dt: float)-> State:
-        return self.next_state(cmd, dt)
+    def step(self, cmd: CarControlStamped, dt: float, curr_state: State = None)-> State:
+        return self.next_state(cmd, dt, curr_state)
 
-    def _linear_model_callback(self, cmd: CarControlStamped, dt: float) -> State:
+
+    def _linear_model_callback(self, cmd: CarControlStamped, dt: float, curr_state: State = None) -> State:
         """
         Update the car state using a non-linear kinematic model.
 
@@ -77,29 +78,29 @@ class CarModel:
         """
         
         # Simulate given/current state
-        state = State()
-        state.x = self.state.x
-        state.y = self.state.y
-        state.v = self.state.v
-        state.yaw = self.state.yaw
-        state.omega = self.state.omega
+        old_x = self.state.x if curr_state is None else curr_state.x
+        old_y = self.state.y if curr_state is None else curr_state.y
+        old_v = self.state.v if curr_state is None else curr_state.v
+        old_yaw = self.state.yaw if curr_state is None else curr_state.yaw
+        old_omega = self.state.omega if curr_state is None else curr_state.omega
 
         # Ensure feasible inputs
         cmd.steering = np.clip(cmd.steering, -self.max_steer, self.max_steer)
 
         # State update
-        state.x = self.state.x + self.state.v * np.cos(self.state.yaw) * dt
-        state.y = self.state.y + self.state.v * np.sin(self.state.yaw) * dt
+        state = State()
+        state.x = old_x + old_v * np.cos(old_yaw) * dt
+        state.y = old_y + old_v * np.sin(old_yaw) * dt
 
-        state.v = self.state.v + cmd.throttle * dt
-        state.v = np.clip(state.v, self.min_speed, self.max_speed)
-
-        state.yaw = self.state.yaw + self.state.v / self.L * np.tan(cmd.steering) * dt
+        state.yaw = old_yaw + old_v / self.L * np.tan(cmd.steering) * dt
         state.yaw = normalize_angle(state.yaw)
+
+        state.v = old_v + cmd.throttle * dt
+        state.v = np.clip(state.v, self.min_speed, self.max_speed)
 
         return state
     
-    def _nonlinear_model_callback(self, cmd:CarControlStamped, dt: float) -> State:
+    def _nonlinear_model_callback(self, cmd:CarControlStamped, dt: float, curr_state: State = None) -> State:
         """
         Update the car state using a nonlinear dynamic model.
 
@@ -116,22 +117,21 @@ class CarModel:
         """
 
         # Simulate given/current state
-        state = State()
-        state.x = self.state.x
-        state.y = self.state.y
-        state.v = self.state.v
-        state.yaw = self.state.yaw
-        state.omega = self.state.omega
+        old_x = self.state.x if curr_state is None else curr_state.x
+        old_y = self.state.y if curr_state is None else curr_state.y
+        old_v = self.state.v if curr_state is None else curr_state.v
+        old_yaw = self.state.yaw if curr_state is None else curr_state.yaw
+        old_omega = self.state.omega if curr_state is None else curr_state.omega
 
         # Ensure feasible inputs
         cmd.steering = np.clip(cmd.steering, -self.max_steer, self.max_steer)
 
         beta = math.atan2((self.Lr * math.tan(cmd.steering) / self.L), 1.0)
-        vx = state.v * math.cos(beta)
-        vy = state.v * math.sin(beta)
+        vx = old_v * math.cos(beta)
+        vy = old_v * math.sin(beta)
 
-        Ffy = -self.Cf * ((vy + self.Lf * state.omega) / (vx + 0.0001) - cmd.steering)
-        Fry = -self.Cr * (vy - self.Lr * state.omega) / (vx + 0.0001)
+        Ffy = -self.Cf * ((vy + self.Lf * old_omega) / (vx + 0.0001) - cmd.steering)
+        Fry = -self.Cr * (vy - self.Lr * old_omega) / (vx + 0.0001)
         R_x = self.c_r1 * abs(vx)
         F_aero = self.c_a * vx ** 2 # 
         F_load = F_aero + R_x #
@@ -139,13 +139,14 @@ class CarModel:
         vy = vy + (Fry / self.m + Ffy * math.cos(cmd.steering) / self.m - vx * state.omega) * dt
 
         # State update
-        state.omega = state.omega + (Ffy * self.Lf * math.cos(cmd.steering) - Fry * self.Lr) / self.Iz * dt
+        state = State()
+        state.omega = old_omega + (Ffy * self.Lf * math.cos(cmd.steering) - Fry * self.Lr) / self.Iz * dt
         
-        state.yaw = state.yaw + state.omega * dt
+        state.yaw = old_yaw + old_omega * dt
         state.yaw = normalize_angle(state.yaw)
 
-        state.x = state.x + vx * math.cos(state.yaw) * dt - vy * math.sin(state.yaw) * dt
-        state.y = state.y + vx * math.sin(state.yaw) * dt + vy * math.cos(state.yaw) * dt
+        state.x = old_x + vx * math.cos(old_yaw) * dt - vy * math.sin(old_yaw) * dt
+        state.y = old_y + vx * math.sin(old_yaw) * dt + vy * math.cos(old_yaw) * dt
 
         state.v = math.sqrt(vx ** 2 + vy ** 2)
         state.v = np.clip(state.v, self.min_speed, self.max_speed)

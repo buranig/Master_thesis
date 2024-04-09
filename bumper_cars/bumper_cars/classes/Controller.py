@@ -48,7 +48,13 @@ class Controller:
         self.car_model = CarModel(car_path)
 
     def simulate_input(self, car_cmd: CarControlStamped) -> State:
-        return self.car_model.step(car_cmd, self.L_d)
+        curr_state = self.car_model.step(car_cmd, self.dt)
+        t = self.dt
+        while t<self.L_d:
+            print("Current_state: " + str(curr_state.x))
+            curr_state = self.car_model.step(car_cmd, self.dt, curr_state=curr_state)
+            t += self.dt
+        return curr_state
 
     def set_state(self, state: State) -> None:
         self.car_model.set_state(state)

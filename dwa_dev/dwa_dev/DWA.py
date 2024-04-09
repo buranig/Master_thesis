@@ -111,6 +111,8 @@ class DWA_algorithm(Controller):
     add_noise = None
     noise_scale_param = None
     
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+
 
     def __init__(self, controller_path:str, robot_num = 1):
         super().__init__(controller_path)
@@ -129,6 +131,7 @@ class DWA_algorithm(Controller):
         self.min_speed = yaml_object["DWA"]["min_speed"] # [m/s]
         self.v_resolution = yaml_object["DWA"]["v_resolution"] # [m/s]
         self.delta_resolution = math.radians(yaml_object["DWA"]["delta_resolution"])# [rad/s]
+        self.a_resolution = yaml_object["DWA"]["a_resolution"] # [m/ss]
         self.max_acc = yaml_object["DWA"]["max_acc"] # [m/ss]
         self.min_acc = yaml_object["DWA"]["min_acc"] # [m/ss]
         self.dt = yaml_object["Controller"]["dt"] # [s] Time tick for motion prediction
@@ -169,10 +172,7 @@ class DWA_algorithm(Controller):
         self.noise_scale_param = yaml_object["Controller"]["noise_scale"]
         np.random.seed(1)
 
-        # Read pre-computed trajectories
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        with open(dir_path + '/../config/trajectories.json', 'r') as file:
-            self.trajs = json.load(file)
+        self.generate_trajectories()
 
     ################# PUBLIC METHODS
     
@@ -193,7 +193,6 @@ class DWA_algorithm(Controller):
         car_cmd.throttle = u[0]
         car_cmd.steering = u[1]
 
-        # print(u, trajectory, u_history)
 
 
         
@@ -298,16 +297,77 @@ class DWA_algorithm(Controller):
                     x[3, i] = 0
         return u, x
 
-    def set_goal(self, goal: State):
+    def set_goal(self, goal: State) -> None:
         self.goal = goal
+    
+    def generate_trajectories(self) -> None:
+        """
+        Generates trajectories and stores them in a json in the config file
+        """
+        
+        dw = self._calc_dynamic_window()
+        complete_trajectories = {}
+        initial_state = State()
+        initial_state.x = 0.0
+        initial_state.y = 0.0
+        initial_state.yaw = np.radians(90.0)
+
+        for v in np.arange(self.min_speed, self.max_speed+self.v_resolution, self.v_resolution):
+            initial_state.v = v
+            traj = []
+            u_total = []
+            cmd = CarControlStamped()
+            for a in np.arange(dw[0], dw[1]+self.a_resolution, self.a_resolution):
+                cmd.throttle = a
+                for delta in np.arange(dw[2], dw[3]+self.delta_resolution, self.delta_resolution):
+                    cmd.steering = delta
+
+                    traj.append(self._calc_trajectory(initial_state, cmd))
+                    u_total.append([a, delta])
+
+            traj = np.array(traj)
+            temp2 = {}
+            for j in range(len(traj)):
+                temp2[u_total[j][0]] = {}
+            for i in range(len(traj)):
+                temp2[u_total[i][0]][u_total[i][1]] = traj[i, :, :].tolist()
+            complete_trajectories[v] = temp2
+                
+        # saving the complete trajectories to a csv file
+        with open(self.dir_path + '/../config/trajectories.json', 'w') as file:
+            json.dump(complete_trajectories, file, indent=4)
+
+        print("\nThe JSON data has been written to 'data.json'")
+    
+
         
 
     ################## PRIVATE METHODS
 
+    def _calc_trajectory(self, curr_state:State, cmd:CarControlStamped):
+        """
+        Computes the trajectory that is used for each vehicle
+        """
+        iterations = math.ceil(self.L_d/self.dt) + 1
+        traj = np.zeros((iterations, 4))
+        traj[0,:] = np.array([curr_state.x, curr_state.y, curr_state.yaw, curr_state.v])
+        i = 1
+        while i < iterations:
+            curr_state = self.car_model.step(cmd,self.dt,curr_state)
+            x = [curr_state.x, curr_state.y, curr_state.yaw, curr_state.v]
+            traj[i,:] = np.array(x)
+            i += 1
+        return traj
+
+    
     def _initialize_paths_targets_dilated_traj(self):
         """
         Initialize the paths, targets, and dilated trajectory.
         """
+        # Read pre-computed trajectories
+        with open(self.dir_path + '/../config/trajectories.json', 'r') as file:
+            self.trajs = json.load(file)
+
         for i in range(self.curr_state.shape[0]):
             self.dilated_traj.append(Point(self.curr_state[i, 0], self.curr_state[i, 1]).buffer(self.dilation_factor, cap_style=3))
         
@@ -339,27 +399,6 @@ class DWA_algorithm(Controller):
         dw = [Vs[0], Vs[1], Vs[2], Vs[3]]
 
         return dw
-
-    def _predict_trajectory(self, x_init, a, delta):
-        """
-        Predict the trajectory with an input.
-
-        Args:
-            x_init (list): Initial state [x(m), y(m), yaw(rad), v(m/s), delta(rad)].
-            a (float): Throttle input.
-            delta (float): Steering input.
-
-        Returns:
-            numpy.ndarray: Predicted trajectory.
-        """
-        x = np.array(x_init)
-        trajectory = np.array(x)
-        time = 0
-        while time < self.predict_time:
-            x = utils.motion(x, [a, delta], self.dt)
-            trajectory = np.vstack((trajectory, x))
-            time += self.dt
-        return trajectory
 
     def _calc_obstacle_cost(self, trajectory, ob):
         """

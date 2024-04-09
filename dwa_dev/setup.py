@@ -13,8 +13,6 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
-        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
         (os.path.join('share', package_name, 'config'), glob('config/*.json')),
     ],
     install_requires=['setuptools', 'lar_msgs', 'lar_utils'],
@@ -27,7 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'dwa = dwa_dev.DWA:main',
-            'generate_trajectories = dwa_dev.generate_trajectories:main'
+            'view_trajs = dwa_dev.view_trajs:main'
         ],
     },
 )

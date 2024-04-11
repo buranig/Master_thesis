@@ -28,9 +28,12 @@ class CarModel:
         self.max_steer = yaml_object["max_steer"] # [rad] max steering angle
         self.max_speed = yaml_object["max_speed"] # [m/s]
         self.min_speed = yaml_object["min_speed"] # [m/s]
+        self.max_acc = yaml_object["max_acc"] # [m/ss]
+        self.min_acc = yaml_object["min_acc"] # [m/ss]
 
+        self.width = yaml_object["width"] # [m] Width of the vehicle's track
         self.L = yaml_object["L"]       # [m] Wheel base of vehicle
-        self.Lr = self.L / 2.0          # [m] Assume CG in middle
+        self.Lr = yaml_object["Lr"]          # [m] Distance from rear axle to center of mass
         self.Lf = self.L - self.Lr
         self.Cf = yaml_object["Cf"]     # N/rad
         self.Cr = yaml_object["Cr"]     # N/rad
@@ -92,7 +95,7 @@ class CarModel:
         state.x = old_x + old_v * np.cos(old_yaw) * dt
         state.y = old_y + old_v * np.sin(old_yaw) * dt
 
-        state.yaw = old_yaw + old_v / self.L * np.tan(cmd.steering) * dt
+        state.yaw = old_yaw + old_v / self.L * np.tan(cmd.steering) * dt # Tan is approximation
         state.yaw = normalize_angle(state.yaw)
 
         state.v = old_v + cmd.throttle * dt

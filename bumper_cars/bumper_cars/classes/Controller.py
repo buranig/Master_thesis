@@ -19,15 +19,7 @@ class Controller:
 
     # Initialize class public parameters
     dt = 0.0
-    L_d = 0.0
-    max_acc = 0.0
-    min_acc = 0.0
-
-    safety = 0.0
-    add_noise = 0.0
-    noise_scale = 0.0
-
-    # car_model = None
+    ph = 0.0
 
 
     def __init__(self, controller_path :str, car_path = ''):
@@ -37,21 +29,14 @@ class Controller:
         
         # Global variables
         self.dt = yaml_object["Controller"]["dt"]
-        self.L_d = yaml_object["Controller"]["L_d"]
-        self.max_acc = yaml_object["Controller"]["max_acc"]
-        self.min_acc = yaml_object["Controller"]["min_acc"]
-
-        self.safety = yaml_object["Controller"]["safety"]
-        self.add_noise = yaml_object["Controller"]["add_noise"]
-        self.noise_scale = yaml_object["Controller"]["noise_scale"]
+        self.ph = yaml_object["Controller"]["ph"]
 
         self.car_model = CarModel(car_path)
 
     def simulate_input(self, car_cmd: CarControlStamped) -> State:
         curr_state = self.car_model.step(car_cmd, self.dt)
         t = self.dt
-        while t<self.L_d:
-            print("Current_state: " + str(curr_state.x))
+        while t<self.ph:
             curr_state = self.car_model.step(car_cmd, self.dt, curr_state=curr_state)
             t += self.dt
         return curr_state

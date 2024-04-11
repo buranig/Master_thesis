@@ -62,54 +62,54 @@ class DWA_algorithm(Controller):
         calc_control_and_trajectory: Calculates the final input with the dynamic window.
     """
 
-    robot_num = None
-    targets = None
-    dilated_traj = None
-    predicted_trajectory = None
-    u_hist = None
+    # robot_num = None
+    # targets = None
+    # dilated_traj = None
+    # predicted_trajectory = None
+    # u_hist = None
 
-    max_steer = None
-    max_speed = None
-    min_speed = None
-    v_resolution = None
-    delta_resolution = None
-    max_acc = None
-    min_acc = None
-    dt = None
-    predict_time = None
-    to_goal_cost_gain = None
-    speed_cost_gain = None
-    obstacle_cost_gain = None
-    heading_cost_gain = None
-    robot_stuck_flag_cons = None
-    dilation_factor = None
-    L = None
-    Lr = None
-    Lf = None
-    Cf = None
-    Cr = None
-    Iz = None
-    m = None
+    # max_steer = None
+    # max_speed = None
+    # min_speed = None
+    # v_resolution = None
+    # delta_resolution = None
+    # max_acc = None
+    # min_acc = None
+    # dt = None
+    # predict_time = None
+    # to_goal_cost_gain = None
+    # speed_cost_gain = None
+    # obstacle_cost_gain = None
+    # heading_cost_gain = None
+    # robot_stuck_flag_cons = None
+    # dilation_factor = None
+    # car_model.L = None
+    # car_model.Lr = None
+    # Lf = None
+    # car_model.Cf = None
+    # car_model.Cr = None
+    # car_model.Iz = None
+    # car_model.m = None
     
-    # Aerodynamic and friction coefficients
-    c_a = None
-    c_r1 = None
-    WB = None
-    L_d = None
-    safety_init = None
-    width_init = None
-    height_init = None
-    min_dist = None
-    to_goal_stop_distance = None
-    update_dist = None
+    # # Aerodynamic and friction coefficients
+    # car_model.c_a = None
+    # car_model.c_r1 = None
+    # car_model.WB = None
+    # ph = None
+    # safety_init = None
+    # width_init = None
+    # height_init = None
+    # min_dist = None
+    # to_goal_stop_distance = None
+    # update_dist = None
     
-    timer_freq = None
+    # timer_freq = None
 
-    show_animation = None
-    boundary_points = None
-    check_collision_bool = None
-    add_noise = None
-    noise_scale_param = None
+    # show_animation = None
+    # boundary_points = None
+    # check_collision_bool = None
+    # add_noise = None
+    # noise_scale_param = None
     
     dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -126,50 +126,21 @@ class DWA_algorithm(Controller):
             # Reading from yaml file
             yaml_object = yaml.safe_load(openfile)
 
-        self.max_steer = yaml_object["DWA"]["max_steer"] # [rad] max steering angle
-        self.max_speed = yaml_object["DWA"]["max_speed"] # [m/s]
-        self.min_speed = yaml_object["DWA"]["min_speed"] # [m/s]
         self.v_resolution = yaml_object["DWA"]["v_resolution"] # [m/s]
-        self.delta_resolution = math.radians(yaml_object["DWA"]["delta_resolution"])# [rad/s]
+        self.delta_resolution = math.radians(yaml_object["DWA"]["delta_resolution"])# [rad]
         self.a_resolution = yaml_object["DWA"]["a_resolution"] # [m/ss]
-        self.max_acc = yaml_object["DWA"]["max_acc"] # [m/ss]
-        self.min_acc = yaml_object["DWA"]["min_acc"] # [m/ss]
-        self.dt = yaml_object["Controller"]["dt"] # [s] Time tick for motion prediction
-        self.predict_time = yaml_object["DWA"]["predict_time"] # [s]
+
         self.to_goal_cost_gain = yaml_object["DWA"]["to_goal_cost_gain"]
         self.speed_cost_gain = yaml_object["DWA"]["speed_cost_gain"]
         self.obstacle_cost_gain = yaml_object["DWA"]["obstacle_cost_gain"]
         self.heading_cost_gain = yaml_object["DWA"]["heading_cost_gain"]
-        self.robot_stuck_flag_cons = yaml_object["DWA"]["robot_stuck_flag_cons"]
         self.dilation_factor = yaml_object["DWA"]["dilation_factor"]
-        self.L = yaml_object["Car_model"]["L"]  # [m] Wheel base of vehicle
-        self.Lr = self.L / 2.0  # [m]
-        self.Lf = self.L - self.Lr
-        self.Cf = yaml_object["Car_model"]["Cf"]  # N/rad
-        self.Cr = yaml_object["Car_model"]["Cr"] # N/rad
-        self.Iz = yaml_object["Car_model"]["Iz"]  # kg/m2
-        self.m = yaml_object["Car_model"]["m"]  # kg
         
         # Aerodynamic and friction coefficients
-        self.c_a = yaml_object["Car_model"]["c_a"]
-        self.c_r1 = yaml_object["Car_model"]["c_r1"]
-        self.WB = yaml_object["Controller"]["WB"] # Wheel base
-        self.L_d = yaml_object["Controller"]["L_d"]  # [m] look-ahead distance
-        self.safety_init = yaml_object["Controller"]["safety"]
         self.width_init = yaml_object["width"]
         self.height_init = yaml_object["height"]
-        self.min_dist = yaml_object["min_dist"]
-        self.to_goal_stop_distance = yaml_object["to_goal_stop_distance"]
-        self.update_dist = 2
-        
 
-        self.timer_freq = yaml_object["timer_freq"]
 
-        self.show_animation = yaml_object["show_animation"]
-        self.boundary_points = np.array([-self.width_init/2, self.width_init/2, -self.height_init/2, self.height_init/2])
-        self.check_collision_bool = False
-        self.add_noise = yaml_object["Controller"]["add_noise"]
-        self.noise_scale_param = yaml_object["Controller"]["noise_scale"]
         np.random.seed(1)
 
         self.generate_trajectories()
@@ -185,25 +156,32 @@ class DWA_algorithm(Controller):
         if self.dilated_traj == []:
             self._initialize_paths_targets_dilated_traj()
 
-        # Compute control
+        # Update expected state of other cars (no input)
+        self._update_others()
+
+        # Compute control   
         u, trajectory, u_history = self.calc_control_and_trajectory(self.curr_state[self.robot_num])
         self.dilated_traj[self.robot_num] = LineString(zip(trajectory[:, 0], trajectory[:, 1])).buffer(self.dilation_factor, cap_style=3)
-        # print("Current_state: " + str(self.curr_state[self.robot_num]))
 
         car_cmd.throttle = u[0]
         car_cmd.steering = u[1]
 
-
-
-        
-        plt.cla()
-        plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-        self.plot_robot_trajectory(self.curr_state[self.robot_num], u, trajectory, self.dilated_traj[self.robot_num], [self.goal.x, self.goal.y], ax)
-        
+        ############################################################################################################################
+        ############################################################################################################################
+        ############################################################################################################################
+        if self.robot_num == 0:
+            plt.cla()
+            plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
+            for i in range(self.curr_state.shape[0]):
+                self.plot_robot_trajectory(self.curr_state[i], u, trajectory, self.dilated_traj[i], [self.goal.x, self.goal.y], ax)
             
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
+                
+            plt.axis("equal")
+            plt.grid(True)
+            plt.pause(0.00001)
+        ############################################################################################################################
+        ############################################################################################################################
+        ############################################################################################################################
 
         return car_cmd
 
@@ -229,7 +207,7 @@ class DWA_algorithm(Controller):
             dw = self._calc_dynamic_window()
 
             # evaluate all trajectory with sampled input in dynamic window
-            nearest = utils.find_nearest(np.arange(self.min_speed, self.max_speed+self.v_resolution, self.v_resolution), x[3])
+            nearest = utils.find_nearest(np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution), x[3])
 
             for a in np.arange(dw[0], dw[1]+self.v_resolution, self.v_resolution):
                 for delta in np.arange(dw[2], dw[3]+self.delta_resolution, self.delta_resolution):
@@ -246,14 +224,14 @@ class DWA_algorithm(Controller):
                     # calc cost
 
                     to_goal_cost = self.to_goal_cost_gain * self._calc_to_goal_cost(trajectory)
-                    speed_cost = self.speed_cost_gain * (self.max_speed - trajectory[-1, 3])
+                    speed_cost = self.speed_cost_gain * (self.car_model.max_speed - trajectory[-1, 3])
                     # if trajectory[-1, 3] <= 0.0:
                     #     speed_cost = 5
                     # else:
                     #     speed_cost = 0.0
                     ob_cost = self.obstacle_cost_gain * self._calc_obstacle_cost(trajectory, ob)
                     heading_cost = self.heading_cost_gain * self._calc_to_goal_heading_cost(trajectory)
-                    final_cost = to_goal_cost +  speed_cost + ob_cost #+ heading_cost #+ speed_cost 
+                    final_cost = to_goal_cost + ob_cost #+  speed_cost  #+ heading_cost #+ speed_cost 
                     # print("COSTS: ", to_goal_cost, speed_cost, ob_cost)
                     # search minimum trajectory
                     if min_cost >= final_cost:
@@ -264,39 +242,6 @@ class DWA_algorithm(Controller):
 
             return best_u, best_trajectory, u_history
     
-    def check_collision(self, x, u, i):
-        """
-        Checks for collision between the robot at index i and other robots.
-
-        Args:
-            x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
-            i (int): Index of the robot to check collision for.
-
-        Raises:
-            Exception: If collision is detected.
-
-        """
-        if x[0,i]>= self.boundary_points[1]-self.WB/2 or x[0,i]<= self.boundary_points[0]+self.WB/2 or x[1,i]>=self.boundary_points[3]-self.WB/2 or x[1,i]<=self.boundary_points[2]+self.WB/2:
-            if self.check_collision_bool:
-                raise Exception('Collision')
-            else:
-                print("Collision detected")
-                u[:, i] = np.zeros(2)
-                x[3, i] = 0
-
-
-        for idx in range(self.robot_num):
-            if idx == i:
-                continue
-            if utils.dist([x[0,i], x[1,i]], [x[0, idx], x[1, idx]]) <= self.WB/2:
-                if self.check_collision_bool:
-                    raise Exception('Collision')
-                else:
-                    print("Collision detected")
-                    u[:, i] = np.zeros(2)
-                    x[3, i] = 0
-        return u, x
-
     def set_goal(self, goal: State) -> None:
         self.goal = goal
     
@@ -312,7 +257,7 @@ class DWA_algorithm(Controller):
         initial_state.y = 0.0
         initial_state.yaw = np.radians(90.0)
 
-        for v in np.arange(self.min_speed, self.max_speed+self.v_resolution, self.v_resolution):
+        for v in np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution):
             initial_state.v = v
             traj = []
             u_total = []
@@ -344,11 +289,26 @@ class DWA_algorithm(Controller):
 
     ################## PRIVATE METHODS
 
+    def _update_others(self):
+        emptyControl = CarControlStamped()
+        for i in range(len(self.dilated_traj)):
+            if i == self.robot_num:
+                continue
+            car_state = State()
+            car_state.x = self.curr_state[i][0]
+            car_state.y = self.curr_state[i][1]
+            car_state.yaw = self.curr_state[i][2]
+            car_state.v = self.curr_state[i][3]
+            car_state.omega = self.curr_state[i][4]
+            traj_i = self._calc_trajectory(car_state, emptyControl )
+            self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1])).buffer(self.dilation_factor, cap_style=3)
+
+
     def _calc_trajectory(self, curr_state:State, cmd:CarControlStamped):
         """
         Computes the trajectory that is used for each vehicle
         """
-        iterations = math.ceil(self.L_d/self.dt) + 1
+        iterations = math.ceil(self.ph/self.dt) + 1
         traj = np.zeros((iterations, 4))
         traj[0,:] = np.array([curr_state.x, curr_state.y, curr_state.yaw, curr_state.v])
         i = 1
@@ -393,8 +353,8 @@ class DWA_algorithm(Controller):
             list: Dynamic window [min_throttle, max_throttle, min_steer, max_steer].
         """
 
-        Vs = [self.min_acc, self.max_acc,
-            -self.max_steer, self.max_steer]
+        Vs = [self.car_model.min_acc, self.car_model.max_acc,
+            -self.car_model.max_steer, self.car_model.max_steer]
 
         dw = [Vs[0], Vs[1], Vs[2], Vs[3]]
 
@@ -423,9 +383,9 @@ class DWA_algorithm(Controller):
         y = trajectory[:, 1]
 
         # check if the trajectory is out of bounds
-        if any(element < -self.width_init/2+self.WB/2 or element > self.width_init/2-self.WB/2 for element in x):
+        if any(element < -self.width_init/2+self.car_model.width/2 or element > self.width_init/2-self.car_model.width/2 for element in x):
             return np.inf
-        if any(element < -self.height_init/2+self.WB/2 or element > self.height_init/2-self.WB/2 for element in y):
+        if any(element < -self.height_init/2+self.car_model.width/2 or element > self.height_init/2-self.car_model.width/2 for element in y):
             return np.inf
 
         if ob:
@@ -433,11 +393,12 @@ class DWA_algorithm(Controller):
                 if dilated.intersects(obstacle):
                     return np.inf # collision        
                 elif distance(dilated, obstacle) < min_distance:
+                    continue
                     min_distance = distance(dilated, obstacle)
-            distance_cost = 1/min_distance
+            distance_cost = 1/(min_distance * 10)
         else:
             distance_cost = 0.0
-        
+        # print("Robot: "+str(self.robot_num) + " distance: " + str(min_distance))
         return distance_cost
 
     def _calc_to_goal_cost(self, trajectory):
@@ -511,12 +472,12 @@ class DWA_algorithm(Controller):
         # plt.plot(x[0], x[1], "xr")
         plt.plot(targets[0], targets[1], "x", color=color_dict[0], markersize=15)
         self.plot_robot(x[0], x[1], x[2])
-        self.plot_arrow(x[0], x[1], x[2], length=1, width=0.5)
-        self.plot_arrow(x[0], x[1], x[2] + u[1], length=3, width=0.5)
+        self.plot_arrow(x[0], x[1], x[2], length=0.5, width=0.05)
+        self.plot_arrow(x[0], x[1], x[2] + u[1], length=0.5, width=0.1)
         self.plot_map()
 
 
-    def plot_arrow(self, x, y, yaw, length=0.5, width=0.1):  # pragma: no cover
+    def plot_arrow(self, x, y, yaw, length=0.2, width=0.1):  # pragma: no cover
         """
         Plot an arrow.
 
@@ -541,12 +502,12 @@ class DWA_algorithm(Controller):
             yaw (float): Yaw angle of the robot.
             i (int): Index of the robot.
         """
-        outline = np.array([[-self.L / 2, self.L / 2,
-                                (self.L / 2), -self.L / 2,
-                                -self.L / 2],
-                            [self.WB / 2, self.WB / 2,
-                                - self.WB / 2, -self.WB / 2,
-                                self.WB / 2]])
+        outline = np.array([[-self.car_model.L / 2, self.car_model.L / 2,
+                                (self.car_model.L / 2), -self.car_model.L / 2,
+                                -self.car_model.L / 2],
+                            [self.car_model.width / 2, self.car_model.width / 2,
+                                - self.car_model.width / 2, -self.car_model.width / 2,
+                                self.car_model.width / 2]])
         Rot1 = np.array([[math.cos(yaw), math.sin(yaw)],
                             [-math.sin(yaw), math.cos(yaw)]])
         outline = (outline.T.dot(Rot1)).T

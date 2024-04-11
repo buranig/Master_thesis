@@ -18,42 +18,29 @@ dest_path = dir_path + "/../config/trajectories.json"
 
 
 package_path = get_package_share_directory('bumper_cars')
-yaml_file_path = package_path + '/config/controller.yaml'  # Adjust the path to your YAML file
+yaml_controller = package_path + '/config/controller.yaml'  # Adjust the path to your YAML file
+yaml_carModel = package_path + '/config/carModel.yaml'  # Adjust the path to your YAML file
 
 # Opening YAML file
-with open(yaml_file_path, 'r') as openfile:
+with open(yaml_controller, 'r') as openfile:
     # Reading from yaml file
-    yaml_object = yaml.safe_load(openfile)
+    yaml_dwa = yaml.safe_load(openfile)
+
+# Opening YAML file
+with open(yaml_carModel, 'r') as openfile:
+    # Reading from yaml file
+    yaml_carModel = yaml.safe_load(openfile)
+
+a_resolution = yaml_dwa["DWA"]["a_resolution"] # [m/s²]
+v_resolution = yaml_dwa["DWA"]["v_resolution"] # [m/s]
+delta_resolution = math.radians(yaml_dwa["DWA"]["delta_resolution"])# [rad/s]
 
 
-
-max_steer = yaml_object["DWA"]["max_steer"] # [rad] max steering angle
-max_speed = yaml_object["DWA"]["max_speed"] # [m/s]
-min_speed = yaml_object["DWA"]["min_speed"] # [m/s]
-a_resolution = yaml_object["DWA"]["a_resolution"] # [m/s²]
-v_resolution = yaml_object["DWA"]["v_resolution"] # [m/s]
-delta_resolution = math.radians(yaml_object["DWA"]["delta_resolution"])# [rad/s]
-max_acc = yaml_object["DWA"]["max_acc"] # [m/ss]
-min_acc = yaml_object["DWA"]["min_acc"] # [m/ss]
-dt = yaml_object["Controller"]["dt"] # [s] Time tick for motion prediction
-predict_time = yaml_object["DWA"]["predict_time"] # [s]
-L = yaml_object["Car_model"]["L"]  # [m] Wheel base of vehicle
-Lr = L / 2.0  # [m]
-Lf = L - Lr
-Cf = yaml_object["Car_model"]["Cf"]  # N/rad
-Cr = yaml_object["Car_model"]["Cr"] # N/rad
-Iz = yaml_object["Car_model"]["Iz"]  # kg/m2
-m = yaml_object["Car_model"]["m"]  # kg
-# Aerodynamic and friction coefficients
-c_a = yaml_object["Car_model"]["c_a"]
-c_r1 = yaml_object["Car_model"]["c_r1"]
-WB = yaml_object["Controller"]["WB"] # Wheel base
-robot_num = yaml_object["robot_num"]
-N=3
-save_flag = True
-show_animation = True
-plot_flag = False
-timer_freq = yaml_object["timer_freq"]
+max_steer = yaml_carModel["max_steer"] # [rad] max steering angle
+max_speed = yaml_carModel["max_speed"] # [m/s]
+min_speed = yaml_carModel["min_speed"] # [m/s]
+max_acc = yaml_carModel["max_acc"] # [m/ss]
+min_acc = yaml_carModel["min_acc"] # [m/ss]
 
 
 def calc_dynamic_window():
@@ -96,7 +83,7 @@ def main():
                 geom = LineString(zip(geom[:, 0], geom[:, 1]))
                 newgeom = LineString(zip(newgeom[:, 0], newgeom[:, 1]))
                 plot_line(geom, ax=ax, add_points=False, linewidth=3)
-                plot_line(newgeom, ax=ax, add_points=False, linewidth=3)
+                # plot_line(newgeom, ax=ax, add_points=False, linewidth=3)
                 
     plt.show()
     #########################################################################################################        

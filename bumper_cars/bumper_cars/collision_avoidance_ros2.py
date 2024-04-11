@@ -95,10 +95,7 @@ class CollisionAvoidance(Node):
 
             # Compute safe control input
             safe_cmd = self.algorithm.compute_cmd(curr_state.env_state)
-            print("DESIRED ACTION")
-            print("Throttle: " + str(des_action.cmd.throttle) + " - Steering: " + str(des_action.cmd.steering))
-            print("ACTUAL ACTION")
-            print("Throttle: " + str(safe_cmd.throttle) + " - Steering: " + str(safe_cmd.steering))
+
             # Send command to car
             self.publisher_.publish(safe_cmd)
             self.goal_marker(next_state)

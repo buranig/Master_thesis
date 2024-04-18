@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'lar_msgs', 'lar_utils'],
     zip_safe=True,
     maintainer='giacomo',
     maintainer_email='buranig@stuent.ethz.ch',
@@ -20,6 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            # 'cbf = cbf_dev.CBF:main',
+            # 'c3bf = cbf_dev.C3BF:main'
         ],
     },
 )

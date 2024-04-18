@@ -24,7 +24,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'dwa = dwa_dev.DWA:main',
+            # 'dwa = dwa_dev.DWA:main',
             'view_trajs = dwa_dev.view_trajs:main'
         ],
     },

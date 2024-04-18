@@ -6,17 +6,11 @@ CBF_robotarium:
   barrier_gain: 0.05
   magnitude_limit: 6
 CBF_simple:
-  max_steer: 0.785398
-  max_acc: 100
-  min_acc: -100
   safety_radius: 2
   barrier_gain: 0.01
   arena_gain: 0.01
   Kv: 0.1
 C3BF:
-  max_steer: 0.785398
-  max_acc: 5
-  min_acc: -5
   safety_radius: 1.5
   barrier_gain: 1
   arena_gain: 50
@@ -61,13 +55,9 @@ Controller:
   # controller_type: MPC
   # cbf_type: C3BF
   # safety: 10
-  # add_noise: false
-  # noise_scale: 0.4
-robot_num: 5
-min_dist: 3
-width: 10
-height: 10
-timer_freq: 0.01
-plot_traj: false
-to_goal_stop_distance: 2.5
-show_animation: true
+  add_noise: false
+  noise_scale: 0.4
+Simulation:
+  width: 10
+  height: 10
+  show_animation: false

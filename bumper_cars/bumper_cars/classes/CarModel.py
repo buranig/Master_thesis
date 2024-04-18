@@ -47,9 +47,9 @@ class CarModel:
         # Linear/nonlinear model
         model_type = yaml_object["model_type"]
         if model_type == 'linear':
-            self.next_state = self._linear_model_callback
+            self.next_state = self.__linear_model_callback
         elif model_type == 'nonlinear':
-            self.next_state = self._nonlinear_model_callback
+            self.next_state = self.__nonlinear_model_callback
         else:
             raise Exception("Wrong value for 'model_type'")
         
@@ -64,7 +64,7 @@ class CarModel:
         return self.next_state(cmd, dt, curr_state)
 
 
-    def _linear_model_callback(self, cmd: CarControlStamped, dt: float, curr_state: State = None) -> State:
+    def __linear_model_callback(self, cmd: CarControlStamped, dt: float, curr_state: State = None) -> State:
         """
         Update the car state using a non-linear kinematic model.
 
@@ -103,7 +103,7 @@ class CarModel:
 
         return state
     
-    def _nonlinear_model_callback(self, cmd:CarControlStamped, dt: float, curr_state: State = None) -> State:
+    def __nonlinear_model_callback(self, cmd:CarControlStamped, dt: float, curr_state: State = None) -> State:
         """
         Update the car state using a nonlinear dynamic model.
 

@@ -61,58 +61,8 @@ class DWA_algorithm(Controller):
         dwa_control: Dynamic Window Approach control.
         calc_control_and_trajectory: Calculates the final input with the dynamic window.
     """
-
-    # robot_num = None
-    # targets = None
-    # dilated_traj = None
-    # predicted_trajectory = None
-    # u_hist = None
-
-    # max_steer = None
-    # max_speed = None
-    # min_speed = None
-    # v_resolution = None
-    # delta_resolution = None
-    # max_acc = None
-    # min_acc = None
-    # dt = None
-    # predict_time = None
-    # to_goal_cost_gain = None
-    # speed_cost_gain = None
-    # obstacle_cost_gain = None
-    # heading_cost_gain = None
-    # robot_stuck_flag_cons = None
-    # dilation_factor = None
-    # car_model.L = None
-    # car_model.Lr = None
-    # Lf = None
-    # car_model.Cf = None
-    # car_model.Cr = None
-    # car_model.Iz = None
-    # car_model.m = None
-    
-    # # Aerodynamic and friction coefficients
-    # car_model.c_a = None
-    # car_model.c_r1 = None
-    # car_model.WB = None
-    # ph = None
-    # safety_init = None
-    # width_init = None
-    # height_init = None
-    # min_dist = None
-    # to_goal_stop_distance = None
-    # update_dist = None
-    
-    # timer_freq = None
-
-    # show_animation = None
-    # boundary_points = None
-    # check_collision_bool = None
-    # add_noise = None
-    # noise_scale_param = None
     
     dir_path = os.path.dirname(os.path.realpath(__file__))
-
 
     def __init__(self, controller_path:str, robot_num = 1):
         super().__init__(controller_path)
@@ -136,14 +86,9 @@ class DWA_algorithm(Controller):
         self.heading_cost_gain = yaml_object["DWA"]["heading_cost_gain"]
         self.dilation_factor = yaml_object["DWA"]["dilation_factor"]
         
-        # Aerodynamic and friction coefficients
-        self.width_init = yaml_object["width"]
-        self.height_init = yaml_object["height"]
-
-
         np.random.seed(1)
 
-        self.generate_trajectories()
+        self.__generate_trajectories()
 
     ################# PUBLIC METHODS
     
@@ -152,144 +97,41 @@ class DWA_algorithm(Controller):
         car_cmd = CarControlStamped()
 
         # Update current state of all cars
-        self.curr_state = self._carStateStamped_to_array(car_list)
+        self.curr_state = utils.carStateStamped_to_array(car_list)
         if self.dilated_traj == []:
-            self._initialize_paths_targets_dilated_traj()
+            self.__initialize_paths_targets_dilated_traj()
 
         # Update expected state of other cars (no input)
-        self._update_others()
+        self.__update_others()
 
         # Compute control   
-        u, trajectory, u_history = self.calc_control_and_trajectory(self.curr_state[self.robot_num])
+        u, trajectory, u_history = self.__calc_control_and_trajectory(self.curr_state[self.robot_num])
         self.dilated_traj[self.robot_num] = LineString(zip(trajectory[:, 0], trajectory[:, 1])).buffer(self.dilation_factor, cap_style=3)
 
         car_cmd.throttle = u[0]
         car_cmd.steering = u[1]
 
-        ############################################################################################################################
-        ############################################################################################################################
-        ############################################################################################################################
-        if self.robot_num == 0:
+        # Debug visualization
+        if self.show_animation and self.robot_num == 0:
             plt.cla()
             plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
             for i in range(self.curr_state.shape[0]):
                 self.plot_robot_trajectory(self.curr_state[i], u, trajectory, self.dilated_traj[i], [self.goal.x, self.goal.y], ax)
-            
-                
             plt.axis("equal")
             plt.grid(True)
             plt.pause(0.00001)
-        ############################################################################################################################
-        ############################################################################################################################
-        ############################################################################################################################
 
         return car_cmd
 
-    def calc_control_and_trajectory(self, x):
-            """
-            Calculate the final input with the dynamic window.
-
-            Args:
-                x (list): Current state [x(m), y(m), yaw(rad), v(m/s), delta(rad)].
-                dw (list): Dynamic window [min_throttle, max_throttle, min_steer, max_steer].
-                ob (list): List of obstacles.
-                i (int): Index of the target.
-
-            Returns:
-                tuple: Tuple containing the control inputs (throttle, delta) and the trajectory.
-            """
-            min_cost = float("inf")
-            best_u = [0.0, 0.0]
-            best_trajectory = np.array([x])
-            # u_buf = self.u_hist[self.robot_num]
-            # trajectory_buf = self.predicted_trajectory[self.robot_num]
-            ob = [self.dilated_traj[idx] for idx in range(len(self.dilated_traj)) if idx != self.robot_num]
-            dw = self._calc_dynamic_window()
-
-            # evaluate all trajectory with sampled input in dynamic window
-            nearest = utils.find_nearest(np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution), x[3])
-
-            for a in np.arange(dw[0], dw[1]+self.v_resolution, self.v_resolution):
-                for delta in np.arange(dw[2], dw[3]+self.delta_resolution, self.delta_resolution):
-
-                    # old_time = time.time()
-                    geom = self.trajs[str(nearest)][str(a)][str(delta)]
-                    geom = np.array(geom)
-                    geom[:,0:2] = (geom[:,0:2]) @ utils.rotateMatrix(np.radians(90)-x[2]) + [x[0],x[1]]
-                    # print(time.time()-old_time)
-                    geom[:,2] = geom[:,2] + x[2] - np.pi/2 #bringing also the yaw angle in the new frame
-
-                    # trajectory = predict_trajectory(x_init, a, delta)
-                    trajectory = geom
-                    # calc cost
-
-                    to_goal_cost = self.to_goal_cost_gain * self._calc_to_goal_cost(trajectory)
-                    speed_cost = self.speed_cost_gain * (self.car_model.max_speed - trajectory[-1, 3])
-                    # if trajectory[-1, 3] <= 0.0:
-                    #     speed_cost = 5
-                    # else:
-                    #     speed_cost = 0.0
-                    ob_cost = self.obstacle_cost_gain * self._calc_obstacle_cost(trajectory, ob)
-                    heading_cost = self.heading_cost_gain * self._calc_to_goal_heading_cost(trajectory)
-                    final_cost = to_goal_cost + ob_cost #+  speed_cost  #+ heading_cost #+ speed_cost 
-                    # print("COSTS: ", to_goal_cost, speed_cost, ob_cost)
-                    # search minimum trajectory
-                    if min_cost >= final_cost:
-                        min_cost = final_cost
-                        best_u = [a, delta]
-                        best_trajectory = trajectory
-                        u_history = [[a, delta] for _ in range(len(trajectory-1))]
-
-            return best_u, best_trajectory, u_history
-    
-    def set_goal(self, goal: State) -> None:
-        self.goal = goal
-    
-    def generate_trajectories(self) -> None:
-        """
-        Generates trajectories and stores them in a json in the config file
-        """
-        
-        dw = self._calc_dynamic_window()
-        complete_trajectories = {}
-        initial_state = State()
-        initial_state.x = 0.0
-        initial_state.y = 0.0
-        initial_state.yaw = np.radians(90.0)
-
-        for v in np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution):
-            initial_state.v = v
-            traj = []
-            u_total = []
-            cmd = CarControlStamped()
-            for a in np.arange(dw[0], dw[1]+self.a_resolution, self.a_resolution):
-                cmd.throttle = a
-                for delta in np.arange(dw[2], dw[3]+self.delta_resolution, self.delta_resolution):
-                    cmd.steering = delta
-
-                    traj.append(self._calc_trajectory(initial_state, cmd))
-                    u_total.append([a, delta])
-
-            traj = np.array(traj)
-            temp2 = {}
-            for j in range(len(traj)):
-                temp2[u_total[j][0]] = {}
-            for i in range(len(traj)):
-                temp2[u_total[i][0]][u_total[i][1]] = traj[i, :, :].tolist()
-            complete_trajectories[v] = temp2
-                
-        # saving the complete trajectories to a csv file
-        with open(self.dir_path + '/../config/trajectories.json', 'w') as file:
-            json.dump(complete_trajectories, file, indent=4)
-
-        print("\nThe JSON data has been written to 'data.json'")
-    
+    def set_goal(self, goal: CarControlStamped) -> None:
+        next_state = self.__simulate_input(goal)
+        self.goal = next_state
 
         
 
     ################## PRIVATE METHODS
 
-    def _update_others(self):
+    def __update_others(self):
         emptyControl = CarControlStamped()
         for i in range(len(self.dilated_traj)):
             if i == self.robot_num:
@@ -300,11 +142,18 @@ class DWA_algorithm(Controller):
             car_state.yaw = self.curr_state[i][2]
             car_state.v = self.curr_state[i][3]
             car_state.omega = self.curr_state[i][4]
-            traj_i = self._calc_trajectory(car_state, emptyControl )
+            traj_i = self.__calc_trajectory(car_state, emptyControl )
             self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1])).buffer(self.dilation_factor, cap_style=3)
 
+    def __simulate_input(self, car_cmd: CarControlStamped) -> State:
+        curr_state = self.car_model.step(car_cmd, self.dt)
+        t = self.dt
+        while t<self.ph:
+            curr_state = self.car_model.step(car_cmd, self.dt, curr_state=curr_state)
+            t += self.dt
+        return curr_state
 
-    def _calc_trajectory(self, curr_state:State, cmd:CarControlStamped):
+    def __calc_trajectory(self, curr_state:State, cmd:CarControlStamped):
         """
         Computes the trajectory that is used for each vehicle
         """
@@ -320,7 +169,7 @@ class DWA_algorithm(Controller):
         return traj
 
     
-    def _initialize_paths_targets_dilated_traj(self):
+    def __initialize_paths_targets_dilated_traj(self):
         """
         Initialize the paths, targets, and dilated trajectory.
         """
@@ -331,18 +180,9 @@ class DWA_algorithm(Controller):
         for i in range(self.curr_state.shape[0]):
             self.dilated_traj.append(Point(self.curr_state[i, 0], self.curr_state[i, 1]).buffer(self.dilation_factor, cap_style=3))
         
-    def _carStateStamped_to_array(self, car_list: List[CarStateStamped]) -> np.array:
-        car_num = len(car_list)
-        car_array = np.empty((car_num, 5))
-        for i in range(len(car_list)):
-            car_i = car_list[i]
-            curr_v = utils.longitudinal_velocity(car_i.vel_x, car_i.vel_y, car_i.turn_angle)
-            np_car_i = np.array([car_i.pos_x, car_i.pos_y, car_i.turn_angle, curr_v, car_i.turn_rate])
-            car_array[i,:] = np_car_i
-        return car_array
 
 
-    def _calc_dynamic_window(self):
+    def __calc_dynamic_window(self):
         """
         Calculate the dynamic window based on the current state.
 
@@ -360,7 +200,7 @@ class DWA_algorithm(Controller):
 
         return dw
 
-    def _calc_obstacle_cost(self, trajectory, ob):
+    def __calc_obstacle_cost(self, trajectory, ob):
         """
         Calculate the obstacle cost.
 
@@ -393,7 +233,7 @@ class DWA_algorithm(Controller):
                 if dilated.intersects(obstacle):
                     return np.inf # collision        
                 elif distance(dilated, obstacle) < min_distance:
-                    continue
+                    continue #TODO: Modify this so that it doesn't just act on collisions
                     min_distance = distance(dilated, obstacle)
             distance_cost = 1/(min_distance * 10)
         else:
@@ -401,7 +241,7 @@ class DWA_algorithm(Controller):
         # print("Robot: "+str(self.robot_num) + " distance: " + str(min_distance))
         return distance_cost
 
-    def _calc_to_goal_cost(self, trajectory):
+    def __calc_to_goal_cost(self, trajectory):
         """
         Calculate the cost to the goal.
 
@@ -423,7 +263,7 @@ class DWA_algorithm(Controller):
         cost = min(np.sqrt(dx**2+dy**2))
         return cost
 
-    def _calc_to_goal_heading_cost(self, trajectory):
+    def __calc_to_goal_heading_cost(self, trajectory):
         """
         Calculate the cost to the goal with angle difference.
 
@@ -443,6 +283,104 @@ class DWA_algorithm(Controller):
         cost_angle = abs(cost_angle)
 
         return cost_angle
+    
+
+    def __calc_control_and_trajectory(self, x):
+            """
+            Calculate the final input with the dynamic window.
+
+            Args:
+                x (list): Current state [x(m), y(m), yaw(rad), v(m/s), delta(rad)].
+                dw (list): Dynamic window [min_throttle, max_throttle, min_steer, max_steer].
+                ob (list): List of obstacles.
+                i (int): Index of the target.
+
+            Returns:
+                tuple: Tuple containing the control inputs (throttle, delta) and the trajectory.
+            """
+            min_cost = float("inf")
+            best_u = [0.0, 0.0]
+            best_trajectory = np.array([x])
+            # u_buf = self.u_hist[self.robot_num]
+            # trajectory_buf = self.predicted_trajectory[self.robot_num]
+            ob = [self.dilated_traj[idx] for idx in range(len(self.dilated_traj)) if idx != self.robot_num]
+            dw = self.__calc_dynamic_window()
+
+            # evaluate all trajectory with sampled input in dynamic window
+            nearest = utils.find_nearest(np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution), x[3])
+
+            for a in np.arange(dw[0], dw[1]+self.v_resolution, self.v_resolution):
+                for delta in np.arange(dw[2], dw[3]+self.delta_resolution, self.delta_resolution):
+
+                    # old_time = time.time()
+                    geom = self.trajs[str(nearest)][str(a)][str(delta)]
+                    geom = np.array(geom)
+                    geom[:,0:2] = (geom[:,0:2]) @ utils.rotateMatrix(np.radians(90)-x[2]) + [x[0],x[1]]
+                    # print(time.time()-old_time)
+                    geom[:,2] = geom[:,2] + x[2] - np.pi/2 #bringing also the yaw angle in the new frame
+
+                    # trajectory = predict_trajectory(x_init, a, delta)
+                    trajectory = geom
+                    # calc cost
+
+                    to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(trajectory)
+                    speed_cost = self.speed_cost_gain * (self.car_model.max_speed - trajectory[-1, 3])
+                    # if trajectory[-1, 3] <= 0.0:
+                    #     speed_cost = 5
+                    # else:
+                    #     speed_cost = 0.0
+                    ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(trajectory, ob)
+                    heading_cost = self.heading_cost_gain * self.__calc_to_goal_heading_cost(trajectory)
+                    final_cost = to_goal_cost + ob_cost #+  speed_cost  #+ heading_cost #+ speed_cost 
+                    # print("COSTS: ", to_goal_cost, speed_cost, ob_cost)
+                    # search minimum trajectory
+                    if min_cost >= final_cost:
+                        min_cost = final_cost
+                        best_u = [a, delta]
+                        best_trajectory = trajectory
+                        u_history = [[a, delta] for _ in range(len(trajectory-1))]
+
+            return best_u, best_trajectory, u_history
+    
+    
+    def __generate_trajectories(self) -> None:
+        """
+        Generates trajectories and stores them in a json in the config file
+        """
+        
+        dw = self.__calc_dynamic_window()
+        complete_trajectories = {}
+        initial_state = State()
+        initial_state.x = 0.0
+        initial_state.y = 0.0
+        initial_state.yaw = np.radians(90.0)
+
+        for v in np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution):
+            initial_state.v = v
+            traj = []
+            u_total = []
+            cmd = CarControlStamped()
+            for a in np.arange(dw[0], dw[1]+self.a_resolution, self.a_resolution):
+                cmd.throttle = a
+                for delta in np.arange(dw[2], dw[3]+self.delta_resolution, self.delta_resolution):
+                    cmd.steering = delta
+
+                    traj.append(self.__calc_trajectory(initial_state, cmd))
+                    u_total.append([a, delta])
+
+            traj = np.array(traj)
+            temp2 = {}
+            for j in range(len(traj)):
+                temp2[u_total[j][0]] = {}
+            for i in range(len(traj)):
+                temp2[u_total[i][0]][u_total[i][1]] = traj[i, :, :].tolist()
+            complete_trajectories[v] = temp2
+                
+        # saving the complete trajectories to a csv file
+        with open(self.dir_path + '/../config/trajectories.json', 'w') as file:
+            json.dump(complete_trajectories, file, indent=4)
+
+        print("\nThe JSON data has been written to 'data.json'")
     
 
 

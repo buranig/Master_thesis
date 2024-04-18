@@ -14,17 +14,15 @@ from visualization_msgs.msg import Marker
 # import control models
 # from planner import utils
 from dwa_dev.DWA import DWA_algorithm as DWA
-# from cbf_dev. import CBF_robotarium
-# from cbf_dev import CBF_simple
-# from cbf_dev import C3BF
+from cbf_dev.CBF import CBF_algorithm as CBF
+from cbf_dev.C3BF import C3BF_algorithm as C3BF
 # from lbp_dev import LBP
 # from mpc_dev import MPC
 
 controller_map = {
     "dwa": DWA,
-    "DWA": DWA
-    # "c3bf": C3BF,
-    # "C3BF": C3BF,
+    "c3bf": C3BF,
+    "cbf": CBF
     # "lbp": LBP,
     # "LBP": LBP,
     # "mpc": MPC,
@@ -47,11 +45,16 @@ class CollisionAvoidance(Node):
         self.car_i = self.get_parameter('car_i').value
         self.car_yaml = self.get_parameter('car_yaml').value
         self.car_alg = self.get_parameter('alg').value
+        print("############################")
+        print("############################")
+        print(self.car_alg)
+        print("############################")
+        print("############################")
 
         self.car_str = '' if self.car_i == 1 else str(self.car_i)
 
         # Init controller
-        self.algorithm = controller_map[self.car_alg](self.car_yaml,self.car_i)
+        self.algorithm = controller_map[self.car_alg.lower()](self.car_yaml,self.car_i)
 
         # Service to query state
         self.state_cli = self.create_client(EnvState, 'env_state')
@@ -86,19 +89,21 @@ class CollisionAvoidance(Node):
             updated_state = carStateStamped_to_State(curr_car)
             self.algorithm.set_state(updated_state)
 
-            # Compute desired action and equivalent goal
+            # Compute desired action
             des_action = self.cmd_request()
-            next_state = self.algorithm.simulate_input(des_action.cmd)
 
-            # Set next state as a goal for the CA algorithm
-            self.algorithm.set_goal(next_state)
+            # Set desired action as a goal for the CA algorithm
+            self.algorithm.set_goal(des_action.cmd)
 
             # Compute safe control input
             safe_cmd = self.algorithm.compute_cmd(curr_state.env_state)
 
             # Send command to car
             self.publisher_.publish(safe_cmd)
-            self.goal_marker(next_state)
+
+            # Draw in Rviz desired goal
+            if type(self.algorithm.goal) is State:
+                self.goal_marker(self.algorithm.goal)
 
     def goal_marker(self, next_state):
         marker = Marker()

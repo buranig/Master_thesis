@@ -27,24 +27,30 @@ class Controller:
         with open(controller_path, 'r') as openfile:
             yaml_object = yaml.safe_load(openfile)
         
-        # Global variables
+        ### Global variables
+
+        # Simulation params
         self.dt = yaml_object["Controller"]["dt"]
         self.ph = yaml_object["Controller"]["ph"]
+        self.show_animation = yaml_object["Simulation"]["show_animation"]
+
+        # Size of map
+        self.width_init = yaml_object["Simulation"]["width"]
+        self.height_init = yaml_object["Simulation"]["height"]
+        self.boundary_points = np.array([-self.width_init/2, self.width_init/2, -self.height_init/2, self.height_init/2])
+
+        # Noise params
+        self.add_noise = yaml_object["Controller"]["add_noise"]
+        self.noise_scale = yaml_object["Controller"]["noise_scale"]
+
 
         self.car_model = CarModel(car_path)
 
-    def simulate_input(self, car_cmd: CarControlStamped) -> State:
-        curr_state = self.car_model.step(car_cmd, self.dt)
-        t = self.dt
-        while t<self.ph:
-            curr_state = self.car_model.step(car_cmd, self.dt, curr_state=curr_state)
-            t += self.dt
-        return curr_state
 
     def set_state(self, state: State) -> None:
         self.car_model.set_state(state)
     
-    def set_goal(self, goal: State) -> None:
+    def set_goal(self, goal: CarControlStamped) -> None:
         raise Exception("Hereditary function doesn't implement 'set_goal'")
     
     def compute_cmd(self, car_list : List[CarStateStamped]) -> CarControlStamped:

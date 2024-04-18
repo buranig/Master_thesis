@@ -15,4 +15,8 @@
   <export>
     <build_type>ament_python</build_type>
   </export>
+
+  <depend>rlcpy</depend>
+  <depend>lar_utils</depend>
+
 </package>

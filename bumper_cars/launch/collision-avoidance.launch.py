@@ -10,6 +10,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def add_car(context, ld):
     param_value = LaunchConfiguration('carNumber').perform(context)
+    alg_name = LaunchConfiguration('alg').perform(context)
 
 
     car_yaml = os.path.join(
@@ -34,7 +35,7 @@ def add_car(context, ld):
             name='ca_node' + str(i + 1),
             parameters=[
                     {'car_yaml': car_yaml},
-                    {'alg': 'dwa'},
+                    {'alg': alg_name},
                     {'car_i': i + 1}
             ],
             emulate_tty=True,
@@ -74,6 +75,12 @@ def generate_launch_description():
         default_value='1'
     )
 
+    car_alg = DeclareLaunchArgument(
+        'alg',
+        description='algorithm to be used to control the cars (dwa/cbf/c3bf/lbc/mpc)',
+        default_value='dwa'
+    )
+
     source_target_arg = DeclareLaunchArgument(
         'source_target',
         description='source of the information, can be sim or real',
@@ -93,6 +100,7 @@ def generate_launch_description():
 
     ld.add_action(carNumber_arg)
     ld.add_action(source_target_arg)
+    ld.add_action(car_alg)
     ld.add_action(node)
     ld.add_action(OpaqueFunction(function=add_car, args=[ld]))
 

@@ -13,6 +13,12 @@ from bumper_cars.classes.Controller import Controller
 # For the parameter file
 import yaml
 
+# For plotting
+import matplotlib.pyplot as plt
+color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
+fig = plt.figure(1, dpi=90, figsize=(10,10))
+ax= fig.add_subplot(111)
+
 
 np.random.seed(1)
 
@@ -55,11 +61,25 @@ class C3BF_algorithm(Controller):
             car_cmd.throttle = u[0]
             car_cmd.steering = u[1]
 
+        # Debug visualization
+        if self.show_animation and self.robot_num == 0:
+            plt.cla()
+            plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
+            for i in range(self.curr_state.shape[1]):
+                self.plot_robot(self.curr_state[0, i], self.curr_state[1, i], self.curr_state[2, i])
+                self.plot_arrow(self.curr_state[0, i], self.curr_state[1, i], self.curr_state[2, i] + self.dxu[1], length=0.3, width=0.05)
+                self.plot_arrow(self.curr_state[0, i], self.curr_state[1, i], self.curr_state[2, i], length=0.1, width=0.05)
+            self.plot_map()
+            plt.axis("equal")
+            plt.grid(True)
+            plt.pause(0.00001)
+            # plt.plot(self.goal[0], self.goal[1], "x", color = color_dict[0])
+
         return car_cmd
 
     def set_goal(self, goal: CarControlStamped) -> None:
-        self.dxu[0] = self.dxu[0]
-        self.dxu[1] = self.dxu[1]
+        self.dxu[0] = goal.throttle
+        self.dxu[1] = goal.steering
         
         # For homogeneity, keep self.goal updated
         self.goal = goal
@@ -167,112 +187,59 @@ class C3BF_algorithm(Controller):
             G[count,:] = -Lg_h
             count+=1
 
-        # Adding arena boundary constraints
-        # # Pos Y
-        # h = (x[1,i] - self.boundary_points[3])**2 - self.safety_radius**2 - self.Kv * abs(x[3,i]*np.sin(x[2,i]))
-        # gradH = np.array([2*(x[1,i] - self.boundary_points[3]), 0, 
-        #                 -self.Kv*np.abs(x[3,i])*np.sign(np.sin(x[2,i]))*np.cos(x[2,i]), 
-        #                 -self.Kv*np.abs(np.sin(x[2,i]))*np.sign(x[3,i])])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([self.arena_gain*h**3 + Lf_h])])
-        
-        # # Neg Y
-        # h = (x[1,i] - self.boundary_points[2])**2 - self.safety_radius**2 - self.Kv * abs(x[3,i]*np.sin(x[2,i]))
-        
-        # gradH = np.array([2*(x[1,i] - self.boundary_points[2]), 0, 
-        #                 -self.Kv*np.abs(x[3,i])*np.sign(np.sin(x[2,i]))*np.cos(x[2,i]), 
-        #                 -self.Kv*np.abs(np.sin(x[2,i]))*np.sign(x[3,i])])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([self.arena_gain*h**3 + Lf_h])])
-        
-        # # Pos X
-        # h = (x[0,i] - self.boundary_points[1])**2 - self.safety_radius**2 - self.Kv * abs(x[3,i]*np.cos(x[2,i]))
-        # gradH = np.array([2*(x[0,i] - self.boundary_points[1]), 0, 
-        #                 self.Kv*np.abs(x[3,i])*np.sign(np.cos(x[2,i]))*np.sin(x[2,i]), 
-        #                 -self.Kv*np.abs(np.cos(x[2,i]))*np.sign(x[3,i])])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([self.arena_gain*h**3 + Lf_h])])
+        # # # # Adding arena boundary constraints
+        # # # # Pos Y
+        # # # h = ((x[1, i] - self.boundary_points[3]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
+        # # # if x[3, i] >= 0:
+        # # #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[3]), 0, -self.Kv])
+        # # # else:
+        # # #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[3]), 0, self.Kv])
 
-        # # Neg X
-        # h = (x[0,i] - self.boundary_points[0])**2 - self.safety_radius**2 - self.Kv * abs(x[3,i]*np.cos(x[2,i]))
-        # gradH = np.array([2*(x[0,i] - self.boundary_points[0]), 0, 
-        #                 self.Kv*np.abs(x[3,i])*np.sign(np.cos(x[2,i]))*np.sin(x[2,i]), 
-        #                 -self.Kv*np.abs(np.cos(x[2,i]))*np.sign(x[3,i])])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([self.arena_gain*h**3 + Lf_h])])
+        # # # Lf_h = np.dot(gradH.T, f)
+        # # # Lg_h = np.dot(gradH.T, g)
+        # # # G = np.vstack([G, -Lg_h])
+        # # # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
 
-        # Adding arena boundary constraints
-        # Pos Y
-        h = ((x[1,i] - self.boundary_points[3])**2 - self.safety_radius**2 - self.Kv * abs(x[3,i]))
-        if x[3,i] >= 0:
-            gradH = np.array([0, 2*(x[1,i] - self.boundary_points[3]), 0, -self.Kv])
-        else:
-            gradH = np.array([0, 2*(x[1,i] - self.boundary_points[3]), 0, self.Kv])
+        # # # # Neg Y
+        # # # h = ((x[1, i] - self.boundary_points[2]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
+        # # # if x[3, i] >= 0:
+        # # #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[2]), 0, -self.Kv])
+        # # # else:
+        # # #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[2]), 0, self.Kv])
+        # # # Lf_h = np.dot(gradH.T, f)
+        # # # Lg_h = np.dot(gradH.T, g)
+        # # # G = np.vstack([G, -Lg_h])
+        # # # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
 
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([self.arena_gain*h**3 + Lf_h])])
+        # # # # Pos X
+        # # # h = ((x[0, i] - self.boundary_points[1]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
+        # # # if x[3, i] >= 0:
+        # # #     gradH = np.array([2 * (x[0, i] - self.boundary_points[1]), 0, 0, -self.Kv])
+        # # # else:
+        # # #     gradH = np.array([2 * (x[0, i] - self.boundary_points[1]), 0, 0, self.Kv])
+        # # # Lf_h = np.dot(gradH.T, f)
+        # # # Lg_h = np.dot(gradH.T, g)
+        # # # G = np.vstack([G, -Lg_h])
+        # # # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
 
-        # Neg Y
-        h = ((x[1,i] - self.boundary_points[2])**2 - self.safety_radius**2 - self.Kv * abs(x[3,i]))
-        if x[3,i] >= 0:
-            gradH = np.array([0, 2*(x[1,i] - self.boundary_points[2]), 0, -self.Kv])
-        else:
-            gradH = np.array([0, 2*(x[1,i] - self.boundary_points[2]), 0, self.Kv])
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([self.arena_gain*h**3 + Lf_h])])
+        # # # # Neg X
+        # # # h = ((x[0, i] - self.boundary_points[0]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
+        # # # if x[3, i] >= 0:
+        # # #     gradH = np.array([2 * (x[0, i] - self.boundary_points[0]), 0, 0, -self.Kv])
+        # # # else:
+        # # #     gradH = np.array([2 * (x[0, i] - self.boundary_points[0]), 0, 0, self.Kv])
+        # # # Lf_h = np.dot(gradH.T, f)
+        # # # Lg_h = np.dot(gradH.T, g)
+        # # # G = np.vstack([G, -Lg_h])
+        # # # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
 
-        # Pos X
-        h = ((x[0,i] - self.boundary_points[1])**2 - self.safety_radius**2 - self.Kv * abs(x[3,i]))
-        if x[3,i] >= 0:
-            gradH = np.array([2*(x[0,i] - self.boundary_points[1]), 0, 0, -self.Kv])
-        else:
-            gradH = np.array([2*(x[0,i] - self.boundary_points[1]), 0, 0, self.Kv])
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([self.arena_gain*h**3 + Lf_h])])
-
-        # Neg X
-        h = ((x[0,i] - self.boundary_points[0])**2 - self.safety_radius**2 - self.Kv * abs(x[3,i]))
-        if x[3,i] >= 0:
-            gradH = np.array([2*(x[0,i] - self.boundary_points[0]), 0, 0, -self.Kv])
-        else:
-            gradH = np.array([2*(x[0,i] - self.boundary_points[0]), 0, 0, self.Kv])
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([self.arena_gain*h**3 + Lf_h])])
-        
-        # safety = 1
-        # G = np.vstack([G, [[0, -x[3,i]*np.sin(x[2,i])], [0, x[3,i]*np.cos(x[2,i])]]])
-        # h1 = ((np.array([self.boundary_points[1]-safety, self.boundary_points[3]-safety])-x[0:2,i])/dt - np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])).reshape(2,1)
-        # H = np.vstack([H, h1])
-        # G = np.vstack([G, [[0, x[3,i]*np.sin(x[2,i])], [0, -x[3,i]*np.cos(x[2,i])]]])
-        # h1 = ((x[0:2,i] - np.array([self.boundary_points[0]+safety, self.boundary_points[2]+safety]))/dt + np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])).reshape(2,1)
-        # H = np.vstack([H, h1])
-        
         # Input constraints
         G = np.vstack([G, [[0, 1], [0, -1]]])
         H = np.vstack([H, self.__delta_to_beta(self.car_model.max_steer), -self.__delta_to_beta(-self.car_model.max_steer)])
-        # TODO: Keeping the following constraints for solves some problem with the circular_seed_10.json --> why??
-        G = np.vstack([G, [[0, x[3,i]/self.car_model.Lr], [0, x[3,i]/self.car_model.Lr]]])
-        H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
-        # G = np.vstack([G, [[0, 1], [0, -1]]])
-        # H = np.vstack([H, self.dxu[1]+self.__delta_to_beta(5), -self.dxu[1]+self.__delta_to_beta(5)])
+        # G = np.vstack([G, [[0, x[3,i]/self.car_model.Lr], [0, x[3,i]/self.car_model.Lr]]])
+        # H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
         G = np.vstack([G, [[1, 0], [-1, 0]]])
-        H = np.vstack([H, self.car_model.max_acc, -self.car_model.min_acc])
+        H = np.vstack([H, self.car_model.max_acc, - self.car_model.min_acc])
 
         solvers.options['show_progress'] = False
         try:

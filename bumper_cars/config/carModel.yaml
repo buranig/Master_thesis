@@ -3,8 +3,8 @@
 max_steer: 0.78         # Maximal and (- minimal) steering angle [rad]
 max_speed: 1.0              # Maximal speed [m/s]       --- Not quite used yet
 min_speed: -1.0             # Minimal speed [m/s]       --- Not quite used yet
-max_acc: 0.1                # Max acceleration [m/ss]
-min_acc: -0.1               # Min acceleration [m/ss]
+max_acc: 0.15                # Max acceleration [m/ss]
+min_acc: -0.15               # Min acceleration [m/ss]
 
 
 ###############  Mechanical properties  #############################################

@@ -13,6 +13,11 @@ from bumper_cars.classes.Controller import Controller
 # For the parameter file
 import yaml
 
+# For plotting
+import matplotlib.pyplot as plt
+color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
+fig = plt.figure(1, dpi=90, figsize=(10,10))
+ax= fig.add_subplot(111)
 
 np.random.seed(1)
 
@@ -34,10 +39,10 @@ class CBF_algorithm(Controller):
             # Reading from yaml file
             yaml_object = yaml.safe_load(openfile)
 
-        self.safety_radius = yaml_object["CBF_simple"]["safety_radius"]
-        self.barrier_gain = yaml_object["CBF_simple"]["barrier_gain"]
-        self.arena_gain = yaml_object["CBF_simple"]["arena_gain"]
-        self.Kv = yaml_object["CBF_simple"]["Kv"] # interval [0.5-1]
+        self.safety_radius = yaml_object["CBF"]["safety_radius"]
+        self.barrier_gain = yaml_object["CBF"]["barrier_gain"]
+        self.arena_gain = yaml_object["CBF"]["arena_gain"]
+        self.Kv = yaml_object["CBF"]["Kv"] # interval [0.5-1]
 
     ################# PUBLIC METHODS
 
@@ -54,12 +59,25 @@ class CBF_algorithm(Controller):
         if u is not None:
             car_cmd.throttle = u[0]
             car_cmd.steering = u[1]
-
+            
+        # Debug visualization
+        if self.show_animation and self.robot_num == 0:
+            plt.cla()
+            plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
+            for i in range(self.curr_state.shape[1]):
+                self.plot_robot(self.curr_state[0, i], self.curr_state[1, i], self.curr_state[2, i])
+                self.plot_arrow(self.curr_state[0, i], self.curr_state[1, i], self.curr_state[2, i] + self.dxu[1], length=0.3, width=0.05)
+                self.plot_arrow(self.curr_state[0, i], self.curr_state[1, i], self.curr_state[2, i], length=0.1, width=0.05)
+            self.plot_map()
+            plt.axis("equal")
+            plt.grid(True)
+            plt.pause(0.00001)
+            # plt.plot(self.goal[0], self.goal[1], "x", color = color_dict[0])
         return car_cmd
 
     def set_goal(self, goal: CarControlStamped) -> None:
-        self.dxu[0] = self.dxu[0]
-        self.dxu[1] = self.dxu[1]
+        self.dxu[0] = goal.throttle
+        self.dxu[1] = goal.steering
         
         # For homogeneity, keep self.goal updated
         self.goal = goal
@@ -95,7 +113,7 @@ class CBF_algorithm(Controller):
 
         return delta  
 
-    def __CBF(self, i, x) -> List[float]:
+    def __CBF(self, i:int, x:List[float]) -> List[float]:
         """
         Computes the control input for the CBF (Collision Cone Control Barrier Function) algorithm.
 
@@ -107,11 +125,10 @@ class CBF_algorithm(Controller):
             numpy.ndarray: Filtered Control input dxu of shape (2, N).
 
         """
-        N = x.shape[1]
-        M = self.dxu.shape[0]
+        N = x.shape[1]              # Number of robots
+        M = self.dxu.shape[0]       # Number of control inputs
         self.dxu[1] = self.__delta_to_beta(self.dxu[1])
 
-        count = 0
         G = np.zeros([N - 1, M])
         H = np.zeros([N - 1, 1])
 
@@ -126,12 +143,32 @@ class CBF_algorithm(Controller):
                       [0, x[3, i] / self.car_model.Lr],
                       [1, 0]]).reshape(4, 2)
 
+        P = np.identity(2) * 2
+        q = np.array([- 2 * self.dxu[0], - 2 * self.dxu[1]])
+
+
+        # Solves a quadratic program
+
+        # minimize    (1/2)*x'*P*x + q'*x
+        # subject to  G*x <= h
+        #             A*x = b.
+        print("Safety radius:", self.safety_radius)
+        print("Kv:", self.Kv)
+        print("Barrier gain:", self.barrier_gain)
+
+        count = 0
         for j in range(N):
 
             if j == i: continue
+            
+            # Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
+            # Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - x[1, j]) - np.sin(x[2, i]) * (x[0, i] - x[0, j]))
+            
+            # h = (x[0, i] - x[0, j]) ** 2 + (x[1, i] - x[1, j]) ** 2 - (
+            #             self.safety_radius ** 2 + self.Kv * abs(x[3, i]))
 
-            P = np.identity(2) * 2
-            q = np.array([-2 * self.dxu[0], - 2 * self.dxu[1]])
+            # H[count] = np.array([self.barrier_gain * np.power(h, 3) + Lf_h])
+            # G[count, :] = - np.array([- np.sign(x[3, i])*self.Kv, Lg_h])
 
             Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
             Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - x[1, j]) - np.sin(x[2, i]) * (x[0, i] - x[0, j]))
@@ -145,64 +182,68 @@ class CBF_algorithm(Controller):
             else:
                 G[count, :] = np.array([-self.Kv, -Lg_h])
 
+
+
             count += 1
+
 
         # Add the input constraint
         G = np.vstack([G, [[0, 1], [0, -1]]])
         H = np.vstack([H, self.__delta_to_beta(self.car_model.max_steer), -self.__delta_to_beta(-self.car_model.max_steer)])
         # TODO: check whether to keep the following constraints
-        G = np.vstack([G, [[0, x[3,i]/self.car_model.Lr], [0, x[3,i]/self.car_model.Lr]]])
-        H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
+        # G = np.vstack([G, [[0, x[3,i]/self.car_model.Lr], [0, x[3,i]/self.car_model.Lr]]])
+        # H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
         G = np.vstack([G, [[1, 0], [-1, 0]]])
-        H = np.vstack([H, self.car_model.max_acc, -self.car_model.min_acc])
+        H = np.vstack([H, self.car_model.max_acc, self.car_model.min_acc])
 
-        # Adding arena boundary constraints
-        # Pos Y
-        h = ((x[1, i] - self.boundary_points[3]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
-        if x[3, i] >= 0:
-            gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[3]), 0, -self.Kv])
-        else:
-            gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[3]), 0, self.Kv])
+        # # # # Adding arena boundary constraints
+        # # # # Pos Y
+        # # # h = ((x[1, i] - self.boundary_points[3]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
+        # # # if x[3, i] >= 0:
+        # # #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[3]), 0, -self.Kv])
+        # # # else:
+        # # #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[3]), 0, self.Kv])
 
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        # # # Lf_h = np.dot(gradH.T, f)
+        # # # Lg_h = np.dot(gradH.T, g)
+        # # # G = np.vstack([G, -Lg_h])
+        # # # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
 
-        # Neg Y
-        h = ((x[1, i] - self.boundary_points[2]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
-        if x[3, i] >= 0:
-            gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[2]), 0, -self.Kv])
-        else:
-            gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[2]), 0, self.Kv])
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        # # # # Neg Y
+        # # # h = ((x[1, i] - self.boundary_points[2]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
+        # # # if x[3, i] >= 0:
+        # # #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[2]), 0, -self.Kv])
+        # # # else:
+        # # #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[2]), 0, self.Kv])
+        # # # Lf_h = np.dot(gradH.T, f)
+        # # # Lg_h = np.dot(gradH.T, g)
+        # # # G = np.vstack([G, -Lg_h])
+        # # # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
 
-        # Pos X
-        h = ((x[0, i] - self.boundary_points[1]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
-        if x[3, i] >= 0:
-            gradH = np.array([2 * (x[0, i] - self.boundary_points[1]), 0, 0, -self.Kv])
-        else:
-            gradH = np.array([2 * (x[0, i] - self.boundary_points[1]), 0, 0, self.Kv])
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        # # # # Pos X
+        # # # h = ((x[0, i] - self.boundary_points[1]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
+        # # # if x[3, i] >= 0:
+        # # #     gradH = np.array([2 * (x[0, i] - self.boundary_points[1]), 0, 0, -self.Kv])
+        # # # else:
+        # # #     gradH = np.array([2 * (x[0, i] - self.boundary_points[1]), 0, 0, self.Kv])
+        # # # Lf_h = np.dot(gradH.T, f)
+        # # # Lg_h = np.dot(gradH.T, g)
+        # # # G = np.vstack([G, -Lg_h])
+        # # # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
 
-        # Neg X
-        h = ((x[0, i] - self.boundary_points[0]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
-        if x[3, i] >= 0:
-            gradH = np.array([2 * (x[0, i] - self.boundary_points[0]), 0, 0, -self.Kv])
-        else:
-            gradH = np.array([2 * (x[0, i] - self.boundary_points[0]), 0, 0, self.Kv])
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        # # # # Neg X
+        # # # h = ((x[0, i] - self.boundary_points[0]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
+        # # # if x[3, i] >= 0:
+        # # #     gradH = np.array([2 * (x[0, i] - self.boundary_points[0]), 0, 0, -self.Kv])
+        # # # else:
+        # # #     gradH = np.array([2 * (x[0, i] - self.boundary_points[0]), 0, 0, self.Kv])
+        # # # Lf_h = np.dot(gradH.T, f)
+        # # # Lg_h = np.dot(gradH.T, g)
+        # # # G = np.vstack([G, -Lg_h])
+        # # # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
 
         solvers.options['show_progress'] = False
+
         try:
             sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
             self.dxu = np.reshape(np.array(sol['x']), (M,))

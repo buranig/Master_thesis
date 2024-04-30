@@ -16,17 +16,15 @@ from visualization_msgs.msg import Marker
 from dwa_dev.DWA import DWA_algorithm as DWA
 from cbf_dev.CBF import CBF_algorithm as CBF
 from cbf_dev.C3BF import C3BF_algorithm as C3BF
-# from lbp_dev import LBP
+# from lbp_dev.LBP import LBP_algorithm as LBP
 # from mpc_dev import MPC
 
 controller_map = {
     "dwa": DWA,
     "c3bf": C3BF,
     "cbf": CBF
-    # "lbp": LBP,
-    # "LBP": LBP,
+    # "lbp": LBP
     # "mpc": MPC,
-    # "MPC": MPC
 }
 
 
@@ -41,15 +39,27 @@ class CollisionAvoidance(Node):
         self.declare_parameter('car_yaml', rclpy.Parameter.Type.STRING)
         self.declare_parameter('alg', rclpy.Parameter.Type.STRING)
 
+        
+        ### Global variables
+
+
+
         # Init variables
         self.car_i = self.get_parameter('car_i').value
         self.car_yaml = self.get_parameter('car_yaml').value
         self.car_alg = self.get_parameter('alg').value
+
         print("############################")
         print("############################")
         print(self.car_alg)
         print("############################")
         print("############################")
+
+        with open(self.car_yaml, 'r') as openfile:
+            yaml_object = yaml.safe_load(openfile)
+        # Simulation params
+        self.dt = yaml_object["Controller"]["dt"]
+        print(self.dt)
 
         self.car_str = '' if self.car_i == 1 else str(self.car_i)
 
@@ -70,6 +80,14 @@ class CollisionAvoidance(Node):
         self.publisher_ = self.create_publisher(CarControlStamped, '/sim/car'+self.car_str+'/set/control', 10)
         self.goal_publisher_ = self.create_publisher(Marker, '/vis/trace', 10)
 
+        # Update timer
+        self.timer = self.create_timer(self.dt, self.timer_callback)
+        self.update_time = False
+
+    def timer_callback(self):
+        self.update_time = True
+        
+
     def state_request(self):
         self.future = self.state_cli.call_async(self.state_req)
         rclpy.spin_until_future_complete(self, self.future)
@@ -80,14 +98,17 @@ class CollisionAvoidance(Node):
         rclpy.spin_until_future_complete(self, self.cmd_future)
         return self.cmd_future.result()
 
-
     def run(self):
         while rclpy.ok():
-            # Update the current state of the car
+            # Update the current state of the car (and do rcply spin to update timer)
             curr_state = self.state_request()
             curr_car = curr_state.env_state[self.car_i - 1] # Select desired car
             updated_state = carStateStamped_to_State(curr_car)
             self.algorithm.set_state(updated_state)
+
+            # Skip rest if no update
+            if self.update_time == False:
+                continue
 
             # Compute desired action
             des_action = self.cmd_request()
@@ -105,6 +126,9 @@ class CollisionAvoidance(Node):
             if type(self.algorithm.goal) is State:
                 self.goal_marker(self.algorithm.goal)
 
+            # Wait for next period
+            self.update_time = False
+            
     def goal_marker(self, next_state):
         marker = Marker()
         marker.header.frame_id = 'world'  # Set the frame of reference
@@ -147,6 +171,6 @@ def main(args=None):
 
     # Run control alg
     node.run()
-    
+
     node.destroy_node()
     rclpy.shutdown()

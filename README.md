@@ -106,7 +106,7 @@ $$ i,j \in \{1, 2, \dots , N\} \textrm{ , } i\neq j $$
 $$ h_{i,j}(x) = \| x_i -x_j\| ^2 - (r^2 + K_v \cdot v_i) $$
 
 <p align="center">
-<img src="./Readme/CBF.gif" alt="Simulation GIF" width="50%">
+<img src="./Readme/CBF_1.gif" alt="Simulation GIF" width="50%">
 </p>
 
 ### Collision Cone Control Barrier Function (3CBF)
@@ -125,13 +125,13 @@ $$v_{rel} = \begin{bmatrix}
 $$\cos(\phi) = \frac{\sqrt{\|p_{rel}\|^2 - R^2}}{\|p_{rel}\|}$$
 
 <p align="center">
-<img src="./Readme/C3BF.gif" alt="Simulation GIF" width="50%">
+<img src="./Readme/3CBF_1.gif" alt="Simulation GIF" width="50%">
 </p>
 
 ### Dynamic Window Approach
 
 <p align="center">
-<img src="./Readme/DWA.gif" alt="Simulation GIF" width="50%">
+<img src="./Readme/DWA_1.gif" alt="Simulation GIF" width="50%">
 </p>
 
 ### Model Predictive Control (MPC)
@@ -152,19 +152,15 @@ $$
 ## Lattice-based Control (LBP)
 
 <p align="center">
-<img src="./Readme/LBP.gif" alt="Simulation GIF" width="50%">
+<img src="./Readme/LBP_1.gif" alt="Simulation GIF" width="50%">
 </p>
 
 ## TODO
 - Implement safety routines in case the method fails (solver fails, trajectory cost is infinite,...)
-- Check if there are soem hardcoded constants in the files
+- Check if there are some hardcoded constants in the files
 - Debug the ROS2 simulation, it starts but the resulting behaviour (mainly for MPC, LBP, DWA) differs from the python simulation.
 - consider yaw flipping when qp solver fails
 - implement noise --> done, maybe kalman filter
-- start planning what to write in the report
-- create e a follow_trajectory script also for dwa like I did for LBP
-- put an additional state in the trajectory as an information on whether the method (solver/ mpc) failed.
-- write the post processing (save/analyze the trajectories and data)
 - fix random walk and random harem option on the controller node
 
 ## ROS2 and Rviz2 Integration

@@ -8,7 +8,7 @@ import numpy as np
 data = pd.read_csv('src/seed_simulation/seed_simulation/seed_sim.csv')
 filename = 'src/seed_simulation/seed_simulation/seed_sim.csv'
 # data = data.to_numpy()
-fontsize = 10
+fontsize = 25
 plt.rcParams['font.family'] = ['serif']
 plt.rcParams['font.serif'] = ['Times New Roman']
 plt.rcParams['font.size'] = fontsize
@@ -19,57 +19,34 @@ colors = np.array(sns.color_palette(None, n_colors=8))[[0, 1, 2, 3, 4, 7]]
 class Plotter:
     def __init__(self, data):
         self.data = data
-    
-    def plot_bars1(self, filename, ylabels):
-        # Create scatter plot
-        sns.set_style("whitegrid")
-        fig, axs = plt.subplots(2, figsize=(10, 6))
-
-        # Plot both cost and violations
-        for lab, (ax, affix) in zip(ylabels, zip(axs, ['', '_viol'])):
-
-            # Read the data from the CSV file into a pandas DataFrame
-            df = pd.read_csv(filename.split(".")[0] + affix + ".csv", header=None)
-            # df = df.drop(columns=1, axis=1)
-            # Rename the columns
-            # df = df.rename(columns={0: "DRInC", 1: "Empirical", 2: "Robust",
-            #                         3: "LQG", 4: "DRLQG",
-            #                         5: "Wasserstein distance"})
-
-            # Round the Wasserstein distance to the nearest 0.02
-            # The data should be much closer than that
-            for r in df.index:
-                df.iloc[r, -1] = 0.02 * round(df.iloc[r, -1] / 0.02)
-
-            # Melt the DataFrame to reshape it
-            melted_df = melt_and_add_category(df)
-
-            # Create the box plot using Seaborn
-            sns.boxplot(x='Method', y='Value', hue='Category',
-                        data=melted_df, ax=ax, palette=colors)
-
-            # Set plot labels and legend
-            ax.set_ylabel(lab)
-            ax.set_ylim(8 if affix == '' else None, None, auto=True)
-            ax.legend(title='Wasserstein distance (ordered)',
-                    ncol=round(np.max(df.iloc[:, -1].to_numpy() / 0.02)),
-                    columnspacing=1.2)
-
-        # Only set xlabel at the bottom
-        axs[0].set_xlabel('')
 
     def plot_bars(self, x, y, hue, title):
         # Create scatter plot
         # sns.set_style("whitegrid")
-        fig, ax = plt.subplots(1, figsize=(10, 6))
+        fig, ax = plt.subplots(1, figsize=(12, 8))
 
         # Create the box plot using Seaborn
         sns.boxplot(x=x, y=y, hue=hue,
                     data=self.data, ax=ax, palette=colors)
         
-        plt.title(title, fontdict={'size': fontsize, 'family': 'serif'})
-        # plt.yscale('log')
-        plt.xlabel("Number of Robots",fontdict={'size': fontsize, 'family': 'serif'})
+        # plt.title(title, fontdict={'size': fontsize, 'family': 'serif'})
+        plt.grid(True)
+        plt.xlabel("Number of AVs",fontdict={'size': fontsize, 'family': 'serif'})
+        if y=="Collision Number":
+            plt.ylabel("Number of Collisions",fontdict={'size': fontsize, 'family': 'serif'})
+        elif y=="Solver Failure":
+            plt.ylabel("Number of Solver Failures",fontdict={'size': fontsize, 'family': 'serif'})
+        elif y=="Avg Computational Time":
+            plt.ylabel("Average Computational Time [s]",fontdict={'size': fontsize, 'family': 'serif'})
+        elif y=="Average Speed":
+            plt.ylabel("Average Speed [m/s]",fontdict={'size': fontsize, 'family': 'serif'})
+        elif y=="Steering Usage":
+            plt.ylabel("Steering Usage [rad]",fontdict={'size': fontsize, 'family': 'serif'})
+        elif y=="Acceleration Usage":
+            plt.ylabel("Acceleration Usage [m/s^2]",fontdict={'size': fontsize, 'family': 'serif'})
+        elif y=="Path Length":
+            plt.ylabel("Average Path Length Increase [%]",fontdict={'size': fontsize, 'family': 'serif'})
+        
         # plt.ylabel(fontdict={'size': fontsize, 'family': 'serif'})
 
 
@@ -152,3 +129,5 @@ for noise in noises:
         elif noise == 0.4:
             noise_str = "Noise3"
         plt.savefig(savepath + pre + "vs_robot_" + noise_str + "_hue_method"+ ".pdf")
+
+print("Done")

@@ -51,7 +51,7 @@ height_init = json_object["height"]
 N=3
 save_flag = True
 show_animation = True
-plot_flag = False
+plot_flag = True
 timer_freq = json_object["timer_freq"]
 
 class RobotType(Enum):
@@ -158,6 +158,9 @@ def main():
     print(__file__ + " start!!")
     print("Max speed: ", max_speed)
     print("Min speed: ", min_speed)
+    plt.rcParams['font.family'] = ['serif']
+    plt.rcParams['font.serif'] = ['Times New Roman']
+    plt.rcParams['font.size'] = 11  
     if save_flag:
         complete_trajectories = {}
 
@@ -165,6 +168,8 @@ def main():
         for v in np.arange(min_speed, max_speed+v_resolution, v_resolution):
             print(v)
             x_init = np.array([0.0, 0.0, np.radians(90.0), v])
+            # x_init = np.array([0.0, 0.0, np.radians(0.0), v])
+
             traj, u_total = generate_trajectories(x_init)
 
             if plot_flag:
@@ -174,22 +179,21 @@ def main():
                     plt.gcf().canvas.mpl_connect(
                         'key_release_event',
                         lambda event: [exit(0) if event.key == 'escape' else None])
-                    plt.plot(trajectory[:, 0], trajectory[:, 1], "-g")
+                    plt.plot(trajectory[:, 0], trajectory[:, 1], "-r")
                     plt.grid(True)
                     plt.axis("equal")
 
-                plt.show()
+                # plt.show()
 
-                fig = plt.figure(1, dpi=90)
-                ax = fig.add_subplot(111)
-                traj = np.array(traj)
-                for i in range(len(traj)):
-                    line = LineString(zip(traj[i, :, 0], traj[i, :, 1]))
-                    dilated = line.buffer(dilation_factor, cap_style=3, join_style=3)
-                    plot_line(line, ax=ax, add_points=False, linewidth=3)
-                    plot_polygon(dilated, ax=ax, add_points=False, alpha=0.5)
-                plt.show()
-
+                # fig = plt.figure(1, dpi=90)
+                # ax = fig.add_subplot(111)
+                # traj = np.array(traj)
+                # for i in range(len(traj)):
+                #     line = LineString(zip(traj[i, :, 0], traj[i, :, 1]))
+                #     dilated = line.buffer(dilation_factor, cap_style=3, join_style=3)
+                #     plot_line(line, ax=ax, add_points=False, linewidth=3)
+                #     plot_polygon(dilated, ax=ax, add_points=False, alpha=0.5)
+                # plt.show()
 
             traj = np.array(traj)
             temp2 = {}
@@ -204,7 +208,14 @@ def main():
                     coords.append([dilated.exterior.coords[idx][0], dilated.exterior.coords[idx][1]])
                 temp2[u_total[i][0]][u_total[i][1]] = traj[i, :, :].tolist()
             complete_trajectories[v] = temp2
-        
+
+        if plot_flag:
+            plt.xlabel("x [m]", fontdict={'size': 11, 'family': 'serif'})
+            plt.ylabel("y [m]", fontdict={'size': 11, 'family': 'serif'})
+            plt.title('LBP Trajectories Set')
+            plt.grid(True)
+            plt.axis("equal")
+            plt.show()
         # print(complete_trajectories)
         
         # saving the complete trajectories to a csv file

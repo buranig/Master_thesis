@@ -77,6 +77,11 @@ def circular_seed(robot_num, R=10.0):
     initial_position['yaw'] = yaw
     initial_position['v'] = v
 
+    fontsize = 30
+    plt.rcParams['font.family'] = ['serif']
+    plt.rcParams['font.serif'] = ['Times New Roman']
+    plt.rcParams['font.size'] = fontsize
+
     trajectories = {}
     possibles_indexes = np.arange(0, len(x0)).tolist()
     for i in range(robot_num):
@@ -90,13 +95,13 @@ def circular_seed(robot_num, R=10.0):
     # save the dictionary to a file
     plt.xlabel("x [m]", fontdict={'size': 15, 'family': 'serif'})
     plt.ylabel("y [m]", fontdict={'size': 15, 'family': 'serif'})
-    plt.title('Seed Simulation Setup', fontdict={'size':20, 'family': 'serif'})
+    plt.title('Seed Simulation Setup', fontdict={'size':15, 'family': 'serif'})
     plt.show() 
     seed = {}
     seed['initial_position'] = initial_position
     seed['trajectories'] = trajectories
     seed['robot_num'] = robot_num
-    save_dict_to_file(seed, filename='src/seeds/circular_seed_')
+    # save_dict_to_file(seed, filename='src/seeds/circular_seed_')
 
 if __name__ == "__main__":
 

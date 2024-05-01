@@ -59,12 +59,12 @@ height_init = json_object["height"]
 N=3
 save_flag = True
 show_animation = True
-plot_flag = False
+plot_flag = True
 robot_num = json_object["robot_num"]
 timer_freq = json_object["timer_freq"]
 
-with open('/home/giacomo/thesis_ws/src/trajectories.json', 'r') as file:
-    data1 = json.load(file)
+# with open('/home/giacomo/thesis_ws/src/trajectories.json', 'r') as file:
+    # data1 = json.load(file)
 
 def calc_states_list(max_yaw=np.deg2rad(-30.0)):
 
@@ -236,6 +236,11 @@ def generate_lookup_table():
             # plot_polygon(info.buffer(0.5, cap_style=3, join_style=3))
             # plot_line(LineString(zip(info2['x'], info2['y'])))
             plt.plot(info2['x'], info2['y'], 'r')
+    plt.xlabel("x [m]", fontdict={'size': 11, 'family': 'serif'})
+    plt.ylabel("y [m]", fontdict={'size': 11, 'family': 'serif'})
+    plt.title('LBP Trajectories Set')
+    plt.grid(True)
+    plt.axis("equal")
     plt.show()
 
     # saving the complete trajectories to a csv file

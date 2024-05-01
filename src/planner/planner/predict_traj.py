@@ -10,6 +10,7 @@ from custom_message.msg import ControlInputs, State, FullState, Coordinate, Path
 import time
 import matplotlib.pyplot as plt
 from rclpy.node import Node
+from planner import utils as utils
 
 # For the parameter file
 import pathlib
@@ -21,20 +22,37 @@ with open(path, 'r') as openfile:
     # Reading from json file
     json_object = json.load(openfile)
 
-max_steer = json_object["Car_model"]["max_steer"] # [rad] max steering angle
-max_speed = json_object["Car_model"]["max_speed"] # [m/s]
-min_speed = json_object["Car_model"]["min_speed"] # [m/s]
-dt = json_object["Controller"]["dt"]  # [s] Time step
-L = json_object["Car_model"]["L"]  # [m] Wheel base of vehicle
-Lr = L / 2.0  # [m]
-Lf = L - Lr
-Cf = json_object["Car_model"]["Cf"]  # N/rad
-Cr = json_object["Car_model"]["Cr"] # N/rad
-Iz = json_object["Car_model"]["Iz"]  # kg/m2
-m = json_object["Car_model"]["m"]  # kg
+# max_steer = json_object["Car_model"]["max_steer"] # [rad] max steering angle
+# max_speed = json_object["Car_model"]["max_speed"] # [m/s]
+# min_speed = json_object["Car_model"]["min_speed"] # [m/s]
+# dt = json_object["Controller"]["dt"]  # [s] Time step
+# L = json_object["Car_model"]["L"]  # [m] Wheel base of vehicle
+# Lr = L / 2.0  # [m]
+# Lf = L - Lr
+# Cf = json_object["Car_model"]["Cf"]  # N/rad
+# Cr = json_object["Car_model"]["Cr"] # N/rad
+# Iz = json_object["Car_model"]["Iz"]  # kg/m2
+# m = json_object["Car_model"]["m"]  # kg
+# # Aerodynamic and friction coefficients
+# c_a = json_object["Car_model"]["c_a"]
+# c_r1 = json_object["Car_model"]["c_r1"]
+
+max_steer = np.radians(45.0)  # [rad] max steering angle
+max_speed = 5 # [m/s]
+min_speed = 0.0 # [m/s]
+
+# dt = 0.1
+Lr = 1.62 #L / 2.0  # [m]
+Lf = 1.04 #L - Lr
+L = Lr+Lf  # [m] Wheel base of vehicle
+Cf = 20000 #1600.0 * 2.0  # N/rad
+Cr = Cf #5650 #1700.0 * 2.0  # N/rad
+Iz = 4192.0  # kg/m2
+m = 1395.0  # kg
 # Aerodynamic and friction coefficients
-c_a = json_object["Car_model"]["c_a"]
-c_r1 = json_object["Car_model"]["c_r1"]
+c_a = 1.36
+c_r1 = 0.02
+dt = 0.01
 
 WB = json_object["Controller"]["WB"] 
 L_d = json_object["Controller"]["L_d"] 
@@ -251,18 +269,25 @@ def normalize_angle(angle):
 
 def main():
     initial_state = State(x=0.0, y=0.0, yaw=0.0, v=0.0, omega=0.0)
-    target = [1, 2]
+    target = [-10, 0]
     # trajectory, tx, ty = predict_trajectory(initial_state, target)
     trajectory = predict_trajectory(initial_state, target, True)
     trajectory1 = predict_trajectory(initial_state, target, False)
+
+    fontsize = 30
+    plt.rcParams['font.family'] = ['serif']
+    plt.rcParams['font.serif'] = ['Times New Roman']
+    plt.rcParams['font.size'] = fontsize
+
     print(len(trajectory.path))
+
     x = []
     y = []
     for coord in trajectory.path:
     
         x.append(coord.x)
         y.append(coord.y)
-    plt.plot(x, y, 'r', label='Linear model')
+    plt.plot(x, y, 'r', label='Kinematic model')
 
     x = []
     y = []
@@ -270,8 +295,16 @@ def main():
     
         x.append(coord.x)
         y.append(coord.y)
-    plt.plot(x, y, 'b', label='Nonlinear model')
-    plt.legend()
+    plt.plot(x, y, 'b', label='Dynamic model')
+    plt.plot(target[0], target[1], 'kx', label='Target', markersize=20)
+    utils.plot_arrow(initial_state.x, initial_state.y, initial_state.yaw, length=L/2, width=0.7, label='Initial State')
+    plt.axis("equal")
+
+    plt.xlabel("x [m]", fontdict={'size': fontsize, 'family': 'serif'})
+    plt.ylabel("y [m]", fontdict={'size': fontsize, 'family': 'serif'})
+    plt.title('Kinematic vs. Dynamic model comparison', fontdict={'size': fontsize, 'family': 'serif'})
+    plt.legend()   
+    plt.grid(True) 
     plt.show()
 
 if __name__ == "__main__":

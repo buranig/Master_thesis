@@ -26,13 +26,13 @@ with open(path, 'r') as openfile:
     json_object = json.load(openfile)
 
 L = json_object["Car_model"]["L"]  
-max_steer = json_object["CBF_simple"]["max_steer"]  # [rad] max steering angle
-max_speed = json_object["CBF_simple"]["max_speed"] # [m/s]
-min_speed = json_object["CBF_simple"]["min_speed"] # [m/s]
-magnitude_limit= json_object["CBF_simple"]["max_speed"] 
+max_steer = json_object["Car_model"]["max_steer"]  # [rad] max steering angle
+max_speed = json_object["Car_model"]["max_speed"] # [m/s]
+min_speed = json_object["Car_model"]["min_speed"] # [m/s]
+magnitude_limit= 1 #json_object["CBF_simple"]["max_speed"] 
 max_acc = 40 #json_object["CBF_simple"]["max_acc"] 
 min_acc = -40 #json_object["CBF_simple"]["min_acc"] 
-dt = json_object["CBF_simple"]["dt"]
+dt = 0.1 #json_object["CBF_simple"]["dt"]
 safety_radius = 3#json_object["CBF_simple"]["safety_radius"]
 barrier_gain = 1# json_object["CBF_simple"]["barrier_gain"]
 Kv = json_object["CBF_simple"]["Kv"] # interval [0.5-1]
@@ -48,8 +48,8 @@ goal1 = np.array([20, 0])
 goal2 = np.array([0, 0])
 cmd1 = ControlInputs()
 cmd2 = ControlInputs()
-trajectory, tx, ty = predict_trajectory(utils.array_to_state(x[:,0]), goal1)
-trajectory2, tx2, ty2 = predict_trajectory(utils.array_to_state(x[:,1]), goal2)
+trajectory = predict_trajectory(utils.array_to_state(x[:,0]), goal1)
+trajectory2 = predict_trajectory(utils.array_to_state(x[:,1]), goal2)
 # Instantiate Robotarium object
 N = 2
 debug_time = time.time()

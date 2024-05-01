@@ -2,10 +2,8 @@
 
 from custom_message.msg import ControlInputs, State, FullState, Coordinate, Path
 import numpy as np
-# from planner.cubic_spline_planner import *
-# from planner.frenet import *
-# from planner.predict_traj import *
 from scipy.spatial.transform import Rotation as Rot
+from shapely.plotting import plot_polygon
 import random
 
 # For the parameter file
@@ -14,7 +12,8 @@ import json
 import time
 import matplotlib.pyplot as plt
 import math
-color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive'}
+
+color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
 
 # TODO: import all this parameters from a config file so that we can easily change them in one place
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
@@ -249,9 +248,28 @@ def state_to_array(state: State):
 
     return array
 
-def plot_arrow(x, y, yaw, length=0.5, width=0.1, color=None):  # pragma: no cover
+def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax, i):
+    """
+    Plots the robot and arrows for visualization.
+
+    Args:
+        i (int): Index of the robot.
+        x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
+        multi_control (numpy.ndarray): Control inputs of shape (2, N).
+        targets (list): List of target points.
+
+    """
+    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-", color=color_dict[i])
+    plot_polygon(dilated_traj[i], ax=ax, add_points=False, alpha=0.5, color=color_dict[i])
+    # plt.plot(x[0, i], x[1, i], "xr")
+    plt.plot(targets[i][0], targets[i][1], "x", color=color_dict[i])
+    plot_robot(x[0, i], x[1, i], x[2, i], i)
+    plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
+    plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
+
+def plot_arrow(x, y, yaw, length=0.5, width=0.1, color=None, label=None):  # pragma: no cover
         plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
-                head_length=width, head_width=width, color=color)
+                head_length=width, head_width=width, color=color, label=label)
         
 def plot_map(width=100, height=100):
         corner_x = [-width/2.0, width/2.0, width/2.0, -width/2.0, -width/2.0]

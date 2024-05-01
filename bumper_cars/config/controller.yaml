@@ -18,20 +18,13 @@ DWA:
   heading_cost_gain: 1
   dilation_factor: 0.1
 LBP:
-  max_steer: 0.785398
-  max_speed: 2
-  min_speed: -1.0
-  max_acc: 5
-  min_acc: -5
   a_resolution: 0.5
   v_resolution: 0.5
   delta_resolution: 15
-  predict_time: 1.5
   to_goal_cost_gain: 20
   speed_cost_gain: 1
   obstacle_cost_gain: 30
   heading_cost_gain: 1
-  robot_stuck_flag_cons: 0.001
   dilation_factor: 0.35
 MPC:
   max_steer: 0.785398
@@ -44,7 +37,7 @@ MPC:
   safety_radius: 2
 Controller:
   dt: 0.1   
-  ph: 0.5
+  ph: 0.4
   # controller_type: MPC
   # cbf_type: C3BF
   # safety: 10

@@ -10,13 +10,11 @@ from typing import List
 
 
 # For the parameter file
-import pathlib
 import yaml
 import json
 
 from shapely.geometry import Point, LineString
 from shapely import distance
-import time
 import os
 
 

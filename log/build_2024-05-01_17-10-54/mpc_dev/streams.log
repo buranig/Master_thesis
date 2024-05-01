@@ -1,0 +1,31 @@
+[3.304s] Invoking command in '/home/giacomo/thesis_ws/build/mpc_dev': PYTHONPATH=/home/giacomo/thesis_ws/build/mpc_dev/prefix_override:/home/giacomo/thesis_ws/install/mpc_dev/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py develop --editable --build-directory /home/giacomo/thesis_ws/build/mpc_dev/build --no-deps symlink_data
+[4.490s] running develop
+[4.496s] /home/giacomo/.local/lib/python3.10/site-packages/setuptools/command/develop.py:40: EasyInstallDeprecationWarning: easy_install command is deprecated.
+[4.496s] !!
+[4.496s] 
+[4.496s]         ********************************************************************************
+[4.497s]         Please avoid running ``setup.py`` and ``easy_install``.
+[4.497s]         Instead, use pypa/build, pypa/installer or other
+[4.497s]         standards-based tools.
+[4.497s] 
+[4.497s]         See https://github.com/pypa/setuptools/issues/917 for details.
+[4.498s]         ********************************************************************************
+[4.498s] 
+[4.498s] !!
+[4.498s]   easy_install.initialize_options(self)
+[5.623s] running egg_info
+[5.728s] writing mpc_dev.egg-info/PKG-INFO
+[5.728s] writing dependency_links to mpc_dev.egg-info/dependency_links.txt
+[5.729s] writing requirements to mpc_dev.egg-info/requires.txt
+[5.729s] writing top-level names to mpc_dev.egg-info/top_level.txt
+[5.729s] writing manifest file 'mpc_dev.egg-info/SOURCES.txt'
+[5.887s] reading manifest file 'mpc_dev.egg-info/SOURCES.txt'
+[5.889s] writing manifest file 'mpc_dev.egg-info/SOURCES.txt'
+[5.967s] running build_ext
+[5.967s] Creating /home/giacomo/thesis_ws/install/mpc_dev/lib/python3.10/site-packages/mpc-dev.egg-link (link to .)
+[5.967s] 
+[5.967s] Installed /home/giacomo/thesis_ws/build/mpc_dev
+[5.967s] running symlink_data
+[5.968s] symbolically linking /home/giacomo/thesis_ws/build/mpc_dev/resource/mpc_dev -> /home/giacomo/thesis_ws/install/mpc_dev/share/ament_index/resource_index/packages
+[5.968s] symbolically linking /home/giacomo/thesis_ws/build/mpc_dev/package.xml -> /home/giacomo/thesis_ws/install/mpc_dev/share/mpc_dev
+[6.081s] Invoked command in '/home/giacomo/thesis_ws/build/mpc_dev' returned '0': PYTHONPATH=/home/giacomo/thesis_ws/build/mpc_dev/prefix_override:/home/giacomo/thesis_ws/install/mpc_dev/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py develop --editable --build-directory /home/giacomo/thesis_ws/build/mpc_dev/build --no-deps symlink_data

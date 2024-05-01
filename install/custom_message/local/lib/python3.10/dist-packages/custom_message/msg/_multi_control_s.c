@@ -1,0 +1,1 @@
+/home/giacomo/thesis_ws/build/custom_message/rosidl_generator_py/custom_message/msg/_multi_control_s.c

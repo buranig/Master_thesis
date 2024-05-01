@@ -1,0 +1,36 @@
+running develop
+/home/giacomo/.local/lib/python3.10/site-packages/setuptools/command/develop.py:40: EasyInstallDeprecationWarning: easy_install command is deprecated.
+!!
+
+        ********************************************************************************
+        Please avoid running ``setup.py`` and ``easy_install``.
+        Instead, use pypa/build, pypa/installer or other
+        standards-based tools.
+
+        See https://github.com/pypa/setuptools/issues/917 for details.
+        ********************************************************************************
+
+!!
+  easy_install.initialize_options(self)
+running egg_info
+writing bumper_cars.egg-info/PKG-INFO
+writing dependency_links to bumper_cars.egg-info/dependency_links.txt
+writing entry points to bumper_cars.egg-info/entry_points.txt
+writing requirements to bumper_cars.egg-info/requires.txt
+writing top-level names to bumper_cars.egg-info/top_level.txt
+writing manifest file 'bumper_cars.egg-info/SOURCES.txt'
+reading manifest file 'bumper_cars.egg-info/SOURCES.txt'
+writing manifest file 'bumper_cars.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/giacomo/thesis_ws/install/bumper_cars/lib/python3.10/site-packages/bumper-cars.egg-link (link to .)
+Installing broadcaster script to /home/giacomo/thesis_ws/install/bumper_cars/lib/bumper_cars
+Installing controller script to /home/giacomo/thesis_ws/install/bumper_cars/lib/bumper_cars
+Installing converter script to /home/giacomo/thesis_ws/install/bumper_cars/lib/bumper_cars
+Installing model script to /home/giacomo/thesis_ws/install/bumper_cars/lib/bumper_cars
+Installing plotter script to /home/giacomo/thesis_ws/install/bumper_cars/lib/bumper_cars
+Installing sensor script to /home/giacomo/thesis_ws/install/bumper_cars/lib/bumper_cars
+
+Installed /home/giacomo/thesis_ws/build/bumper_cars
+running symlink_data
+symbolically linking /home/giacomo/thesis_ws/build/bumper_cars/resource/bumper_cars -> /home/giacomo/thesis_ws/install/bumper_cars/share/ament_index/resource_index/packages
+symbolically linking /home/giacomo/thesis_ws/build/bumper_cars/package.xml -> /home/giacomo/thesis_ws/install/bumper_cars/share/bumper_cars

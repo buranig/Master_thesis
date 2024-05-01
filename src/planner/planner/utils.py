@@ -267,9 +267,10 @@ def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax,
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
     plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
 
-def plot_arrow(x, y, yaw, length=0.5, width=0.1, color=None, label=None):  # pragma: no cover
-        plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
-                head_length=width, head_width=width, color=color, label=label)
+def plot_arrow(x, y, yaw, length=0.5, width=0.1):  # pragma: no cover
+    plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
+              head_length=width, head_width=width)
+    plt.plot(x, y)
         
 def plot_map(width=100, height=100):
         corner_x = [-width/2.0, width/2.0, width/2.0, -width/2.0, -width/2.0]
@@ -537,3 +538,15 @@ def plot_robot(x, y, yaw, i):
     outline[1, :] += y
     plt.plot(np.array(outline[0, :]).flatten(),
                 np.array(outline[1, :]).flatten(), color_dict[i], label="Robot " + str(i))
+    
+def rotateMatrix(a):
+    """
+    Rotate a 2D matrix by the given angle.
+
+    Parameters:
+    a (float): The angle of rotation in radians.
+
+    Returns:
+    numpy.ndarray: The rotated matrix.
+    """
+    return np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])

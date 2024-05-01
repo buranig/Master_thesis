@@ -1,0 +1,31 @@
+[3.362s] Invoking command in '/home/giacomo/thesis_ws/build/lbp_dev': PYTHONPATH=/home/giacomo/thesis_ws/build/lbp_dev/prefix_override:/home/giacomo/thesis_ws/install/lbp_dev/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py develop --editable --build-directory /home/giacomo/thesis_ws/build/lbp_dev/build --no-deps symlink_data
+[4.570s] running develop
+[4.571s] /home/giacomo/.local/lib/python3.10/site-packages/setuptools/command/develop.py:40: EasyInstallDeprecationWarning: easy_install command is deprecated.
+[4.571s] !!
+[4.571s] 
+[4.571s]         ********************************************************************************
+[4.571s]         Please avoid running ``setup.py`` and ``easy_install``.
+[4.571s]         Instead, use pypa/build, pypa/installer or other
+[4.572s]         standards-based tools.
+[4.572s] 
+[4.572s]         See https://github.com/pypa/setuptools/issues/917 for details.
+[4.572s]         ********************************************************************************
+[4.572s] 
+[4.572s] !!
+[4.573s]   easy_install.initialize_options(self)
+[5.218s] running egg_info
+[5.264s] writing lbp_dev.egg-info/PKG-INFO
+[5.265s] writing dependency_links to lbp_dev.egg-info/dependency_links.txt
+[5.265s] writing requirements to lbp_dev.egg-info/requires.txt
+[5.265s] writing top-level names to lbp_dev.egg-info/top_level.txt
+[5.266s] writing manifest file 'lbp_dev.egg-info/SOURCES.txt'
+[5.361s] reading manifest file 'lbp_dev.egg-info/SOURCES.txt'
+[5.365s] writing manifest file 'lbp_dev.egg-info/SOURCES.txt'
+[5.413s] running build_ext
+[5.413s] Creating /home/giacomo/thesis_ws/install/lbp_dev/lib/python3.10/site-packages/lbp-dev.egg-link (link to .)
+[5.416s] 
+[5.416s] Installed /home/giacomo/thesis_ws/build/lbp_dev
+[5.416s] running symlink_data
+[5.416s] symbolically linking /home/giacomo/thesis_ws/build/lbp_dev/resource/lbp_dev -> /home/giacomo/thesis_ws/install/lbp_dev/share/ament_index/resource_index/packages
+[5.416s] symbolically linking /home/giacomo/thesis_ws/build/lbp_dev/package.xml -> /home/giacomo/thesis_ws/install/lbp_dev/share/lbp_dev
+[5.500s] Invoked command in '/home/giacomo/thesis_ws/build/lbp_dev' returned '0': PYTHONPATH=/home/giacomo/thesis_ws/build/lbp_dev/prefix_override:/home/giacomo/thesis_ws/install/lbp_dev/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py develop --editable --build-directory /home/giacomo/thesis_ws/build/lbp_dev/build --no-deps symlink_data

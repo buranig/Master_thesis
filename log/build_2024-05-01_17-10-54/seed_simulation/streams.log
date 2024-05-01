@@ -1,0 +1,31 @@
+[3.320s] Invoking command in '/home/giacomo/thesis_ws/build/seed_simulation': PYTHONPATH=/home/giacomo/thesis_ws/build/seed_simulation/prefix_override:/home/giacomo/thesis_ws/install/seed_simulation/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py develop --editable --build-directory /home/giacomo/thesis_ws/build/seed_simulation/build --no-deps symlink_data
+[4.875s] running develop
+[4.877s] /home/giacomo/.local/lib/python3.10/site-packages/setuptools/command/develop.py:40: EasyInstallDeprecationWarning: easy_install command is deprecated.
+[4.878s] !!
+[4.879s] 
+[4.881s]         ********************************************************************************
+[4.882s]         Please avoid running ``setup.py`` and ``easy_install``.
+[4.883s]         Instead, use pypa/build, pypa/installer or other
+[4.884s]         standards-based tools.
+[4.885s] 
+[4.886s]         See https://github.com/pypa/setuptools/issues/917 for details.
+[4.887s]         ********************************************************************************
+[4.888s] 
+[4.889s] !!
+[4.890s]   easy_install.initialize_options(self)
+[5.729s] running egg_info
+[5.811s] writing seed_simulation.egg-info/PKG-INFO
+[5.813s] writing dependency_links to seed_simulation.egg-info/dependency_links.txt
+[5.813s] writing requirements to seed_simulation.egg-info/requires.txt
+[5.814s] writing top-level names to seed_simulation.egg-info/top_level.txt
+[5.814s] writing manifest file 'seed_simulation.egg-info/SOURCES.txt'
+[5.904s] reading manifest file 'seed_simulation.egg-info/SOURCES.txt'
+[5.906s] writing manifest file 'seed_simulation.egg-info/SOURCES.txt'
+[5.958s] running build_ext
+[5.958s] Creating /home/giacomo/thesis_ws/install/seed_simulation/lib/python3.10/site-packages/seed-simulation.egg-link (link to .)
+[5.959s] 
+[5.960s] Installed /home/giacomo/thesis_ws/build/seed_simulation
+[5.960s] running symlink_data
+[5.960s] symbolically linking /home/giacomo/thesis_ws/build/seed_simulation/resource/seed_simulation -> /home/giacomo/thesis_ws/install/seed_simulation/share/ament_index/resource_index/packages
+[5.960s] symbolically linking /home/giacomo/thesis_ws/build/seed_simulation/package.xml -> /home/giacomo/thesis_ws/install/seed_simulation/share/seed_simulation
+[6.051s] Invoked command in '/home/giacomo/thesis_ws/build/seed_simulation' returned '0': PYTHONPATH=/home/giacomo/thesis_ws/build/seed_simulation/prefix_override:/home/giacomo/thesis_ws/install/seed_simulation/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py develop --editable --build-directory /home/giacomo/thesis_ws/build/seed_simulation/build --no-deps symlink_data

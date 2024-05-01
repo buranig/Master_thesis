@@ -1,0 +1,13 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from custom_message/msg/Path.msg
+// generated code does not contain a copyright notice
+
+#include "custom_message/msg/Coordinate.idl"
+
+module custom_message {
+  module msg {
+    struct Path {
+      sequence<custom_message::msg::Coordinate> path;
+    };
+  };
+};

@@ -1,0 +1,31 @@
+[3.318s] Invoking command in '/home/giacomo/thesis_ws/build/dwa_dev': PYTHONPATH=/home/giacomo/thesis_ws/build/dwa_dev/prefix_override:/home/giacomo/thesis_ws/install/dwa_dev/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py develop --editable --build-directory /home/giacomo/thesis_ws/build/dwa_dev/build --no-deps symlink_data
+[4.721s] running develop
+[4.722s] /home/giacomo/.local/lib/python3.10/site-packages/setuptools/command/develop.py:40: EasyInstallDeprecationWarning: easy_install command is deprecated.
+[4.722s] !!
+[4.722s] 
+[4.723s]         ********************************************************************************
+[4.723s]         Please avoid running ``setup.py`` and ``easy_install``.
+[4.723s]         Instead, use pypa/build, pypa/installer or other
+[4.723s]         standards-based tools.
+[4.723s] 
+[4.723s]         See https://github.com/pypa/setuptools/issues/917 for details.
+[4.724s]         ********************************************************************************
+[4.724s] 
+[4.724s] !!
+[4.724s]   easy_install.initialize_options(self)
+[5.701s] running egg_info
+[5.747s] writing dwa_dev.egg-info/PKG-INFO
+[5.747s] writing dependency_links to dwa_dev.egg-info/dependency_links.txt
+[5.748s] writing requirements to dwa_dev.egg-info/requires.txt
+[5.748s] writing top-level names to dwa_dev.egg-info/top_level.txt
+[5.748s] writing manifest file 'dwa_dev.egg-info/SOURCES.txt'
+[5.843s] reading manifest file 'dwa_dev.egg-info/SOURCES.txt'
+[5.844s] writing manifest file 'dwa_dev.egg-info/SOURCES.txt'
+[5.895s] running build_ext
+[5.895s] Creating /home/giacomo/thesis_ws/install/dwa_dev/lib/python3.10/site-packages/dwa-dev.egg-link (link to .)
+[5.897s] 
+[5.897s] Installed /home/giacomo/thesis_ws/build/dwa_dev
+[5.897s] running symlink_data
+[5.897s] symbolically linking /home/giacomo/thesis_ws/build/dwa_dev/resource/dwa_dev -> /home/giacomo/thesis_ws/install/dwa_dev/share/ament_index/resource_index/packages
+[5.897s] symbolically linking /home/giacomo/thesis_ws/build/dwa_dev/package.xml -> /home/giacomo/thesis_ws/install/dwa_dev/share/dwa_dev
+[5.978s] Invoked command in '/home/giacomo/thesis_ws/build/dwa_dev' returned '0': PYTHONPATH=/home/giacomo/thesis_ws/build/dwa_dev/prefix_override:/home/giacomo/thesis_ws/install/dwa_dev/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py develop --editable --build-directory /home/giacomo/thesis_ws/build/dwa_dev/build --no-deps symlink_data

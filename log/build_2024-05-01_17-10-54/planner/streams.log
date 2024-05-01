@@ -1,0 +1,31 @@
+[3.319s] Invoking command in '/home/giacomo/thesis_ws/build/planner': PYTHONPATH=/home/giacomo/thesis_ws/build/planner/prefix_override:/home/giacomo/thesis_ws/install/planner/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py develop --editable --build-directory /home/giacomo/thesis_ws/build/planner/build --no-deps symlink_data
+[4.567s] running develop
+[4.567s] /home/giacomo/.local/lib/python3.10/site-packages/setuptools/command/develop.py:40: EasyInstallDeprecationWarning: easy_install command is deprecated.
+[4.568s] !!
+[4.568s] 
+[4.568s]         ********************************************************************************
+[4.568s]         Please avoid running ``setup.py`` and ``easy_install``.
+[4.568s]         Instead, use pypa/build, pypa/installer or other
+[4.568s]         standards-based tools.
+[4.569s] 
+[4.569s]         See https://github.com/pypa/setuptools/issues/917 for details.
+[4.569s]         ********************************************************************************
+[4.569s] 
+[4.569s] !!
+[4.569s]   easy_install.initialize_options(self)
+[5.404s] running egg_info
+[5.455s] writing planner.egg-info/PKG-INFO
+[5.458s] writing dependency_links to planner.egg-info/dependency_links.txt
+[5.459s] writing requirements to planner.egg-info/requires.txt
+[5.459s] writing top-level names to planner.egg-info/top_level.txt
+[5.459s] writing manifest file 'planner.egg-info/SOURCES.txt'
+[5.591s] reading manifest file 'planner.egg-info/SOURCES.txt'
+[5.593s] writing manifest file 'planner.egg-info/SOURCES.txt'
+[5.663s] running build_ext
+[5.663s] Creating /home/giacomo/thesis_ws/install/planner/lib/python3.10/site-packages/planner.egg-link (link to .)
+[5.664s] 
+[5.665s] Installed /home/giacomo/thesis_ws/build/planner
+[5.665s] running symlink_data
+[5.669s] symbolically linking /home/giacomo/thesis_ws/build/planner/resource/planner -> /home/giacomo/thesis_ws/install/planner/share/ament_index/resource_index/packages
+[5.670s] symbolically linking /home/giacomo/thesis_ws/build/planner/package.xml -> /home/giacomo/thesis_ws/install/planner/share/planner
+[5.816s] Invoked command in '/home/giacomo/thesis_ws/build/planner' returned '0': PYTHONPATH=/home/giacomo/thesis_ws/build/planner/prefix_override:/home/giacomo/thesis_ws/install/planner/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py develop --editable --build-directory /home/giacomo/thesis_ws/build/planner/build --no-deps symlink_data

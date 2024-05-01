@@ -1,0 +1,1 @@
+/home/giacomo/thesis_ws/src/custom_message/msg/FullState.msg

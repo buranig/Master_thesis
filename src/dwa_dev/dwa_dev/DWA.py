@@ -70,34 +70,6 @@ with open('/home/giacomo/thesis_ws/src/dwa_dev/trajectories.json', 'r') as file:
 with open('/home/giacomo/thesis_ws/src/seeds/seed_8.json', 'r') as file:
     seed = json.load(file)
 
-def normalize_angle(angle):
-    """
-    Normalize an angle to [-pi, pi].
-
-    Args:
-        angle (float): Angle in radians.
-
-    Returns:
-        float: Angle in radians in the range [-pi, pi].
-    """
-    while angle > np.pi:
-        angle -= 2.0 * np.pi
-    while angle < -np.pi:
-        angle += 2.0 * np.pi
-    return angle
-
-def rotateMatrix(a):
-    """
-    Rotate a matrix by an angle.
-
-    Args:
-        a (float): Angle in radians.
-
-    Returns:
-        numpy.ndarray: Rotated matrix.
-    """
-    return np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
-
 def find_nearest(array, value):
     """
     Find the nearest value in an array.
@@ -229,8 +201,8 @@ def calc_to_goal_heading_cost(trajectory, goal):
     dy = goal[1] - trajectory[-1, 1]
 
     # either using the angle difference or the distance --> if we want to use the angle difference, we need to normalize the angle before taking the difference
-    error_angle = normalize_angle(math.atan2(dy, dx))
-    cost_angle = error_angle - normalize_angle(trajectory[-1, 2])
+    error_angle = utils.normalize_angle(math.atan2(dy, dx))
+    cost_angle = error_angle - utils.normalize_angle(trajectory[-1, 2])
     cost_angle = abs(cost_angle)
 
     return cost_angle
@@ -364,7 +336,8 @@ class DWA_algorithm():
                         x[3, i] = 0
                         self.reached_goal[i] = True
                     
-                    self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
+                    else: 
+                        self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
 
                 if check_goal_reached(x, self.targets, i):
                     print(f"Vehicle {i} reached goal!!")
@@ -512,7 +485,7 @@ class DWA_algorithm():
                     # old_time = time.time()
                     geom = data[str(nearest)][str(a)][str(delta)]
                     geom = np.array(geom)
-                    geom[:,0:2] = (geom[:,0:2]) @ rotateMatrix(np.radians(90)-x[2]) + [x[0],x[1]]
+                    geom[:,0:2] = (geom[:,0:2]) @ utils.rotateMatrix(np.radians(90)-x[2]) + [x[0],x[1]]
                     # print(time.time()-old_time)
                     geom[:,2] = geom[:,2] + x[2] - np.pi/2 #bringing also the yaw angle in the new frame
 
@@ -862,7 +835,7 @@ def main_seed():
     print("Done")
     if show_animation:
         for i in range(robot_num):
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-r")
+            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
         plt.pause(0.0001)
         plt.show()
        

@@ -43,7 +43,7 @@ The most important forlder is the /src one, where all the developement code is s
 
 All the nodes and the excanged topics are visible in the following figure:
 
-<img src="./Readme/rosgraph.png" alt="Project Structure" style="width:100%;">
+<img src="./Readme/rosgraph1.png" alt="Project Structure" style="width:100%;">
 
 ## Dependencies
 I'm running this project on ROS2 humble, using UBUNTU 22.04. 

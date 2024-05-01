@@ -53,7 +53,7 @@ to_goal_stop_distance = json_object["to_goal_stop_distance"]
 update_dist = 2
 # N=3
 
-robot_num = json_object["robot_num"]
+robot_num = 5 #json_object["robot_num"]
 timer_freq = json_object["timer_freq"]
 
 show_animation = json_object["show_animation"]
@@ -67,7 +67,7 @@ color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:or
 with open('/home/giacomo/thesis_ws/src/dwa_dev/trajectories.json', 'r') as file:
     data = json.load(file)
 
-with open('/home/giacomo/thesis_ws/src/seeds/seed_1.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_8.json', 'r') as file:
     seed = json.load(file)
 
 def normalize_angle(angle):
@@ -235,54 +235,6 @@ def calc_to_goal_heading_cost(trajectory, goal):
 
     return cost_angle
 
-def plot_arrow(x, y, yaw, length=0.5, width=0.1):  # pragma: no cover
-    """
-    Plot an arrow.
-
-    Args:
-        x (float): X-coordinate of the arrow.
-        y (float): Y-coordinate of the arrow.
-        yaw (float): Yaw angle of the arrow.
-        length (float, optional): Length of the arrow. Defaults to 0.5.
-        width (float, optional): Width of the arrow. Defaults to 0.1.
-    """
-    plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
-              head_length=width, head_width=width)
-    plt.plot(x, y)
-
-def plot_robot(x, y, yaw, i):  
-    """
-    Plot the robot.
-
-    Args:
-        x (float): X-coordinate of the robot.
-        y (float): Y-coordinate of the robot.
-        yaw (float): Yaw angle of the robot.
-        i (int): Index of the robot.
-    """
-    outline = np.array([[-L / 2, L / 2,
-                            (L / 2), -L / 2,
-                            -L / 2],
-                        [WB / 2, WB / 2,
-                            - WB / 2, -WB / 2,
-                            WB / 2]])
-    Rot1 = np.array([[math.cos(yaw), math.sin(yaw)],
-                        [-math.sin(yaw), math.cos(yaw)]])
-    outline = (outline.T.dot(Rot1)).T
-    outline[0, :] += x
-    outline[1, :] += y
-    plt.plot(np.array(outline[0, :]).flatten(),
-                np.array(outline[1, :]).flatten(), color_dict[i])
-
-def plot_map():
-    """
-    Plot the map.
-    """
-    corner_x = [-width_init/2.0, width_init/2.0, width_init/2.0, -width_init/2.0, -width_init/2.0]
-    corner_y = [height_init/2.0, height_init/2.0, -height_init/2.0, -height_init/2.0, height_init/2.0]
-
-    plt.plot(corner_x, corner_y)
-
 def update_targets(paths, targets, x, i):
     """
     Update the targets for the paths.
@@ -322,25 +274,6 @@ def initialize_paths_targets_dilated_traj(x):
         targets.append([paths[i][0].x, paths[i][0].y])
 
     return paths, targets, dilated_traj
-
-def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax, i):
-    """
-    Plots the robot and arrows for visualization.
-
-    Args:
-        i (int): Index of the robot.
-        x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
-        multi_control (numpy.ndarray): Control inputs of shape (2, N).
-        targets (list): List of target points.
-
-    """
-    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-", color=color_dict[i])
-    plot_polygon(dilated_traj[i], ax=ax, add_points=False, alpha=0.5, color=color_dict[i])
-    # plt.plot(x[0, i], x[1, i], "xr")
-    plt.plot(targets[i][0], targets[i][1], "x", color=color_dict[i], markersize=15)
-    plot_robot(x[0, i], x[1, i], x[2, i], i)
-    plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-    plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
 
 def check_goal_reached(x, targets, i, distance=0.5):
     """
@@ -420,25 +353,34 @@ class DWA_algorithm():
 
         """
         for i in range(self.robot_num):
-            # Step 9: Check if the distance between the current position and the target is less than 5
-            if utils.dist(point1=(x[0,i], x[1,i]), point2=self.targets[i]) < update_dist:
-                # Perform some action when the condition is met
-                self.paths[i].pop(0)
-                if not self.paths[i]:
-                    print("Path complete")
-                    return x, u, True
-                
-                self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
+            if not self.reached_goal[i]:
+                # Step 9: Check if the distance between the current position and the target is less than 5
+                if utils.dist(point1=(x[0,i], x[1,i]), point2=self.targets[i]) < update_dist:
+                    # Perform some action when the condition is met
+                    self.paths[i].pop(0)
+                    if not self.paths[i]:
+                        print("Path complete")
+                        u[:, i] = np.zeros(2)
+                        x[3, i] = 0
+                        self.reached_goal[i] = True
+                    
+                    self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
 
-            t_prev = time.time()
-            x, u = self.update_robot_state(x, u, dt, i)
-            self.computational_time.append(time.time()-t_prev)
-
-            if check_goal_reached(x, self.targets, i):
-                break_flag = True
+                if check_goal_reached(x, self.targets, i):
+                    print(f"Vehicle {i} reached goal!!")
+                    u[:, i] = np.zeros(2)
+                    x[3, i] = 0
+                    self.reached_goal[i] = True
+                else:
+                    t_prev = time.time()
+                    x, u = self.update_robot_state(x, u, dt, i)
+                    self.computational_time.append(time.time()-t_prev)
 
             if show_animation:
-                plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
+                utils.plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
+        
+        if all(self.reached_goal):
+                break_flag = True
         return x, u, break_flag
     
     def go_to_goal(self, x, u, break_flag):
@@ -472,7 +414,7 @@ class DWA_algorithm():
             
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if show_animation:
-                plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
+                utils.plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
         if all(self.reached_goal):
                 break_flag = True
         return x, u, break_flag
@@ -726,7 +668,7 @@ def main():
                 break_flag = True
 
             if show_animation:
-                plot_robot_trajectory(x, u, dwa.predicted_trajectory, dilated_traj, targets, ax, i)
+                utils.plot_robot_trajectory(x, u, dwa.predicted_trajectory, dilated_traj, targets, ax, i)
 
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")
@@ -825,7 +767,7 @@ def main1():
                 break_flag = True
 
             if show_animation:
-                plot_robot_trajectory(x, u, dwa.predicted_trajectory, dilated_traj, targets, ax, i)
+                utils.plot_robot_trajectory(x, u, dwa.predicted_trajectory, dilated_traj, targets, ax, i)
 
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")

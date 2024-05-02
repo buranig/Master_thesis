@@ -1,1 +1,0 @@
-/home/giacomo/thesis_ws/src/custom_message/msg/ControlInputs.msg

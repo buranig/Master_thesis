@@ -1,9 +1,0 @@
-source;share/lbp_dev/hook/pythonpath.ps1
-source;share/lbp_dev/hook/pythonpath.dsv
-source;share/lbp_dev/hook/pythonpath.sh
-source;share/lbp_dev/hook/ament_prefix_path.ps1
-source;share/lbp_dev/hook/ament_prefix_path.dsv
-source;share/lbp_dev/hook/ament_prefix_path.sh
-source;../../build/lbp_dev/share/lbp_dev/hook/pythonpath_develop.ps1
-source;../../build/lbp_dev/share/lbp_dev/hook/pythonpath_develop.dsv
-source;../../build/lbp_dev/share/lbp_dev/hook/pythonpath_develop.sh

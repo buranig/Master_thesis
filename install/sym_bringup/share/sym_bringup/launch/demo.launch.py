@@ -1,1 +1,0 @@
-/home/giacomo/thesis_ws/src/sym_bringup/launch/demo.launch.py

@@ -1,1 +1,0 @@
-/home/giacomo/thesis_ws/src/mpc_dev/setup.py

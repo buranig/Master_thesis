@@ -1,1 +1,0 @@
-/home/giacomo/thesis_ws/build/sym_bringup/ament_cmake_environment_hooks/local_setup.bash

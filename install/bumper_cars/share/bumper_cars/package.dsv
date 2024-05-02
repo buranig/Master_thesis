@@ -1,9 +1,0 @@
-source;share/bumper_cars/hook/pythonpath.ps1
-source;share/bumper_cars/hook/pythonpath.dsv
-source;share/bumper_cars/hook/pythonpath.sh
-source;share/bumper_cars/hook/ament_prefix_path.ps1
-source;share/bumper_cars/hook/ament_prefix_path.dsv
-source;share/bumper_cars/hook/ament_prefix_path.sh
-source;../../build/bumper_cars/share/bumper_cars/hook/pythonpath_develop.ps1
-source;../../build/bumper_cars/share/bumper_cars/hook/pythonpath_develop.dsv
-source;../../build/bumper_cars/share/bumper_cars/hook/pythonpath_develop.sh

@@ -1,1 +1,0 @@
-/home/giacomo/thesis_ws/build/custom_message/rosidl_generator_c/custom_message/msg/detail/coordinate__type_support.h

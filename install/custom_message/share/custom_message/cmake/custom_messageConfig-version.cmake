@@ -1,1 +1,0 @@
-/home/giacomo/thesis_ws/build/custom_message/ament_cmake_core/custom_messageConfig-version.cmake

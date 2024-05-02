@@ -1,1 +1,0 @@
-/home/giacomo/thesis_ws/src/bumper_cars/setup.py

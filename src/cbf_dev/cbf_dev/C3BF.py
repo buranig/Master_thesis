@@ -50,57 +50,9 @@ noise_scale_param = json_object["noise_scale_param"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_7.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_8.json', 'r') as file:
     data = json.load(file)
 
-def delta_to_beta(delta):
-    """
-    Converts the steering angle delta to the slip angle beta.
-
-    Args:
-        delta (float): Steering angle in radians.
-
-    Returns:
-        float: Slip angle in radians.
-
-    """
-    beta = utils.normalize_angle(np.arctan2(Lr*np.tan(delta)/L, 1.0))
-
-    return beta
-
-def delta_to_beta_array(delta):
-    """
-    Converts an array of steering angles delta to an array of slip angles beta.
-
-    Args:
-        delta (numpy.ndarray): Array of steering angles in radians.
-
-    Returns:
-        numpy.ndarray: Array of slip angles in radians.
-
-    """
-    beta = utils.normalize_angle_array(np.arctan2(Lr*np.tan(delta)/L, 1.0))
-
-    return beta
-
-def beta_to_delta(beta):
-    """
-    Converts the slip angle beta to the steering angle delta.
-
-    Args:
-        beta (float): Slip angle in radians.
-
-    Returns:
-        float: Steering angle in radians.
-
-    """
-    try:
-        delta = utils.normalize_angle_array(np.arctan2(L*np.tan(beta)/Lr, 1.0))
-    except:
-        delta = utils.normalize_angle(np.arctan2(L*np.tan(beta)/Lr, 1.0))
-
-    return delta           
-   
 def update_paths(paths):
     """
     Updates the given paths.
@@ -215,33 +167,46 @@ class C3BF_algorithm():
 
     def run_3cbf(self, x, break_flag):
         for i in range(self.robot_num):
-            t_prev = time.time()
+            if not self.reached_goal[i]:
+                # Step 9: Check if the distance between the current position and the target is less than 5
+                if utils.dist(point1=(x[0,i], x[1,i]), point2=self.targets[i]) < 2:
+                    # Perform some action when the condition is met
+                    self.paths[i].pop(0)
+                    if not self.paths[i]:
+                        print("Path complete")
+                        self.dxu[:, i] = 0
+                        x[3,i] = 0
+                        self.reached_goal[i] = True
+                    
+                    else: 
+                        self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
+                
+                if check_goal_reached(x, self.targets, i):
+                    print(f"Vehicle {i} reached goal!!")
+                    self.dxu[:, i] = 0
+                    x[3,i] = 0
+                    self.reached_goal[i] = True
+                else:
+                    t_prev = time.time()
+                    if add_noise:
+                        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
+                        noisy_pos = x + noise
+                        self.control_robot(i, noisy_pos)
+                        plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
+                    else:
+                        self.control_robot(i, x)
 
-            if add_noise: 
-                noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
-                noisy_pos = x + noise
-                self.control_robot(i, noisy_pos)
-                plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
-            else:
-                self.control_robot(i, x)
+                    self.computational_time.append((time.time() - t_prev))
+            
+                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
 
-            self.computational_time.append((time.time() - t_prev))
-            # Step 9: Check if the distance between the current position and the target is less than 5
-            if utils.dist(point1=(x[0,i], x[1,i]), point2=self.targets[i]) < 4:
-                # Perform some action when the condition is met
-                self.paths[i].pop(0)
-                if not self.paths[i]:
-                    print("Path complete")
-                    break_flag = True
-                    return x, break_flag
-                self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
-
-            x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
-            plot_robot(x[0, i], x[1, i], x[2, i], i)
+            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.plot(self.targets[i][0], self.targets[i][1], "x", color = color_dict[i])
-        
+            plt.plot(self.targets[i][0], self.targets[i][1], "x", color=color_dict[i])
+
+        if all(self.reached_goal):
+            break_flag = True
         return x, break_flag
     
     def go_to_goal(self, x, break_flag):
@@ -320,7 +285,7 @@ class C3BF_algorithm():
         """
         N = x.shape[1]
         M = self.dxu.shape[0]
-        self.dxu[1,:] = delta_to_beta_array(self.dxu[1,:])
+        self.dxu[1,:] = utils.delta_to_beta_array(self.dxu[1,:])
 
         count = 0
         G = np.zeros([N-1,M])
@@ -476,7 +441,7 @@ class C3BF_algorithm():
         
         # Input constraints
         G = np.vstack([G, [[0, 1], [0, -1]]])
-        H = np.vstack([H, delta_to_beta(max_steer), -delta_to_beta(-max_steer)])
+        H = np.vstack([H, utils.delta_to_beta(max_steer), -utils.delta_to_beta(-max_steer)])
         # TODO: Keeping the following constraints for solves some problem with the circular_seed_10.json --> why??
         # G = np.vstack([G, [[0, x[3,i]/Lr], [0, x[3,i]/Lr]]])
         # H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
@@ -497,7 +462,7 @@ class C3BF_algorithm():
             print("Throttle out of bounds: ")
             print(self.dxu[0,i])
             # self.dxu[0,i] = np.clip(self.dxu[0,i], -min_acc, max_acc)
-        self.dxu[1,i] = beta_to_delta(self.dxu[1,i])    
+        self.dxu[1,i] = utils.beta_to_delta(self.dxu[1,i])    
 
 
     def check_collision(self, x, i):

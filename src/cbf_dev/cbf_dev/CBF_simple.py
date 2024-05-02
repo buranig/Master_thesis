@@ -55,54 +55,6 @@ color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:or
 with open('/home/giacomo/thesis_ws/src/seeds/seed_8.json', 'r') as file:
     data = json.load(file)
 
-def delta_to_beta(delta):
-    """
-    Converts the steering angle delta to the slip angle beta.
-
-    Args:
-        delta (float): Steering angle in radians.
-
-    Returns:
-        float: Slip angle in radians.
-
-    """
-    beta = utils.normalize_angle(np.arctan2(Lr*np.tan(delta)/L, 1.0))
-
-    return beta
-
-def delta_to_beta_array(delta):
-    """
-    Converts an array of steering angles delta to an array of slip angles beta.
-
-    Args:
-        delta (numpy.ndarray): Array of steering angles in radians.
-
-    Returns:
-        numpy.ndarray: Array of slip angles in radians.
-
-    """
-    beta = utils.normalize_angle_array(np.arctan2(Lr*np.tan(delta)/L, 1.0))
-
-    return beta
-
-def beta_to_delta(beta):
-    """
-    Converts the slip angle beta to the steering angle delta.
-
-    Args:
-        beta (float): Slip angle in radians.
-
-    Returns:
-        float: Steering angle in radians.
-
-    """
-    try:
-        delta = utils.normalize_angle_array(np.arctan2(L*np.tan(beta)/Lr, 1.0))
-    except:
-        delta = utils.normalize_angle(np.arctan2(L*np.tan(beta)/Lr, 1.0))
-
-    return delta  
-
 def update_paths(paths):
     """
     Updates the given paths.
@@ -312,7 +264,7 @@ class CBF_algorithm():
         """
         N = x.shape[1]
         M = self.dxu.shape[0]
-        self.dxu[1,:] = delta_to_beta_array(self.dxu[1,:])
+        self.dxu[1,:] = utils.delta_to_beta_array(self.dxu[1,:])
 
         count = 0
         G = np.zeros([N - 1, M])
@@ -353,7 +305,7 @@ class CBF_algorithm():
 
         # Add the input constraint
         G = np.vstack([G, [[0, 1], [0, -1]]])
-        H = np.vstack([H, delta_to_beta(max_steer), -delta_to_beta(-max_steer)])
+        H = np.vstack([H, utils.delta_to_beta(max_steer), -utils.delta_to_beta(-max_steer)])
         # TODO: check whether to keep the following constraints
         G = np.vstack([G, [[0, x[3,i]/Lr], [0, x[3,i]/Lr]]])
         H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
@@ -418,7 +370,7 @@ class CBF_algorithm():
             print("Throttle out of bounds: ")
             print(self.dxu[0,i])
             self.dxu[0,i] = np.clip(self.dxu[0,i], -min_acc, max_acc)
-        self.dxu[1,i] = beta_to_delta(self.dxu[1,i])
+        self.dxu[1,i] = utils.beta_to_delta(self.dxu[1,i])
 
     def check_collision(self, x, i):
         """

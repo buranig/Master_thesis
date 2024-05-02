@@ -550,3 +550,52 @@ def rotateMatrix(a):
     numpy.ndarray: The rotated matrix.
     """
     return np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
+
+def delta_to_beta(delta):
+    """
+    Converts the steering angle delta to the slip angle beta.
+
+    Args:
+        delta (float): Steering angle in radians.
+
+    Returns:
+        float: Slip angle in radians.
+
+    """
+    beta = normalize_angle(np.arctan2(Lr*np.tan(delta)/L, 1.0))
+
+    return beta
+
+def delta_to_beta_array(delta):
+    """
+    Converts an array of steering angles delta to an array of slip angles beta.
+
+    Args:
+        delta (numpy.ndarray): Array of steering angles in radians.
+
+    Returns:
+        numpy.ndarray: Array of slip angles in radians.
+
+    """
+    beta = normalize_angle_array(np.arctan2(Lr*np.tan(delta)/L, 1.0))
+
+    return beta
+
+def beta_to_delta(beta):
+    """
+    Converts the slip angle beta to the steering angle delta.
+
+    Args:
+        beta (float): Slip angle in radians.
+
+    Returns:
+        float: Steering angle in radians.
+
+    """
+    try:
+        delta = normalize_angle_array(np.arctan2(L*np.tan(beta)/Lr, 1.0))
+    except:
+        delta = normalize_angle(np.arctan2(L*np.tan(beta)/Lr, 1.0))
+
+    return delta           
+ 

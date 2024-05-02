@@ -47,11 +47,12 @@ boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_
 check_collision_bool = False
 add_noise = json_object["add_noise"]
 noise_scale_param = json_object["noise_scale_param"]
+show_animation = json_object["show_animation"]
 
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_6.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_8.json', 'r') as file:
     data = json.load(file)
 
 def delta_to_beta(delta):
@@ -118,30 +119,6 @@ def update_paths(paths):
         updated_paths.append(utils.update_path(path))
     return updated_paths
 
-def plot_robot(x, y, yaw, i): 
-    """
-    Plot the robot.
-
-    Args:
-        x (float): X-coordinate of the robot.
-        y (float): Y-coordinate of the robot.
-        yaw (float): Yaw angle of the robot.
-        i (int): Index of the robot.
-    """
-    outline = np.array([[-L / 2, L / 2,
-                            (L / 2), -L / 2,
-                            -L / 2],
-                        [WB / 2, WB / 2,
-                            - WB / 2, -WB / 2,
-                            WB / 2]])
-    Rot1 = np.array([[math.cos(yaw), math.sin(yaw)],
-                        [-math.sin(yaw), math.cos(yaw)]])
-    outline = (outline.T.dot(Rot1)).T
-    outline[0, :] += x
-    outline[1, :] += y
-    plt.plot(np.array(outline[0, :]).flatten(),
-                np.array(outline[1, :]).flatten(), color_dict[i], label="Robot " + str(i))
-
 def plot_robot_and_arrows(i, x, multi_control, targets):
     """
     Plots the robot and arrows for visualization.
@@ -153,7 +130,7 @@ def plot_robot_and_arrows(i, x, multi_control, targets):
         targets (list): List of target points.
 
     """
-    plot_robot(x[0, i], x[1, i], x[2, i], i)
+    utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
     utils.plot_arrow(x[0, i], x[1, i], x[2, i] + multi_control.multi_control[i].delta, length=3, width=0.5)
     utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
     plt.plot(targets[i][0], targets[i][1], "x", color = color_dict[i])
@@ -215,32 +192,46 @@ class CBF_algorithm():
         
     def run_cbf(self, x, break_flag):
         for i in range(self.robot_num):
-            t_prev = time.time()
-            if add_noise:
-                noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
-                noisy_pos = x + noise
-                self.control_robot(i, noisy_pos)
-                plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
-            else:
-                self.control_robot(i, x)
+            if not self.reached_goal[i]:
+                # Step 9: Check if the distance between the current position and the target is less than 5
+                if utils.dist(point1=(x[0,i], x[1,i]), point2=self.targets[i]) < 2:
+                    # Perform some action when the condition is met
+                    self.paths[i].pop(0)
+                    if not self.paths[i]:
+                        print("Path complete")
+                        self.dxu[:, i] = 0
+                        x[3,i] = 0
+                        self.reached_goal[i] = True
+                    
+                    else: 
+                        self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
+                
+                if check_goal_reached(x, self.targets, i):
+                    print(f"Vehicle {i} reached goal!!")
+                    self.dxu[:, i] = 0
+                    x[3,i] = 0
+                    self.reached_goal[i] = True
+                else:
+                    t_prev = time.time()
+                    if add_noise:
+                        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
+                        noisy_pos = x + noise
+                        self.control_robot(i, noisy_pos)
+                        plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
+                    else:
+                        self.control_robot(i, x)
 
-            self.computational_time.append((time.time() - t_prev))
-            # Step 9: Check if the distance between the current position and the target is less than 5
-            if utils.dist(point1=(x[0,i], x[1,i]), point2=self.targets[i]) < 2:
-                # Perform some action when the condition is met
-                self.paths[i].pop(0)
-                if not self.paths[i]:
-                    print("Path complete")
-                    break_flag = True
-                    return x, break_flag
-                self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
+                    self.computational_time.append((time.time() - t_prev))
+            
+                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
 
-            x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
-            plot_robot(x[0, i], x[1, i], x[2, i], i)
+            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
             plt.plot(self.targets[i][0], self.targets[i][1], "x", color=color_dict[i])
-        
+
+        if all(self.reached_goal):
+            break_flag = True
         return x, break_flag
     
     def go_to_goal(self, x, break_flag):
@@ -273,7 +264,7 @@ class CBF_algorithm():
             if all(self.reached_goal):
                 break_flag = True
 
-            plot_robot(x[0, i], x[1, i], x[2, i], i)
+            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
             plt.scatter(self.targets[i][0], self.targets[i][1], marker="x", color=color_dict[i], s=200)
@@ -712,7 +703,11 @@ def main_seed(args=None):
 
     # Step 3: Create an array x with the initial values
     x = np.array([x0, y, yaw, v])
+    u = np.zeros((2, robot_num))
     
+    trajectory = np.zeros((x.shape[0]+u.shape[0], robot_num, 1))
+    trajectory[:, :, 0] = np.concatenate((x,u))
+
     # Step 4: Create paths for each robot
     traj = data['trajectories']
     paths = [[Coordinate(x=traj[str(idx)][i][0], y=traj[str(idx)][i][1]) for i in range(len(traj[str(idx)]))] for idx in range(robot_num)]
@@ -728,9 +723,12 @@ def main_seed(args=None):
             'key_release_event',
             lambda event: [exit(0) if event.key == 'escape' else None])
         
-        # x, break_flag = cbf.run_cbf(x, break_flag)
-        x, break_flag = cbf.go_to_goal(x, break_flag)
+        x, break_flag = cbf.run_cbf(x, break_flag)
+        # x, break_flag = cbf.go_to_goal(x, break_flag)
         
+        trajectory = np.dstack([trajectory, np.concatenate((x, cbf.dxu))])
+        
+
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")
         plt.grid(True)
@@ -738,6 +736,13 @@ def main_seed(args=None):
 
         if break_flag:  
             break
+
+    print("Done")
+    if show_animation:
+        for i in range(robot_num):
+            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
+        plt.pause(0.0001)
+        plt.show()
 
 if __name__=='__main__':
     main_seed()

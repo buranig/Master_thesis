@@ -53,7 +53,7 @@ to_goal_stop_distance = json_object["to_goal_stop_distance"]
 update_dist = 2
 # N=3
 
-robot_num = 5 #json_object["robot_num"]
+robot_num = json_object["robot_num"]
 timer_freq = json_object["timer_freq"]
 
 show_animation = json_object["show_animation"]

@@ -465,7 +465,7 @@ def cbf_sim(seed, robot_num):
     print("Done")
     if show_animation:
         for i in range(robot_num):
-            CBF.plot_robot(x[0, i], x[1, i], x[2, i], i)
+            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
             plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])

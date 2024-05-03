@@ -9,6 +9,11 @@ To add it as a ROS2 package, simpy head to the ```your-workspace/src``` folder a
 git clone -b ros2-humble git@github.com:buranig/Master_thesis.git collision-avoidance-ros2
 ```
 
+Then, compile your current workspace with the newly added packages:
+```
+colcon build --symlink-install
+```
+
 ## Command reference
 
 Terminal 1:

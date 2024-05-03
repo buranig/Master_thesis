@@ -17,6 +17,8 @@ color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:or
 
 # TODO: import all this parameters from a config file so that we can easily change them in one place
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
+# path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params_small.json')
+
 # Opening JSON file
 with open(path, 'r') as openfile:
     # Reading from json file
@@ -267,10 +269,10 @@ def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax,
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
     plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
 
-def plot_arrow(x, y, yaw, length=0.5, width=0.1):  # pragma: no cover
+def plot_arrow(x, y, yaw, length=0.5, width=0.1, color='k'):  # pragma: no cover
     plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
-              head_length=width, head_width=width)
-    plt.plot(x, y)
+              head_length=width, head_width=width, color=color)
+    plt.plot(x, y, color)
         
 def plot_map(width=100, height=100):
         corner_x = [-width/2.0, width/2.0, width/2.0, -width/2.0, -width/2.0]

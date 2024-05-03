@@ -1,0 +1,105 @@
+{
+    "CBF_simple":
+        {
+            "max_steer": 0.785398,
+            "max_acc": 100,
+            "min_acc": -100,
+            "safety_radius": 0.5,
+            "barrier_gain": 0.001, 
+            "arena_gain": 0.0,
+            "Kv": 1
+        },
+    "C3BF":
+        {
+            "max_steer": 0.785398,
+            "max_acc": 5,
+            "min_acc": -5,
+            "safety_radius": 1.5,
+            "barrier_gain": 0.1, 
+            "arena_gain": 0.0,
+            "Kv": 0.1
+        },
+    "DWA":
+        {
+            "max_steer": 0.785398,
+            "max_speed": 2.0,
+            "min_speed": -1.0,
+            "max_acc": 2,
+            "min_acc": -2,
+            "a_resolution": 0.5,
+            "v_resolution": 0.5,
+            "delta_resolution": 15,
+            "predict_time": 2,
+            "to_goal_cost_gain": 1,
+            "speed_cost_gain": 1,
+            "obstacle_cost_gain": 30,
+            "heading_cost_gain": 1,
+            "robot_stuck_flag_cons": 0.001,
+            "dilation_factor": 0.35
+        },
+    "LBP":
+        {
+            "max_steer": 0.785398,
+            "max_speed": 2,
+            "min_speed": -1.0,
+            "max_acc": 5,
+            "min_acc": -5,
+            "a_resolution": 0.5,
+            "v_resolution": 0.5,
+            "delta_resolution": 15,
+            "predict_time": 1.5,
+            "to_goal_cost_gain": 20,
+            "speed_cost_gain": 1,
+            "obstacle_cost_gain": 30,
+            "heading_cost_gain": 1,
+            "robot_stuck_flag_cons": 0.001,
+            "dilation_factor": 0.35
+        },
+    "MPC":
+        {
+            "max_steer": 0.785398,
+            "max_speed": 2,
+            "min_speed": -1.0,
+            "max_acc": 2,
+            "min_acc": -2,
+            "horizon": 8,
+            "dt_pred": 0.2,
+            "safety_radius": 2
+        },
+    "Car_model":
+        {
+            "max_steer": 0.785398,
+            "max_speed": 0.1,
+            "min_speed": -0.05,
+            "L": 0.17, 
+            "Cf": 320.0,
+            "Cr": 340.0, 
+            "Iz": 225.0,
+            "m": 150.0,
+            "c_a": 1.36,
+            "c_r1": 0.01
+        },
+    "Controller":
+        {   
+            "dt": 0.1,
+            "max_steer": 0.785398,
+            "WB": 0.1,
+            "L_d": 1,
+            "max_acc": 100,
+            "min_acc": -100,
+            "controller_type": "MPC",
+            "cbf_type": "C3BF"
+        },
+    "robot_num": 5,
+    "safety": 0.8, 
+    "min_dist": 0.8,
+    "width": 5,
+    "height": 5,
+    "timer_freq": 0.01,
+    "plot_traj": false,
+    "to_goal_stop_distance": 2.5,
+    "show_animation": true,
+    "add_noise": true,
+    "noise_scale_param": 0.0
+    
+}

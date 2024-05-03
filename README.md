@@ -3,8 +3,13 @@
 
 In this branch, the code from the ```master``` branch has been adapted as a ROS2 pacakge to perform collision-less multi-car control.
 
+To add it as a ROS2 package, simpy head to the ```your-workspace/src``` folder and git clone it there:
 
-Command reference:
+```
+git clone -b ros2-humble git@github.com:buranig/Master_thesis.git collision-avoidance-ros2
+```
+
+## Command reference
 
 Terminal 1:
 ```
@@ -21,7 +26,7 @@ Terminal 3:
 ros2 launch bumper_cars collision-avoidance.launch.py carNumber:=1
 ```
 
-Terminal 4:
+Terminal 4 (_optional_):
 ```
 ros2 run dwa_dev view_trajs
 ```

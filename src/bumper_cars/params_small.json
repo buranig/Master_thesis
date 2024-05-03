@@ -1,22 +1,13 @@
 {
-    "CBF_robotarium":
-        {
-            "max_steer": 0.523599,
-            "max_speed": 6,
-            "min_speed": -1.0,
-            "safety_radius": 7,
-            "barrier_gain": 0.05, 
-            "magnitude_limit": 6
-        },
     "CBF_simple":
         {
             "max_steer": 0.785398,
             "max_acc": 100,
             "min_acc": -100,
-            "safety_radius": 2,
-            "barrier_gain": 0.01, 
-            "arena_gain": 0.01,
-            "Kv": 0.1
+            "safety_radius": 0.5,
+            "barrier_gain": 0.001, 
+            "arena_gain": 0.0,
+            "Kv": 1
         },
     "C3BF":
         {
@@ -24,8 +15,8 @@
             "max_acc": 5,
             "min_acc": -5,
             "safety_radius": 1.5,
-            "barrier_gain": 1, 
-            "arena_gain": 50,
+            "barrier_gain": 0.1, 
+            "arena_gain": 0.0,
             "Kv": 0.1
         },
     "DWA":
@@ -78,9 +69,9 @@
     "Car_model":
         {
             "max_steer": 0.785398,
-            "max_speed": 2,
-            "min_speed": -1.0,
-            "L": 1.0, 
+            "max_speed": 0.1,
+            "min_speed": -0.05,
+            "L": 0.17, 
             "Cf": 320.0,
             "Cr": 340.0, 
             "Iz": 225.0,
@@ -92,18 +83,18 @@
         {   
             "dt": 0.1,
             "max_steer": 0.785398,
-            "WB": 0.7,
+            "WB": 0.1,
             "L_d": 1,
-            "max_acc": 5.0,
-            "min_acc": -5.0,
+            "max_acc": 100,
+            "min_acc": -100,
             "controller_type": "MPC",
             "cbf_type": "C3BF"
         },
     "robot_num": 5,
-    "safety": 10, 
-    "min_dist": 3,
-    "width": 30,
-    "height": 30,
+    "safety": 0.8, 
+    "min_dist": 0.8,
+    "width": 5,
+    "height": 5,
     "timer_freq": 0.01,
     "plot_traj": false,
     "to_goal_stop_distance": 2.5,

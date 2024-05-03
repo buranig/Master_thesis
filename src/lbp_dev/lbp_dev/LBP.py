@@ -64,30 +64,6 @@ with open('/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP.json', 'r') as file:
 with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_11.json', 'r') as file:
     seed = json.load(file)
 
-def normalize_angle(angle):
-    """
-    Normalize an angle to [-pi, pi].
-    :param angle: (float)
-    :return: (float) Angle in radian in [-pi, pi]
-    """
-    while angle > np.pi:
-        angle -= 2.0 * np.pi
-    while angle < -np.pi:
-        angle += 2.0 * np.pi
-    return angle
-
-def rotateMatrix(a):
-    """
-    Rotate a 2D matrix by the given angle.
-
-    Parameters:
-    a (float): The angle of rotation in radians.
-
-    Returns:
-    numpy.ndarray: The rotated matrix.
-    """
-    return np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
-
 def lbp_control(x, goal, ob, u_buf, trajectory_buf):
     """
     Calculates the control input, trajectory, and control history for the LBP algorithm.
@@ -179,7 +155,7 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
             geom[:,0] = info['x']
             geom[:,1] = info['y']
             geom[:,2] = info['yaw']
-            geom[:,0:2] = (geom[:,0:2]) @ rotateMatrix(-x[2]) + [x[0],x[1]]
+            geom[:,0:2] = (geom[:,0:2]) @ utils.rotateMatrix(-x[2]) + [x[0],x[1]]
             
             geom[:,2] = geom[:,2] + x[2] #bringing also the yaw angle in the new frame
             
@@ -333,40 +309,11 @@ def calc_to_goal_heading_cost(trajectory, goal):
     dy = goal[1] - trajectory[-1, 1]
 
     # either using the angle difference or the distance --> if we want to use the angle difference, we need to normalize the angle before taking the difference
-    error_angle = normalize_angle(math.atan2(dy, dx))
-    cost_angle = error_angle - normalize_angle(trajectory[-1, 2])
+    error_angle = utils.normalize_angle(math.atan2(dy, dx))
+    cost_angle = error_angle - utils.normalize_angle(trajectory[-1, 2])
     cost = abs(math.atan2(math.sin(cost_angle), math.cos(cost_angle)))
 
     return cost
-
-def plot_arrow(x, y, yaw, length=0.5, width=0.1):  # pragma: no cover
-    plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
-              head_length=width, head_width=width)
-    plt.plot(x, y)
-
-def plot_robot(x, y, yaw, i):  
-    """
-    Plot the robot.
-
-    Args:
-        x (float): X-coordinate of the robot.
-        y (float): Y-coordinate of the robot.
-        yaw (float): Yaw angle of the robot.
-        i (int): Index of the robot.
-    """
-    outline = np.array([[-L / 2, L / 2,
-                            (L / 2), -L / 2,
-                            -L / 2],
-                        [WB / 2, WB / 2,
-                            - WB / 2, -WB / 2,
-                            WB / 2]])
-    Rot1 = np.array([[math.cos(yaw), math.sin(yaw)],
-                        [-math.sin(yaw), math.cos(yaw)]])
-    outline = (outline.T.dot(Rot1)).T
-    outline[0, :] += x
-    outline[1, :] += y
-    plt.plot(np.array(outline[0, :]).flatten(),
-                np.array(outline[1, :]).flatten(), color_dict[i])
 
 def update_targets(paths, targets, x, i):
     """
@@ -454,25 +401,6 @@ def update_robot_state(x, u, dt, targets, dilated_traj, u_hist, predicted_trajec
 
     return x, u, predicted_trajectory, u_hist
 
-def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax, i):
-    """
-    Plots the robot and arrows for visualization.
-
-    Args:
-        i (int): Index of the robot.
-        x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
-        multi_control (numpy.ndarray): Control inputs of shape (2, N).
-        targets (list): List of target points.
-
-    """
-    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-", color=color_dict[i])
-    plot_polygon(dilated_traj[i], ax=ax, add_points=False, alpha=0.5, color=color_dict[i])
-    # plt.plot(x[0, i], x[1, i], "xr")
-    plt.plot(targets[i][0], targets[i][1], "x", color=color_dict[i])
-    plot_robot(x[0, i], x[1, i], x[2, i], i)
-    plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-    plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
-
 def check_goal_reached(x, targets, i, distance=0.5):
     """
     Check if the given point has reached the goal.
@@ -506,26 +434,35 @@ class LBP_algorithm():
 
     def run_lbp(self, x, u, break_flag):
         for i in range(self.robot_num):
-            
-            # self.paths, self.targets = update_targets(self.paths, self.targets, x, i)
-            if utils.dist(point1=(x[0,i], x[1,i]), point2=self.targets[i]) < update_dist:
-                # Perform some action when the condition is met
-                self.paths[i].pop(0)
-                if not self.paths[i]:
-                    print("Path complete")
-                    return x, u, True
-                
-                self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
+            if not self.reached_goal[i]:
+                # Step 9: Check if the distance between the current position and the target is less than 5
+                if utils.dist(point1=(x[0,i], x[1,i]), point2=self.targets[i]) < update_dist:
+                    # Perform some action when the condition is met
+                    self.paths[i].pop(0)
+                    if not self.paths[i]:
+                        print("Path complete")
+                        u[:, i] = np.zeros(2)
+                        x[3, i] = 0
+                        self.reached_goal[i] = True
+                    else: 
+                        self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
 
-            t_prev = time.time()
-            x, u, self.predicted_trajectory, self.u_hist = update_robot_state(x, u, dt, self.targets, self.dilated_traj, self.u_hist, self.predicted_trajectory, i)
-            self.computational_time.append(time.time()-t_prev)
-
-            if check_goal_reached(x, self.targets, i):
-                break_flag = True
+                if check_goal_reached(x, self.targets, i):
+                    print(f"Vehicle {i} reached goal!!")
+                    u[:, i] = np.zeros(2)
+                    x[3, i] = 0
+                    self.reached_goal[i] = True
+                else:
+                    t_prev = time.time()
+                    x, u, self.predicted_trajectory, self.u_hist = update_robot_state(x, u, dt, self.targets, self.dilated_traj, self.u_hist, self.predicted_trajectory, i)
+                    self.computational_time.append(time.time()-t_prev)
 
             if show_animation:
-                plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
+                utils.plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
+ 
+        if all(self.reached_goal):
+                break_flag = True
+
         return x, u, break_flag
     
     def go_to_goal(self, x, u, break_flag):
@@ -551,7 +488,7 @@ class LBP_algorithm():
                 break_flag = True
 
             if show_animation:
-                plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
+                utils.plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
         return x, u, break_flag
     
     def check_collision(self, x, u, i):
@@ -640,7 +577,7 @@ def main():
                 break_flag = True
 
             if show_animation:
-                plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax, i)
+                utils.plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax, i)
 
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")
@@ -704,7 +641,7 @@ def main1():
                 break_flag = True
 
             if show_animation:
-                plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax, i)
+                utils.plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax, i)
 
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")
@@ -791,7 +728,7 @@ def main2():
                 break_flag = True
 
             if show_animation:
-                plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax, i)
+                utils.plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax, i)
 
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")
@@ -863,8 +800,8 @@ def main_seed():
         plt.cla()
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
         
-        # x, u, break_flag = lbp.run_lbp(x, u, break_flag)
-        x, u, break_flag = lbp.go_to_goal(x, u, break_flag)
+        x, u, break_flag = lbp.run_lbp(x, u, break_flag)
+        # x, u, break_flag = lbp.go_to_goal(x, u, break_flag)
 
         trajectory = np.dstack([trajectory, x])
 
@@ -879,7 +816,7 @@ def main_seed():
     print("Done")
     if show_animation:
         for i in range(robot_num):
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-r")
+            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
         plt.pause(0.0001)
         plt.show()
 

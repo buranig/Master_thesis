@@ -11,6 +11,7 @@ import json
 
 # TODO: import all this parameters from a config file so that we can easily change them in one place
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
+path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params_small.json')
 # Opening JSON file
 with open(path, 'r') as openfile:
     # Reading from json file
@@ -50,7 +51,7 @@ def random_seed(robot_num):
     trajectories = {}
     for i in range(robot_num):
         # generate a path for each robot
-        trajectories[i] = utils.create_seed(len_path=10)
+        trajectories[i] = utils.create_seed(len_path=3)
     # save the dictionary to a file
         
     seed = {}
@@ -101,10 +102,10 @@ def circular_seed(robot_num, R=10.0):
     seed['initial_position'] = initial_position
     seed['trajectories'] = trajectories
     seed['robot_num'] = robot_num
-    # save_dict_to_file(seed, filename='src/seeds/circular_seed_')
+    save_dict_to_file(seed, filename='src/seeds/circular_seed_')
 
 if __name__ == "__main__":
 
-    circular_seed(R=11.5, robot_num=14)
-    # random_seed(robot_num=9)
+    circular_seed(R=1, robot_num=5)
+    # random_seed(robot_num=5)
     # random_seed()

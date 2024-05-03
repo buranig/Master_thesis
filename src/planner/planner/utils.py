@@ -17,6 +17,8 @@ color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:or
 
 # TODO: import all this parameters from a config file so that we can easily change them in one place
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
+# path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params_small.json')
+
 # Opening JSON file
 with open(path, 'r') as openfile:
     # Reading from json file
@@ -267,9 +269,10 @@ def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax,
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
     plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
 
-def plot_arrow(x, y, yaw, length=0.5, width=0.1, color=None, label=None):  # pragma: no cover
-        plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
-                head_length=width, head_width=width, color=color, label=label)
+def plot_arrow(x, y, yaw, length=0.5, width=0.1, color='k'):  # pragma: no cover
+    plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
+              head_length=width, head_width=width, color=color)
+    plt.plot(x, y, color)
         
 def plot_map(width=100, height=100):
         corner_x = [-width/2.0, width/2.0, width/2.0, -width/2.0, -width/2.0]
@@ -537,3 +540,64 @@ def plot_robot(x, y, yaw, i):
     outline[1, :] += y
     plt.plot(np.array(outline[0, :]).flatten(),
                 np.array(outline[1, :]).flatten(), color_dict[i], label="Robot " + str(i))
+    
+def rotateMatrix(a):
+    """
+    Rotate a 2D matrix by the given angle.
+
+    Parameters:
+    a (float): The angle of rotation in radians.
+
+    Returns:
+    numpy.ndarray: The rotated matrix.
+    """
+    return np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
+
+def delta_to_beta(delta):
+    """
+    Converts the steering angle delta to the slip angle beta.
+
+    Args:
+        delta (float): Steering angle in radians.
+
+    Returns:
+        float: Slip angle in radians.
+
+    """
+    beta = normalize_angle(np.arctan2(Lr*np.tan(delta)/L, 1.0))
+
+    return beta
+
+def delta_to_beta_array(delta):
+    """
+    Converts an array of steering angles delta to an array of slip angles beta.
+
+    Args:
+        delta (numpy.ndarray): Array of steering angles in radians.
+
+    Returns:
+        numpy.ndarray: Array of slip angles in radians.
+
+    """
+    beta = normalize_angle_array(np.arctan2(Lr*np.tan(delta)/L, 1.0))
+
+    return beta
+
+def beta_to_delta(beta):
+    """
+    Converts the slip angle beta to the steering angle delta.
+
+    Args:
+        beta (float): Slip angle in radians.
+
+    Returns:
+        float: Steering angle in radians.
+
+    """
+    try:
+        delta = normalize_angle_array(np.arctan2(L*np.tan(beta)/Lr, 1.0))
+    except:
+        delta = normalize_angle(np.arctan2(L*np.tan(beta)/Lr, 1.0))
+
+    return delta           
+ 

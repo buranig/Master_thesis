@@ -22,37 +22,37 @@ with open(path, 'r') as openfile:
     # Reading from json file
     json_object = json.load(openfile)
 
-# max_steer = json_object["Car_model"]["max_steer"] # [rad] max steering angle
-# max_speed = json_object["Car_model"]["max_speed"] # [m/s]
-# min_speed = json_object["Car_model"]["min_speed"] # [m/s]
-# dt = json_object["Controller"]["dt"]  # [s] Time step
-# L = json_object["Car_model"]["L"]  # [m] Wheel base of vehicle
-# Lr = L / 2.0  # [m]
-# Lf = L - Lr
-# Cf = json_object["Car_model"]["Cf"]  # N/rad
-# Cr = json_object["Car_model"]["Cr"] # N/rad
-# Iz = json_object["Car_model"]["Iz"]  # kg/m2
-# m = json_object["Car_model"]["m"]  # kg
-# # Aerodynamic and friction coefficients
-# c_a = json_object["Car_model"]["c_a"]
-# c_r1 = json_object["Car_model"]["c_r1"]
+max_steer = json_object["Car_model"]["max_steer"] # [rad] max steering angle
+max_speed = json_object["Car_model"]["max_speed"] # [m/s]
+min_speed = json_object["Car_model"]["min_speed"] # [m/s]
+dt = json_object["Controller"]["dt"]  # [s] Time step
+L = json_object["Car_model"]["L"]  # [m] Wheel base of vehicle
+Lr = L / 2.0  # [m]
+Lf = L - Lr
+Cf = json_object["Car_model"]["Cf"]  # N/rad
+Cr = json_object["Car_model"]["Cr"] # N/rad
+Iz = json_object["Car_model"]["Iz"]  # kg/m2
+m = json_object["Car_model"]["m"]  # kg
+# Aerodynamic and friction coefficients
+c_a = json_object["Car_model"]["c_a"]
+c_r1 = json_object["Car_model"]["c_r1"]
 
 max_steer = np.radians(45.0)  # [rad] max steering angle
 max_speed = 5 # [m/s]
 min_speed = 0.0 # [m/s]
 
 # dt = 0.1
-Lr = 1.62 #L / 2.0  # [m]
-Lf = 1.04 #L - Lr
-L = Lr+Lf  # [m] Wheel base of vehicle
-Cf = 20000 #1600.0 * 2.0  # N/rad
-Cr = Cf #5650 #1700.0 * 2.0  # N/rad
-Iz = 4192.0  # kg/m2
-m = 1395.0  # kg
-# Aerodynamic and friction coefficients
-c_a = 1.36
-c_r1 = 0.02
-dt = 0.01
+# Lr = 1.62 #L / 2.0  # [m]
+# Lf = 1.04 #L - Lr
+# L = Lr+Lf  # [m] Wheel base of vehicle
+# Cf = 20000 #1600.0 * 2.0  # N/rad
+# Cr = Cf #5650 #1700.0 * 2.0  # N/rad
+# Iz = 4192.0  # kg/m2
+# m = 1395.0  # kg
+# # Aerodynamic and friction coefficients
+# c_a = 1.36
+# c_r1 = 0.02
+# dt = 0.01
 
 WB = json_object["Controller"]["WB"] 
 L_d = json_object["Controller"]["L_d"] 
@@ -73,7 +73,7 @@ def predict_trajectory(initial_state: State, target, linear=True):
     traj = []  # List to store the trajectory points
 
     # Append the initial state coordinates to the trajectory
-    traj.append(Coordinate(x=initial_state.x, y=initial_state.y))
+    traj.append((initial_state.x, initial_state.y))
 
     cmd = ControlInputs()  # Create a ControlInputs object
     old_time = time.time()  # Get the current time
@@ -86,10 +86,10 @@ def predict_trajectory(initial_state: State, target, linear=True):
         new_state, old_time = linear_model_callback(initial_state, cmd)
     else:
         new_state, old_time = nonlinear_model_callback(initial_state, cmd)
-    traj.append(Coordinate(x=new_state.x, y=new_state.y))
+    traj.append((new_state.x, new_state.y))
 
     # Continue predicting the trajectory until the distance between the last point and the target is less than 10
-    while dist(point1=(traj[-1].x, traj[-1].y), point2=target) > 0.5:
+    while dist(point1=(traj[-1][0], traj[-1][1]), point2=target) > 0.5:
 
         # Calculate the control inputs for the new state
         cmd.throttle, cmd.delta = pure_pursuit_steer_control(target, new_state)
@@ -99,7 +99,7 @@ def predict_trajectory(initial_state: State, target, linear=True):
             new_state, old_time = linear_model_callback(new_state, cmd)
         else:
             new_state, old_time = nonlinear_model_callback(new_state, cmd)
-        traj.append(Coordinate(x=new_state.x, y=new_state.y))
+        traj.append((new_state.x, new_state.y))
 
         if debug:
             # Plot the trajectory and other elements for debugging
@@ -119,7 +119,73 @@ def predict_trajectory(initial_state: State, target, linear=True):
     # traj = traj[0:-1:5]
     plt.show()
 
-    return Path(path=traj)
+    return traj
+
+def predict_trajectory_horizon(initial_state: State, target, linear=True, horizon=2):
+    """
+    Predicts the trajectory of a vehicle from an initial state to a target point.
+
+    Args:
+        initial_state (State): The initial state of the vehicle.
+        target (tuple): The target point (x, y) to reach.
+
+    Returns:
+        Path: The predicted trajectory as a Path object.
+    """
+    traj = []  # List to store the trajectory points
+
+    # Append the initial state coordinates to the trajectory
+    traj.append((initial_state.x, initial_state.y))
+
+    cmd = ControlInputs()  # Create a ControlInputs object
+    old_time = time.time()  # Get the current time
+
+    # Calculate the control inputs for the initial state
+    cmd.throttle, cmd.delta = pure_pursuit_steer_control(target, initial_state)
+
+    # Update the state using the linear model and append the new state coordinates to the trajectory
+    if linear:
+        new_state, old_time = linear_model_callback(initial_state, cmd)
+    else:
+        new_state, old_time = nonlinear_model_callback(initial_state, cmd)
+    traj.append((new_state.x, new_state.y))
+
+    # Continue predicting the trajectory until the distance between the last point and the target is less than 10
+    t = 0
+
+    while t < horizon:
+
+        # Calculate the control inputs for the new state
+        cmd.throttle, cmd.delta = pure_pursuit_steer_control(target, new_state)
+
+        # Update the state using the linear model and append the new state coordinates to the trajectory
+        if linear:
+            new_state, old_time = linear_model_callback(new_state, cmd)
+        else:
+            new_state, old_time = nonlinear_model_callback(new_state, cmd)
+        traj.append((new_state.x, new_state.y))
+
+        t += dt
+
+        if debug:
+            # Plot the trajectory and other elements for debugging
+            plt.cla()
+            plt.gcf().canvas.mpl_connect(
+                'key_release_event',
+                lambda event: [exit(0) if event.key == 'escape' else None])
+            
+            plot_path(traj)
+            plt.plot(initial_state.x, initial_state.y, 'k.')
+            plt.plot(target[0], target[1], 'b.')
+            plt.axis("equal")
+            plt.grid(True)
+            plt.pause(0.000001)
+    
+    # Reduce the number of points in the trajectory for efficiency
+    # traj = traj[0:-1:5]
+    plt.show()
+
+    return traj
 
 def plot_path(path: Path):
         x = []
@@ -266,7 +332,6 @@ def normalize_angle(angle):
 
     return angle
 
-
 def main():
     initial_state = State(x=0.0, y=0.0, yaw=0.0, v=0.0, omega=0.0)
     target = [-10, 0]
@@ -279,22 +344,22 @@ def main():
     plt.rcParams['font.serif'] = ['Times New Roman']
     plt.rcParams['font.size'] = fontsize
 
-    print(len(trajectory.path))
+    print(len(trajectory))
 
     x = []
     y = []
-    for coord in trajectory.path:
+    for coord in trajectory:
     
-        x.append(coord.x)
-        y.append(coord.y)
+        x.append(coord[0])
+        y.append(coord[1])
     plt.plot(x, y, 'r', label='Kinematic model')
 
     x = []
     y = []
-    for coord in trajectory1.path:
+    for coord in trajectory1:
     
-        x.append(coord.x)
-        y.append(coord.y)
+        x.append(coord[0])
+        y.append(coord[1])
     plt.plot(x, y, 'b', label='Dynamic model')
     plt.plot(target[0], target[1], 'kx', label='Target', markersize=20)
     utils.plot_arrow(initial_state.x, initial_state.y, initial_state.yaw, length=L/2, width=0.7, label='Initial State')

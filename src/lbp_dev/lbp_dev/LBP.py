@@ -40,7 +40,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 
 WB = json_object["Controller"]["WB"] # Wheel base
-robot_num = json_object["robot_num"]
+robot_num = 6 #json_object["robot_num"]
 safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
@@ -82,28 +82,6 @@ def lbp_control(x, goal, ob, u_buf, trajectory_buf):
     u, trajectory, u_history = calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf)
     return u, trajectory, u_history
 
-def predict_trajectory(x_init, a, delta):
-    """
-    Predicts the trajectory of an object given the initial state, acceleration, and steering angle.
-
-    Parameters:
-    x_init (list): The initial state of the object [x, y, theta].
-    a (float): The acceleration of the object.
-    delta (float): The steering angle of the object.
-
-    Returns:
-    numpy.ndarray: The predicted trajectory of the object.
-    """
-
-    x = np.array(x_init)
-    trajectory = np.array(x)
-    time = 0
-    while time < predict_time:
-        x = utils.motion(x, [a, delta], dt)
-        trajectory = np.vstack((trajectory, x))
-        time += dt
-    return trajectory
-
 def calc_dynamic_window(x):
     """
     Calculates the dynamic window for velocity search based on the current state.
@@ -144,6 +122,7 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
     min_cost = float("inf")
     best_u = [0.0, 0.0]
     best_trajectory = np.array([x])
+    u_history = {}
 
     # Calculate the cost of each possible trajectory and return the minimum
     for v in v_search:
@@ -159,7 +138,6 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
             
             geom[:,2] = geom[:,2] + x[2] #bringing also the yaw angle in the new frame
             
-            # trajectory = predict_trajectory(x_init, a, delta)
             trajectory = geom
             # calc cost
 
@@ -186,16 +164,17 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
                 # print(f"Control seq. {len(info['ctrl'])}")
                 best_u = [a, info['ctrl'][1]]
                 best_trajectory = trajectory
-                u_history = info['ctrl'].copy()
+                u_history['ctrl'] = info['ctrl'].copy()
+                u_history['v_goal'] = v
 
     # Calculate cost of the previous best trajectory and compare it with that of the new trajectories
     # If the cost of the previous best trajectory is lower, use the previous best trajectory
     
     #TODO: this section has a small bug due to popping elements from the buffer, it gets to a point where there 
     # are no more elements in the buffer to use
-    if len(u_buf) > 4:
-        u_buf.pop(0)
-    
+    if len(u_buf['ctrl']) > 4:
+        u_buf['ctrl'].pop(0)
+        
         trajectory_buf = trajectory_buf[1:]
 
         to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
@@ -206,9 +185,10 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
 
         if min_cost >= final_cost:
             min_cost = final_cost
-            best_u = [0, u_buf[1]]
+            # best_u = [(u_buf['v_goal']-x[3])/dt, u_buf['ctrl'][1]]
+            best_u = [0, u_buf['ctrl'][1]]
             best_trajectory = trajectory_buf
-            u_history = u_buf
+            u_history['ctrl'] = u_buf['ctrl']
 
     elif min_cost == np.inf:
         # emergency stop
@@ -218,7 +198,7 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
         else:
             best_u = [max_acc, 0]
         best_trajectory = np.array([x[0:3], x[0:3]])
-        u_history = [min_acc, 0]
+        u_history['ctrl'] = [min_acc, 0]
 
 
     return best_u, best_trajectory, u_history
@@ -789,7 +769,7 @@ def main_seed():
     for i in range(robot_num):
         dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
 
-    u_hist = dict.fromkeys(range(robot_num),[0]*int(predict_time/dt))
+    u_hist = dict.fromkeys(range(robot_num),{'ctrl': [0]*int(predict_time/dt), 'v_goal': 0})
     fig = plt.figure(1, dpi=90, figsize=(10,10))
     ax = fig.add_subplot(111)
     

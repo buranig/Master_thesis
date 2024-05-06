@@ -183,9 +183,11 @@ class CBF_algorithm(Controller):
                 G[count, :] = np.array([-self.Kv, -Lg_h])
 
 
-
             count += 1
 
+        if self.robot_num ==0:
+            print("G\n",G)
+            print("H\n",H)
 
         # Add the input constraint
         G = np.vstack([G, [[0, 1], [0, -1]]])

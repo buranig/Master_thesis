@@ -10,8 +10,6 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def add_car(context, ld):
     param_value = LaunchConfiguration('carNumber').perform(context)
-    alg_name = LaunchConfiguration('alg').perform(context)
-
 
     car_yaml = os.path.join(
         get_package_share_directory('bumper_cars'),
@@ -31,12 +29,14 @@ def add_car(context, ld):
         #
         node = Node(
             package='bumper_cars',
-            executable='collision_avoidance_ros2',
+            executable='collision_avoidance_ros2.py',
             name='ca_node' + str(i + 1),
             parameters=[
                     {'car_yaml': car_yaml},
-                    {'alg': alg_name},
-                    {'car_i': i + 1}
+                    {'alg': LaunchConfiguration('alg')},
+                    {'car_i': i + 1},
+                    {'gen_traj': LaunchConfiguration('gen_traj')},
+                    {'source': LaunchConfiguration('source_target')}
             ],
             emulate_tty=True,
             output='both'
@@ -58,7 +58,8 @@ def add_car(context, ld):
                     {'arm_mpc': False},
                     {'carNumber': i + 1}
             ],
-                remappings=[('/sim/car'+car_i+'/set/control', '/sim/car'+car_i+'/desired_control') ],
+                remappings=[('/sim/car'+car_i+'/set/control', '/sim/car'+car_i+'/desired_control'),
+                            ('/car'+car_i+'/set/control', '/car'+car_i+'/desired_control') ],
             emulate_tty=True,
             output='both'
         )
@@ -87,9 +88,22 @@ def generate_launch_description():
         default_value='sim'
     )
 
+    gen_traj = DeclareLaunchArgument(
+        'gen_traj',
+        description='boolean to select whether trajectories must be re-computed',
+        default_value='False'
+    )
+
+    sim = DeclareLaunchArgument(
+        'sim',
+        description='boolean to select whether we are working in simulation or real world',
+        default_value='False'
+    )
+
+
     node = Node(
         package='bumper_cars',
-        executable='state_buffer',
+        executable='state_buffer.py',
         name='state_buffer_node',
         parameters=[
                 {'carNumber': LaunchConfiguration('carNumber')}
@@ -101,6 +115,8 @@ def generate_launch_description():
     ld.add_action(carNumber_arg)
     ld.add_action(source_target_arg)
     ld.add_action(car_alg)
+    ld.add_action(gen_traj)
+    ld.add_action(sim)
     ld.add_action(node)
     ld.add_action(OpaqueFunction(function=add_car, args=[ld]))
 

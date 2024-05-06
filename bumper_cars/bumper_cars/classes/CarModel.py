@@ -95,7 +95,7 @@ class CarModel:
         state.x = old_x + old_v * np.cos(old_yaw) * dt
         state.y = old_y + old_v * np.sin(old_yaw) * dt
 
-        state.yaw = old_yaw + old_v / self.L * np.tan(cmd.steering) * dt # Tan is approximation
+        state.yaw = old_yaw + old_v / self.L * np.tan(cmd.steering) * dt # TODO: Tan is approximation
         state.yaw = normalize_angle(state.yaw)
 
         state.v = old_v + cmd.throttle * dt

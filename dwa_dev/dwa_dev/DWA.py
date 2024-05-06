@@ -81,8 +81,6 @@ class DWA_algorithm(Controller):
         
         np.random.seed(1)
 
-        self.__generate_trajectories()
-
     ################# PUBLIC METHODS
     
     def compute_cmd(self, car_list : List[CarStateStamped]) -> CarControlStamped:
@@ -120,7 +118,45 @@ class DWA_algorithm(Controller):
         next_state = self.__simulate_input(goal)
         self.goal = next_state
 
+    def compute_traj(self):
+        """
+        Generates trajectories and stores them in a json in the config file
+        """
         
+        dw = self.__calc_dynamic_window()
+        complete_trajectories = {}
+        initial_state = State()
+        initial_state.x = 0.0
+        initial_state.y = 0.0
+        initial_state.yaw = np.radians(90.0)
+
+        for v in np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution):
+            initial_state.v = v
+            traj = []
+            u_total = []
+            cmd = CarControlStamped()
+            for a in np.arange(dw[0], dw[1]+self.a_resolution, self.a_resolution):
+                cmd.throttle = a
+                for delta in np.arange(dw[2], dw[3]+self.delta_resolution, self.delta_resolution):
+                    cmd.steering = delta
+
+                    traj.append(self.__calc_trajectory(initial_state, cmd))
+                    u_total.append([a, delta])
+
+            traj = np.array(traj)
+            temp2 = {}
+            for j in range(len(traj)):
+                temp2[u_total[j][0]] = {}
+            for i in range(len(traj)):
+                temp2[u_total[i][0]][u_total[i][1]] = traj[i, :, :].tolist()
+            complete_trajectories[v] = temp2
+                
+        # saving the complete trajectories to a csv file
+        with open(self.dir_path + '/../config/trajectories.json', 'w') as file:
+            json.dump(complete_trajectories, file, indent=4)
+
+        print("\nThe JSON data has been written to 'data.json'")
+
 
     ################## PRIVATE METHODS
 
@@ -334,44 +370,4 @@ class DWA_algorithm(Controller):
                         u_history = [[a, delta] for _ in range(len(trajectory-1))]
 
             return best_u, best_trajectory, u_history
-    
-    
-    def __generate_trajectories(self) -> None:
-        """
-        Generates trajectories and stores them in a json in the config file
-        """
-        
-        dw = self.__calc_dynamic_window()
-        complete_trajectories = {}
-        initial_state = State()
-        initial_state.x = 0.0
-        initial_state.y = 0.0
-        initial_state.yaw = np.radians(90.0)
-
-        for v in np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution):
-            initial_state.v = v
-            traj = []
-            u_total = []
-            cmd = CarControlStamped()
-            for a in np.arange(dw[0], dw[1]+self.a_resolution, self.a_resolution):
-                cmd.throttle = a
-                for delta in np.arange(dw[2], dw[3]+self.delta_resolution, self.delta_resolution):
-                    cmd.steering = delta
-
-                    traj.append(self.__calc_trajectory(initial_state, cmd))
-                    u_total.append([a, delta])
-
-            traj = np.array(traj)
-            temp2 = {}
-            for j in range(len(traj)):
-                temp2[u_total[j][0]] = {}
-            for i in range(len(traj)):
-                temp2[u_total[i][0]][u_total[i][1]] = traj[i, :, :].tolist()
-            complete_trajectories[v] = temp2
-                
-        # saving the complete trajectories to a csv file
-        with open(self.dir_path + '/../config/trajectories.json', 'w') as file:
-            json.dump(complete_trajectories, file, indent=4)
-
-        print("\nThe JSON data has been written to 'data.json'")
     

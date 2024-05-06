@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
     
 import rclpy
@@ -35,25 +34,29 @@ from lar_msgs.srv import EnvState, CarCommand
 class CollisionAvoidance(Node):
     def __init__(self):
         super().__init__('ca')
-        self.declare_parameter('car_i', 1)
+        self.declare_parameter('car_i', rclpy.Parameter.Type.INTEGER)
+        self.declare_parameter('gen_traj', rclpy.Parameter.Type.BOOL)
+        self.declare_parameter('source', rclpy.Parameter.Type.STRING)
         self.declare_parameter('car_yaml', rclpy.Parameter.Type.STRING)
         self.declare_parameter('alg', rclpy.Parameter.Type.STRING)
-
         
         ### Global variables
-
-
 
         # Init variables
         self.car_i = self.get_parameter('car_i').value
         self.car_yaml = self.get_parameter('car_yaml').value
         self.car_alg = self.get_parameter('alg').value
+        self.gen_traj = self.get_parameter('gen_traj').value
+        self.source = self.get_parameter('source').value
 
-        print("############################")
-        print("############################")
-        print(self.car_alg)
-        print("############################")
-        print("############################")
+        # # # print("############################")
+        # # # print("############################")
+        # # # print("car_alg:", self.car_alg)
+        # # # print("gen_traj:", self.gen_traj)
+        # # # print("sim:", self.source)
+        # # # print("car_i:", self.car_i)
+        # # # print("############################")
+        # # # print("############################")
 
         with open(self.car_yaml, 'r') as openfile:
             yaml_object = yaml.safe_load(openfile)
@@ -66,6 +69,10 @@ class CollisionAvoidance(Node):
         # Init controller
         self.algorithm = controller_map[self.car_alg.lower()](self.car_yaml,self.car_i)
 
+        # Generate trajectory (if needed)
+        if self.gen_traj:
+            self.algorithm.compute_traj()
+
         # Service to query state
         self.state_cli = self.create_client(EnvState, 'env_state')
         self.cmd_cli = self.create_client(CarCommand, 'car_cmd')
@@ -77,7 +84,11 @@ class CollisionAvoidance(Node):
         self.cmd_req = CarCommand.Request()
         self.cmd_req.car = self.car_i - 1
 
-        self.publisher_ = self.create_publisher(CarControlStamped, '/sim/car'+self.car_str+'/set/control', 10)
+        if self.source:
+            self.publisher_ = self.create_publisher(CarControlStamped, '/sim/car'+self.car_str+'/set/control', 10)
+        else:
+            self.publisher_ = self.create_publisher(CarControlStamped, '/car'+self.car_str+'/set/control', 10)
+
         self.goal_publisher_ = self.create_publisher(Marker, '/vis/trace', 10)
 
         # Update timer
@@ -101,10 +112,13 @@ class CollisionAvoidance(Node):
     def run(self):
         while rclpy.ok():
             # Update the current state of the car (and do rcply spin to update timer)
-            curr_state = self.state_request()
-            curr_car = curr_state.env_state[self.car_i - 1] # Select desired car
-            updated_state = carStateStamped_to_State(curr_car)
-            self.algorithm.set_state(updated_state)
+            try:
+                curr_state = self.state_request() # Might return empty list
+                curr_car = curr_state.env_state[self.car_i - 1] # Select desired car
+                updated_state = carStateStamped_to_State(curr_car)
+                self.algorithm.set_state(updated_state)
+            except:
+                continue
 
             # Skip rest if no update
             if self.update_time == False:
@@ -174,3 +188,6 @@ def main(args=None):
 
     node.destroy_node()
     rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

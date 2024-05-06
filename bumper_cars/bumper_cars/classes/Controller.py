@@ -54,9 +54,11 @@ class Controller:
 
         self.car_model = CarModel(car_path)
 
-
     def set_state(self, state: State) -> None:
         self.car_model.set_state(state)
+
+    def compute_traj(self):
+        pass
     
     def set_goal(self, goal: CarControlStamped) -> None:
         raise Exception("Hereditary function doesn't implement 'set_goal'")

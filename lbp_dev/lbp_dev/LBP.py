@@ -6,7 +6,7 @@ from enum import Enum
 import pathlib
 import json
 import yaml
-from custom_message.msg import Coordinate
+# from custom_message.msg import Coordinate
 from shapely.geometry import Point, Polygon, LineString
 from shapely import intersection, distance
 from shapely.plotting import plot_polygon, plot_line
@@ -18,6 +18,9 @@ from lar_msgs.msg import CarControlStamped, CarStateStamped
 from typing import List
 import os
 
+
+# import lbp_dev.lattice_motion_model as motion_model
+# from lbp_dev.lattice import calc_uniform_polar_states, generate_path
 
 # For animation purposes
 fig = plt.figure(1, dpi=90, figsize=(10,10))
@@ -57,7 +60,6 @@ class LBP_algorithm(Controller):
 
         self.show_animation = yaml_object["Simulation"]["show_animation"]
 
-
     ################# PUBLIC METHODS
     
     def compute_cmd(self, car_list : List[CarStateStamped]) -> CarControlStamped:
@@ -95,6 +97,10 @@ class LBP_algorithm(Controller):
     def set_goal(self, goal: CarControlStamped) -> None:
         next_state = self.__simulate_input(goal)
         self.goal = next_state
+
+    #TODO: implement this function
+    def compute_traj(self):
+        pass
 
     ################## PRIVATE METHODS
 
@@ -136,6 +142,7 @@ class LBP_algorithm(Controller):
             car_state.omega = self.curr_state[i][4]
             traj_i = self.__calc_trajectory(car_state, emptyControl )
             self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1])).buffer(self.dilation_factor, cap_style=3)
+            
 
     def __initialize_paths_targets_dilated_traj(self):
         """

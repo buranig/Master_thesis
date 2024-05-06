@@ -26,8 +26,8 @@ from custom_message.msg import State, ControlInputs
 from planner import utils as utils
 sys.path.append(str(pathlib.Path(__file__).parent.parent))
 
-import lattice_planner as planner
-import lattice_motion_model as motion_model
+import lbp_dev.lattice_planner as planner
+import lbp_dev.lattice_motion_model as motion_model
 
 TABLE_PATH = os.path.dirname(os.path.abspath(__file__)) + "/lookup_table.csv"
 

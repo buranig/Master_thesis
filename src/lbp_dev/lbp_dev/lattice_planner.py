@@ -14,7 +14,7 @@ import pathlib
 path_planning_dir = pathlib.Path(__file__).parent.parent
 sys.path.append(str(path_planning_dir))
 
-import lattice_motion_model as motion_model
+import lbp_dev.lattice_motion_model as motion_model
 from custom_message.msg import State, ControlInputs
 from planner import utils as utils
 

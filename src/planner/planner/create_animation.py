@@ -11,7 +11,7 @@ import pathlib
 import json
 
 import matplotlib
-matplotlib.use("Agg") # Uncomment to visualize but not save
+# matplotlib.use("Agg") # Uncomment to visualize but not save
 
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
 # Opening JSON file
@@ -34,8 +34,9 @@ fpath = '/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_trajectories.pkl'
 fpath = '/home/giacomo/thesis_ws/src/seed_simulation/seed_simulation/objs.pkl'
 fpath = '/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_trajectories.pkl'
 fpath = '/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_trajectories.pkl'
+fpath = '/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_LBP_trajectories.pkl'
 f = open(fpath, 'rb')
-method = "DWA"
+method = "LBP"
 obj = pickle.load(f)
 f.close()
 
@@ -45,6 +46,7 @@ targets = obj[1]
 if method == "LBP" or method == "DWA":
     fpath = '/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_dilated_traj.pkl'
     fpath = '/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_dilated_traj.pkl'
+    fpath = '/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_LBP_dilated_traj.pkl'
     f = open(fpath, 'rb')
     obj = pickle.load(f)
     f.close()
@@ -89,4 +91,5 @@ plt.show()
 
 writergif = animation.PillowWriter(fps=10) 
 # writergif.setup(fig, "2D_Schrodinger_Equation.gif", dpi = 300) 
-anim.save('/home/giacomo/Video/Video/' + method + '.gif', writer=writergif, dpi="figure")
+# anim.save('/home/giacomo/Video/Video/' + method + '.gif', writer=writergif, dpi="figure")
+anim.save('/home/giacomo/Video/Video/' + 'CBF-LBP' + '.gif', writer=writergif, dpi="figure")

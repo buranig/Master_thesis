@@ -15,17 +15,19 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
+find_package(lar_msgs REQUIRED)
 
 add_subdirectory(lib/model-driving)
-
 
 # Include Cpp "include" directory
 include_directories(include)
 
+
 # Create Cpp executable
-add_executable(bumper_car_model src/driving_dynamics_test.cpp)
-target_link_libraries(bumper_car_model PRIVATE driving_model)
-# ament_target_dependencies(bumper_car_model rclcpp)
+add_executable(bumper_car_model src/modelStep.cpp)
+target_link_libraries(bumper_car_model PUBLIC driving_model)
+ament_target_dependencies(bumper_car_model PUBLIC rclcpp lar_msgs )
+
 
 # Install Cpp executables
 install(TARGETS

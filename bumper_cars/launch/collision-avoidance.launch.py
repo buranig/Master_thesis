@@ -112,12 +112,32 @@ def generate_launch_description():
         output='both'
     )
 
+    amz_mini = os.path.join(
+        get_package_share_directory('bumper_cars'),
+        'lib','model-driving','config',
+        'amz_mini_car5.yaml'
+    )
+
+
+
+    model_stepper = Node(
+        package='bumper_cars',
+        executable='modelStep',
+        name='model_stepper_node',
+        parameters=[
+                {'car_path': amz_mini}
+        ],
+        emulate_tty=True,
+        output='both'
+    )
+
     ld.add_action(carNumber_arg)
     ld.add_action(source_target_arg)
     ld.add_action(car_alg)
     ld.add_action(gen_traj)
     ld.add_action(sim)
     ld.add_action(node)
+    ld.add_action(model_stepper)
     ld.add_action(OpaqueFunction(function=add_car, args=[ld]))
 
     return ld

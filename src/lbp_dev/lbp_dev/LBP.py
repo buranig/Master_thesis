@@ -535,7 +535,8 @@ def main():
     predicted_trajectory = dict.fromkeys(range(N),np.zeros([int(predict_time/dt), 3]))
     for i in range(N):
         predicted_trajectory[i][:, 0:3] = x[0:3, i]
-    u_hist = dict.fromkeys(range(N),[0]*int(predict_time/dt))
+    
+    u_hist = dict.fromkeys(range(robot_num),{'ctrl': [0]*int(predict_time/dt), 'v_goal': 0})
 
     dilated_traj = []
     for i in range(N):
@@ -598,7 +599,7 @@ def main1():
     for i in range(robot_num):
         predicted_trajectory[i] = np.full((int(predict_time/dt), 3), x[0:3,i])
     
-    u_hist = dict.fromkeys(range(robot_num),[0]*int(predict_time/dt))
+    u_hist = dict.fromkeys(range(robot_num),{'ctrl': [0]*int(predict_time/dt), 'v_goal': 0})
 
     paths, targets, dilated_traj = initialize_paths_targets_dilated_traj(x)
 
@@ -681,7 +682,8 @@ def main2():
     for i in range(robot_num):
         dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
 
-    u_hist = dict.fromkeys(range(robot_num),[0]*int(predict_time/dt))
+    u_hist = dict.fromkeys(range(robot_num),{'ctrl': [0]*int(predict_time/dt), 'v_goal': 0})
+
     fig = plt.figure(1, dpi=90, figsize=(10,10))
     ax = fig.add_subplot(111)
 
@@ -801,7 +803,7 @@ def main_seed():
         plt.show()
 
 if __name__ == '__main__':
-    # main1()
-    main_seed()
+    main()
+    # main_seed()
 
     

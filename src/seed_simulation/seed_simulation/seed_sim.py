@@ -527,7 +527,7 @@ def lbp_sim(seed, robot_num):
     for i in range(robot_num):
         dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
 
-    u_hist = dict.fromkeys(range(robot_num),[0]*int(predict_time/dt))
+    u_hist = dict.fromkeys(range(robot_num),{'ctrl': [0]*int(predict_time/dt), 'v_goal': 0})
 
     if show_animation:
         plt.ion()
@@ -708,12 +708,12 @@ def main():
         #     data.append(lbp_data)
         #     plt.close()
         
-        print(f"File {filename}, for noise scaling {noise_scale_param} does not exist in the csv file, executing all methods...\n")
-        dwa_trajectory, dwa_computational_time = dwa_sim(seed, robot_num)   
-        print(f"DWA average computational time: {sum(dwa_computational_time) / len(dwa_computational_time)}\n")
-        dwa_data = data_process.post_process_simultation(dwa_trajectory, dwa_computational_time, method='DWA')
-        data.append(dwa_data)
-        plt.close()
+        # print(f"File {filename}, for noise scaling {noise_scale_param} does not exist in the csv file, executing all methods...\n")
+        # dwa_trajectory, dwa_computational_time = dwa_sim(seed, robot_num)   
+        # print(f"DWA average computational time: {sum(dwa_computational_time) / len(dwa_computational_time)}\n")
+        # dwa_data = data_process.post_process_simultation(dwa_trajectory, dwa_computational_time, method='DWA')
+        # data.append(dwa_data)
+        # plt.close()
 
         # mpc_trajectory, mpc_computational_time = mpc_sim(seed, robot_num)
         # print(f"MPC average computational time: {sum(mpc_computational_time) / len(mpc_computational_time)}\n")
@@ -735,11 +735,11 @@ def main():
         # data.append(cbf_data)
         # plt.close()
 
-        # lbp_trajectory, lbp_computational_time = lbp_sim(seed, robot_num)
-        # print(f"LBP average computational time: {sum(lbp_computational_time) / len(lbp_computational_time)}\n")
-        # lbp_data = data_process.post_process_simultation(lbp_trajectory, lbp_computational_time, method="LBP")
-        # data.append(lbp_data)
-        # plt.close()
+        lbp_trajectory, lbp_computational_time = lbp_sim(seed, robot_num)
+        print(f"LBP average computational time: {sum(lbp_computational_time) / len(lbp_computational_time)}\n")
+        lbp_data = data_process.post_process_simultation(lbp_trajectory, lbp_computational_time, method="LBP")
+        data.append(lbp_data)
+        plt.close()
 
         df1 = pd.DataFrame(data)
         frames = [df, df1]

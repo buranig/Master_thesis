@@ -29,37 +29,64 @@ dt = json_object["Controller"]["dt"]  # [s] Time step
 L = json_object["Car_model"]["L"]  # [m] Wheel base of vehicle
 Lr = L / 2.0  # [m]
 Lf = L - Lr
-Cf = json_object["Car_model"]["Cf"]  # N/rad
-Cr = json_object["Car_model"]["Cr"] # N/rad
-Iz = json_object["Car_model"]["Iz"]  # kg/m2
-m = json_object["Car_model"]["m"]  # kg
-# Aerodynamic and friction coefficients
-c_a = json_object["Car_model"]["c_a"]
-c_r1 = json_object["Car_model"]["c_r1"]
+# Cf = json_object["Car_model"]["Cf"]  # N/rad
+# Cr = json_object["Car_model"]["Cr"] # N/rad
+# Iz = json_object["Car_model"]["Iz"]  # kg/m2
+# m = json_object["Car_model"]["m"]  # kg
+# # Aerodynamic and friction coefficients
+# c_a = json_object["Car_model"]["c_a"]
+# c_r1 = json_object["Car_model"]["c_r1"]
 
-max_steer = np.radians(45.0)  # [rad] max steering angle
-max_speed = 5 # [m/s]
-min_speed = 0.0 # [m/s]
 
 # dt = 0.1
 # Lr = 1.62 #L / 2.0  # [m]
 # Lf = 1.04 #L - Lr
 # L = Lr+Lf  # [m] Wheel base of vehicle
-# Cf = 20000 #1600.0 * 2.0  # N/rad
-# Cr = Cf #5650 #1700.0 * 2.0  # N/rad
-# Iz = 4192.0  # kg/m2
-# m = 1395.0  # kg
+Cf = 50000 #1600.0 * 2.0  # N/rad
+Cr = Cf #5650 #1700.0 * 2.0  # N/rad
+Iz = 4192.0  # kg*m2
+m = 1395.0  # kg
 # # Aerodynamic and friction coefficients
-# c_a = 1.36
-# c_r1 = 0.02
-# dt = 0.01
+c_a = 1.36
+c_r1 = 0.02
+dt = 0.01
 
 WB = json_object["Controller"]["WB"] 
 L_d = json_object["Controller"]["L_d"] 
 
 debug = False
 
-def predict_trajectory(initial_state: State, target, linear=True):
+color_dict = {
+    0: "r",
+    1: "b",
+    2: "g",
+    3: "y",
+    4: "m",
+    5: "c",
+    6: "k",
+    7: "tab:orange",
+    8: "tab:brown",
+    9: "tab:gray",
+    10: "tab:olive",
+    11: "tab:pink",
+    12: "tab:purple",
+    13: "tab:red",
+    14: "tab:blue",
+    15: "tab:green",
+}
+
+class Dynamic_params:
+    def __init__(self):
+        self.Iz = Iz
+        self.m = m
+        self.c_a = c_a
+        self.c_r1 = c_r1
+        self.Cf = Cf
+        self.Cr = Cr
+
+        
+
+def predict_trajectory(initial_state: State, target, dynamic_params: Dynamic_params, linear=True):
     """
     Predicts the trajectory of a vehicle from an initial state to a target point.
 
@@ -85,7 +112,7 @@ def predict_trajectory(initial_state: State, target, linear=True):
     if linear:
         new_state, old_time = linear_model_callback(initial_state, cmd)
     else:
-        new_state, old_time = nonlinear_model_callback(initial_state, cmd)
+        new_state, old_time = nonlinear_model_callback(initial_state, cmd, dyn_param=dynamic_params)
     traj.append((new_state.x, new_state.y))
 
     # Continue predicting the trajectory until the distance between the last point and the target is less than 10
@@ -98,7 +125,7 @@ def predict_trajectory(initial_state: State, target, linear=True):
         if linear:
             new_state, old_time = linear_model_callback(new_state, cmd)
         else:
-            new_state, old_time = nonlinear_model_callback(new_state, cmd)
+            new_state, old_time = nonlinear_model_callback(new_state, cmd, dyn_param=dynamic_params)
         traj.append((new_state.x, new_state.y))
 
         if debug:
@@ -117,7 +144,8 @@ def predict_trajectory(initial_state: State, target, linear=True):
     
     # Reduce the number of points in the trajectory for efficiency
     # traj = traj[0:-1:5]
-    plt.show()
+    if debug:
+       plt.show()
 
     return traj
 
@@ -220,7 +248,7 @@ def linear_model_callback(initial_state: State, cmd: ControlInputs):
 
     return state, time.time()
 
-def nonlinear_model_callback(initial_state: State, cmd: ControlInputs):
+def nonlinear_model_callback(initial_state: State, cmd: ControlInputs, dyn_param: Dynamic_params):
     """
     Nonlinear model callback function.
 
@@ -241,10 +269,10 @@ def nonlinear_model_callback(initial_state: State, cmd: ControlInputs):
     vx = initial_state.v * math.cos(beta)
     vy = initial_state.v * math.sin(beta)
 
-    Ffy = -Cf * ((vy + Lf * initial_state.omega) / (vx + 0.0001) - cmd.delta)
-    Fry = -Cr * (vy - Lr * initial_state.omega) / (vx + 0.0001)
-    R_x = c_r1 * abs(vx)
-    F_aero = c_a * vx ** 2
+    Ffy = -dyn_param.Cf * ((vy + Lf * initial_state.omega) / (vx + 0.0001) - cmd.delta)
+    Fry = -dyn_param.Cr * (vy - Lr * initial_state.omega) / (vx + 0.0001)
+    R_x = dyn_param.c_r1 * abs(vx)
+    F_aero = dyn_param.c_a * vx ** 2
     F_load = F_aero + R_x
 
     state.omega = initial_state.omega + (Ffy * Lf * math.cos(cmd.delta) - Fry * Lr) / Iz * dt
@@ -291,7 +319,7 @@ def pure_pursuit_steer_control(target, pose):
     else:
         desired_speed = max_speed
 
-    print(f'Steering angle: {delta} and desired speed: {desired_speed}')
+    # print(f'Steering angle: {delta} and desired speed: {desired_speed}')
     throttle = 3 * (desired_speed-pose.v)
     return throttle, delta
 
@@ -337,41 +365,171 @@ def main():
     target = [-10, 0]
     # trajectory, tx, ty = predict_trajectory(initial_state, target)
     trajectory = predict_trajectory(initial_state, target, True)
-    trajectory1 = predict_trajectory(initial_state, target, False)
 
-    fontsize = 30
+    fontsize = 10
     plt.rcParams['font.family'] = ['serif']
     plt.rcParams['font.serif'] = ['Times New Roman']
     plt.rcParams['font.size'] = fontsize
 
     print(len(trajectory))
 
-    x = []
-    y = []
+    # Plot Kinematic model Trajectory
+    x_kin = []
+    y_kin = []
     for coord in trajectory:
     
-        x.append(coord[0])
-        y.append(coord[1])
-    plt.plot(x, y, 'r', label='Kinematic model')
+        x_kin.append(coord[0])
+        y_kin.append(coord[1])
 
-    x = []
-    y = []
-    for coord in trajectory1:
-    
-        x.append(coord[0])
-        y.append(coord[1])
-    plt.plot(x, y, 'b', label='Dynamic model')
+    # Plot Dynamic model Trajectory
+    lb = 10000
+    ub = 100000
+    step = 10000
+    Cf_range = np.linspace(lb, ub, int((ub-lb)/step))
+    dyn_param = Dynamic_params()
+
+    fig = plt.figure(0, figsize=(10, 10))
+    for i, Cf_i in enumerate(Cf_range):
+        dyn_param.Cf = Cf_i
+        dyn_param.Cr = Cf_i
+        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, linear=False, dynamic_params=dyn_param)
+
+        # print(f'Cf: {dyn_param.Cf}')
+        x = []
+        y = []
+        for coord in trajectory1:
+        
+            x.append(coord[0])
+            y.append(coord[1])
+        plt.plot(x, y, color_dict[i], label='Dynamic model, m: ' + str(round(dyn_param.m,1)) + ' kg, Iz: ' + str(round(dyn_param.Iz,2)) + ' kg*m2, Cf: ' + str(dyn_param.Cf))
+
     plt.plot(target[0], target[1], 'kx', label='Target', markersize=20)
     utils.plot_arrow(initial_state.x, initial_state.y, initial_state.yaw, length=L/2, width=0.7, label='Initial State')
+    plt.plot(x_kin, y_kin, 'r', label='Kinematic model')
     plt.axis("equal")
-
     plt.xlabel("x [m]", fontdict={'size': fontsize, 'family': 'serif'})
     plt.ylabel("y [m]", fontdict={'size': fontsize, 'family': 'serif'})
-    plt.title('Kinematic vs. Dynamic model comparison', fontdict={'size': fontsize, 'family': 'serif'})
+    plt.title('Kinematic vs. Dynamic model comparison, m:' + str(dyn_param.m), fontdict={'size': fontsize, 'family': 'serif'})
     plt.legend()   
     plt.grid(True) 
+    print('Saving plot to /home/giacomo/Immagini/system_identification/kinematic_vs_dynamic_model_Cf.png\n')
+    plt.savefig('/home/giacomo/Immagini/system_identification/kinematic_vs_dynamic_model_Cf.png', dpi=300, bbox_inches='tight')
     plt.show()
 
+    # Plot Dynamic model Trajectory as funtion of m
+    lb = 50
+    ub = 150
+    step = 10
+    m_range = np.linspace(lb, ub, int((ub-lb)/step))
+    dyn_param = Dynamic_params()
+
+    fig = plt.figure(0, figsize=(10, 10))
+
+    for i, m_i in enumerate(m_range):
+        dyn_param.m = m_i
+        dyn_param.Iz = 1/12 * m_i * (L**2 + WB**2)
+        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, linear=False, dynamic_params=dyn_param)
+
+        x = []
+        y = []
+        for coord in trajectory1:
+        
+            x.append(coord[0])
+            y.append(coord[1])
+        plt.plot(x, y, color_dict[i], label='Dynamic model, m: ' + str(round(dyn_param.m,1)) + ' kg, Iz: ' + str(round(dyn_param.Iz,2)) + ' kg*m2')
+
+    plt.plot(target[0], target[1], 'kx', label='Target', markersize=20)
+    utils.plot_arrow(initial_state.x, initial_state.y, initial_state.yaw, length=L/2, width=0.7, label='Initial State')
+    plt.plot(x_kin, y_kin, 'r', label='Kinematic model')  
+    plt.axis("equal")
+    plt.xlabel("x [m]", fontdict={'size': fontsize, 'family': 'serif'})
+    plt.ylabel("y [m]", fontdict={'size': fontsize, 'family': 'serif'})
+    plt.title('Kinematic vs. Dynamic model comparison, Cf: ' + str(dyn_param.Cf), fontdict={'size': fontsize, 'family': 'serif'})
+    plt.legend()   
+    plt.grid(True) 
+    # save the plot
+    print('Saving plot to /home/giacomo/Immagini/system_identification/kinematic_vs_dynamic_model_Iz.png\n')
+    plt.savefig('/home/giacomo/Immagini/system_identification/kinematic_vs_dynamic_model_Iz.png', dpi=300, bbox_inches='tight')
+
+    plt.show()
+
+    # Plot Dynamic model Trajectory as function of c_a
+    lb = 0.5
+    ub = 2
+    step = 0.1
+    c_a_range = np.linspace(lb, ub, int((ub-lb)/step))
+    dyn_param = Dynamic_params()
+    dyn_param.m = 150
+    dyn_param.Iz = 1/12 * dyn_param.m * (L**2 + WB**2)
+    
+    fig = plt.figure(0, figsize=(10, 10))
+
+    for i, c_a_i in enumerate(c_a_range):
+        dyn_param.c_a = c_a_i
+        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, linear=False, dynamic_params=dyn_param)
+
+        # print(f'c_a: {dyn_param.c_a}')
+        x = []
+        y = []
+        for coord in trajectory1:
+        
+            x.append(coord[0])
+            y.append(coord[1])
+        plt.plot(x, y, color_dict[i], label='Dynamic model, c_a: ' + str(dyn_param.c_a))
+
+    plt.plot(target[0], target[1], 'kx', label='Target', markersize=20)    
+    utils.plot_arrow(initial_state.x, initial_state.y, initial_state.yaw, length=L/2, width=0.7, label='Initial State')
+    plt.plot(x_kin, y_kin, 'r', label='Kinematic model')
+    plt.axis("equal")
+    plt.xlabel("x [m]", fontdict={'size': fontsize, 'family': 'serif'})
+    plt.ylabel("y [m]", fontdict={'size': fontsize, 'family': 'serif'})
+    plt.title('Kinematic vs. Dynamic model comparison, m:' + str(dyn_param.m) + ', Cf: ' + str(dyn_param.Cf), fontdict={'size': fontsize, 'family': 'serif'})
+    plt.legend()
+    plt.grid(True)
+    # save the plot
+    print('Saving plot to /home/giacomo/Immagini/system_identification/kinematic_vs_dynamic_model_c_a.png\n')
+    plt.savefig('/home/giacomo/Immagini/system_identification/kinematic_vs_dynamic_model_c_a.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    # Plot Dynamic model Trajectory as function of c_r1
+    lb = 0.01
+    ub = 0.1
+    step = 0.01
+    c_r1_range = np.linspace(lb, ub, int((ub-lb)/step))
+    dyn_param = Dynamic_params()
+    dyn_param.m = 150
+    dyn_param.Iz = 1/12 * dyn_param.m * (L**2 + WB**2)
+
+    fig = plt.figure(0, figsize=(10, 10))
+
+    for i, c_r1_i in enumerate(c_r1_range):
+        dyn_param.c_r1 = c_r1_i
+        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, linear=False, dynamic_params=dyn_param)
+
+        # print(f'c_r1: {dyn_param.c_r1}')
+        x = []
+        y = []
+        for coord in trajectory1:
+        
+            x.append(coord[0])
+            y.append(coord[1])
+        plt.plot(x, y, color_dict[i], label='Dynamic model, c_r1: ' + str(dyn_param.c_r1))
+    
+    plt.plot(target[0], target[1], 'kx', label='Target', markersize=20)
+    utils.plot_arrow(initial_state.x, initial_state.y, initial_state.yaw, length=L/2, width=0.7, label='Initial State')
+    plt.plot(x_kin, y_kin, 'r', label='Kinematic model')
+    plt.axis("equal")
+    plt.xlabel("x [m]", fontdict={'size': fontsize, 'family': 'serif'})
+    plt.ylabel("y [m]", fontdict={'size': fontsize, 'family': 'serif'})
+    plt.title('Kinematic vs. Dynamic model comparison, m:' + str(dyn_param.m) + ', Cf: ' + str(dyn_param.Cf), fontdict={'size': fontsize, 'family': 'serif'})
+    plt.legend()
+    plt.grid(True)
+    # save the plot
+    print('Saving plot to /home/giacomo/Immagini/system_identification/kinematic_vs_dynamic_model_c_r1.png\n')
+    plt.savefig('/home/giacomo/Immagini/system_identification/kinematic_vs_dynamic_model_c_r1.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+    
 if __name__ == "__main__":
     main()
 

@@ -59,8 +59,8 @@ class KinMPCPathFollower(Controller):
         self,
         obsx,
         obsy,
-        N=80,  # timesteps in MPC Horizon
-        DT=0.15,  # discretization time between timesteps (s)
+        N=20,  # timesteps in MPC Horizon
+        DT=0.2,  # discretization time between timesteps (s)
         L_F=1.5213,  # distance from CoG to front axle (m)
         L_R=1.4987,  # distance from CoG to rear axle (m)
         V_MIN=0.0,  # min/max velocity constraint (m/s)
@@ -117,10 +117,10 @@ class KinMPCPathFollower(Controller):
         # Second index is the state element, as detailed below.
         self.z_dv = self.opti.variable(self.N + 1, 4)
 
-        self.x_dv = self.z_dv[:, 0]
-        self.y_dv = self.z_dv[:, 1]
-        self.psi_dv = self.z_dv[:, 2]
-        self.v_dv = self.z_dv[:, 3]
+        # self.x_dv = self.z_dv[:, 0]
+        # self.y_dv = self.z_dv[:, 1]
+        # self.psi_dv = self.z_dv[:, 2]
+        # self.v_dv = self.z_dv[:, 3]
 
         # Control inputs used to achieve self.z_dv according to dynamics.
         # First index is the timestep k, i.e. self.u_dv[0,:] is u_0.
@@ -154,43 +154,47 @@ class KinMPCPathFollower(Controller):
 
         # Ipopt with custom options: https://web.casadi.org/docs/ -> see sec 9.1 on Opti stack.
         p_opts = {"expand": True}
-        s_opts = {"max_cpu_time": 0.1, "print_level": 0}
+        s_opts = {"max_cpu_time": 0.1, "print_level": 1}
         self.opti.solver("ipopt", p_opts, s_opts)
 
         sol = self.solve()
 
     def _add_constraints(self):
         # State Bound Constraints
-        self.opti.subject_to(self.opti.bounded(self.V_MIN, self.v_dv, self.V_MAX))
+        self.opti.subject_to(self.opti.bounded(self.V_MIN, self.z_dv[:,3], self.V_MAX))
 
         # Initial State Constraint
-        self.opti.subject_to(self.x_dv[0] == self.z_curr[0])
-        self.opti.subject_to(self.y_dv[0] == self.z_curr[1])
-        self.opti.subject_to(self.psi_dv[0] == self.z_curr[2])
-        self.opti.subject_to(self.v_dv[0] == self.z_curr[3])
+        self.opti.subject_to(self.z_dv[0,0] == self.z_curr[0])
+        self.opti.subject_to(self.z_dv[0,1] == self.z_curr[1])
+        self.opti.subject_to(self.z_dv[0,2] == self.z_curr[2])
+        self.opti.subject_to(self.z_dv[0,3] == self.z_curr[3])
 
         # State Dynamics Constraints
         for i in range(self.N):
             beta = casadi.atan(
                 self.L_R / (self.L_F + self.L_R) * casadi.tan(self.df_dv[i])
             )
+
             self.opti.subject_to(
-                self.x_dv[i + 1]
-                == self.x_dv[i]
-                + self.DT * (self.v_dv[i] * casadi.cos(self.psi_dv[i] + beta))
+                self.z_dv[i + 1, 0]
+                == self.z_dv[i, 0]
+                + self.DT * (self.z_dv[i, 3] * casadi.cos(self.z_dv[i, 2] + beta))
             )
+
             self.opti.subject_to(
-                self.y_dv[i + 1]
-                == self.y_dv[i]
-                + self.DT * (self.v_dv[i] * casadi.sin(self.psi_dv[i] + beta))
+                self.z_dv[i + 1, 1]
+                == self.z_dv[i, 1]
+                + self.DT * (self.z_dv[i, 3] * casadi.sin(self.z_dv[i, 2] + beta))
             )
+
             self.opti.subject_to(
-                self.psi_dv[i + 1]
-                == self.psi_dv[i]
-                + self.DT * (self.v_dv[i] / self.L_R * casadi.sin(beta))
+                self.z_dv[i + 1, 2]
+                == self.z_dv[i, 2]
+                + self.DT * (self.z_dv[i, 3] / self.L_R * casadi.sin(beta))
             )
+
             self.opti.subject_to(
-                self.v_dv[i + 1] == self.v_dv[i] + self.DT * (self.acc_dv[i])
+                self.z_dv[i + 1, 3] == self.z_dv[i, 3] + self.DT * (self.acc_dv[i])
             )
 
         # Input Bound Constraints
@@ -232,6 +236,7 @@ class KinMPCPathFollower(Controller):
         # Other Constraints
         self.opti.subject_to(0 <= self.sl_df_dv)
         self.opti.subject_to(0 <= self.sl_acc_dv)
+
         # e.g. things like collision avoidance or lateral acceleration bounds could go here.
         # for obs in range(len(self.obsx)):
         #     self.opti.subject_to(
@@ -245,6 +250,7 @@ class KinMPCPathFollower(Controller):
             return casadi.mtimes(z, casadi.mtimes(Q, z.T))
 
         cost = 0
+        cost += _quad_form(self.z_dv[0, :] - self.z_curr.T, 100*self.Q)  # initial state cost
         for i in range(self.N):
             cost += _quad_form(
                 self.z_dv[i + 1, :] - self.z_ref[i, :], self.Q
@@ -369,15 +375,16 @@ def main():
     u_idx = 0
     acc_prev = 0.0
     df_prev = 0.0
-    x = np.array([0.0, 0.0, 0.0, 0.0])
+    x = np.array([0.0, 2.000, 0.0, 0.0])
 
     kmpc = KinMPCPathFollower(None, None)
-    # kmpc._update_initial_condition(x[0], x[1], x[2], x[3])
-    # # kmpc._update_initial_condition(0., 0., 0., 0.)
-    # kmpc._update_reference(
-    #     [cx[idx]] * kmpc.N, [cy[idx]] * kmpc.N, [cyaw[idx]] * kmpc.N, [0] * kmpc.N
-    # )
-    # kmpc._update_previous_input(acc_prev, df_prev)
+    # kmpc.opti.set_value(kmpc.z_curr, [x[0], x[1], x[2], x[3]])
+    # kmpc.opti.subject_to()
+    # kmpc._add_constraints()
+    kmpc._update_initial_condition(x[0], x[1], x[2], x[3])
+    kmpc._update_reference([cx[idx]] * kmpc.N, [cy[idx]] * kmpc.N, [cyaw[idx]] * kmpc.N, [0] * kmpc.N)
+    kmpc._update_previous_input(acc_prev, df_prev)
+
     # kmpc._add_constraints()
     sol_dict = kmpc.solve()
     print("x: ", x)
@@ -397,7 +404,7 @@ def main():
             idx += 1
             print("idx: ", idx)
 
-            # kmpc = KinMPCPathFollower(None, None)
+            kmpc = KinMPCPathFollower(None, None)
             kmpc._update_initial_condition(x[0], x[1], x[2], x[3])
             kmpc._update_reference(
                 [cx[idx]] * kmpc.N,
@@ -413,7 +420,7 @@ def main():
             #     print(key, sol_dict[key])
             # print("\n")
             print("x: ", x)
-            print(f"goal: {sol_dict['z_mpc'][-1, :]}")
+            print(f"goal: {sol_dict['z_mpc'][0, :]}")
             print(f"ref: {sol_dict['z_ref'][-1, :]}")
             print('\n')
         else:
@@ -503,4 +510,4 @@ def main2():
         plt.show()
 
 if __name__ == "__main__":
-    main()
+    main2()

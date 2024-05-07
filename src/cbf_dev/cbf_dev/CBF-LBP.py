@@ -5,6 +5,8 @@ from cvxopt import matrix
 from planner import utils as utils
 import lbp_dev.LBP as LBP
 from shapely.geometry import Point, LineString
+from shapely.plotting import plot_polygon
+
 import pickle
 
 from custom_message.msg import ControlInputs, MultiControl, Coordinate
@@ -39,7 +41,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
 
-robot_num = 15 #json_object["robot_num"]
+robot_num = 12 #json_object["robot_num"]
 safety_init = json_object["safety"]
 min_dist = json_object["min_dist"]
 width_init = json_object["width"]
@@ -56,7 +58,7 @@ dilation_factor = json_object["LBP"]["dilation_factor"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_7.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_6.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -400,7 +402,8 @@ class CBF_algorithm():
 
             self.lbp.u_hist[i]['v_goal'] = np.clip(x[3,i] + self.dxu[0,i]*dt, min_speed, max_speed)
             
-            plt.plot(self.predicted_trajectory[i][:,0], self.predicted_trajectory[i][:,1], color=color_dict[i], linestyle='--')
+            plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
+            # plt.plot(self.predicted_trajectory[i][:,0], self.predicted_trajectory[i][:,1], color=color_dict[i], linestyle='--')
             # print(f'Solver successful for robot {i}')
         else: 
             ob = [self.lbp.dilated_traj[idx] for idx in range(len(self.lbp.dilated_traj)) if idx != i]
@@ -410,7 +413,8 @@ class CBF_algorithm():
 
             self.lbp.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
             self.lbp.predicted_trajectory = self.predicted_trajectory
-            plt.plot(self.predicted_trajectory[i][:,0], self.predicted_trajectory[i][:,1], color=color_dict[i], linestyle='--')
+            # plt.plot(self.predicted_trajectory[i][:,0], self.predicted_trajectory[i][:,1], color=color_dict[i], linestyle='--')
+            plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
             # if i ==0:
             #     print(f'Robot {i} - LBP control, throttle: {self.dxu[0,i]}, delta: {self.dxu[1,i]}')
             #     print(f'u_hist: {self.lbp.u_hist[i]}')
@@ -567,8 +571,8 @@ class CBF_algorithm():
 
             self.lbp.u_hist[i]['v_goal'] = np.clip(x[3,i] + self.dxu[0,i]*dt, min_speed, max_speed)
             
-            plt.plot(self.predicted_trajectory[i][:,0], self.predicted_trajectory[i][:,1], color=color_dict[i], linestyle='--')
-            # print(f'Solver successful for robot {i}')
+            plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
+
         else: 
             ob = [self.lbp.dilated_traj[idx] for idx in range(len(self.lbp.dilated_traj)) if idx != i]
             
@@ -577,7 +581,7 @@ class CBF_algorithm():
 
             self.lbp.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
             self.lbp.predicted_trajectory = self.predicted_trajectory
-            plt.plot(self.predicted_trajectory[i][:,0], self.predicted_trajectory[i][:,1], color=color_dict[i], linestyle='--')       
+            plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
 
     def check_collision(self, x, i):
         """

@@ -8,6 +8,46 @@ import math
 import lbp_dev.lattice as lt
 from MPC import get_switch_back_course
 
+import json
+import pathlib
+
+path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
+# Opening JSON file
+with open(path, 'r') as openfile:
+    # Reading from json file
+    json_object = json.load(openfile)
+
+L = json_object["Car_model"]["L"]
+max_steer = json_object["CBF_simple"]["max_steer"]  # [rad] max steering angle
+max_speed = json_object["Car_model"]["max_speed"] # [m/s]
+min_speed = json_object["Car_model"]["min_speed"] # [m/s]
+max_acc = json_object["CBF_simple"]["max_acc"] 
+min_acc = json_object["CBF_simple"]["min_acc"] 
+car_max_acc = json_object["Controller"]["max_acc"]
+car_min_acc = json_object["Controller"]["min_acc"]
+dt = json_object["Controller"]["dt"]
+safety_radius = json_object["CBF_simple"]["safety_radius"]
+barrier_gain = json_object["CBF_simple"]["barrier_gain"]
+arena_gain = json_object["CBF_simple"]["arena_gain"]
+Kv = json_object["CBF_simple"]["Kv"] # interval [0.5-1]
+Lr = L / 2.0  # [m]
+Lf = L - Lr
+WB = json_object["Controller"]["WB"]
+
+robot_num = 12 #json_object["robot_num"]
+safety_init = json_object["safety"]
+min_dist = json_object["min_dist"]
+width_init = json_object["width"]
+height_init = json_object["height"]
+to_goal_stop_distance = json_object["to_goal_stop_distance"]
+boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_init/2])
+check_collision_bool = False
+add_noise = json_object["add_noise"]
+noise_scale_param = json_object["noise_scale_param"]
+show_animation = json_object["show_animation"]
+predict_time = json_object["LBP"]["predict_time"] # [s]
+dilation_factor = json_object["LBP"]["dilation_factor"]
+
 color_dict = {
     0: "r",
     1: "b",
@@ -60,20 +100,20 @@ class KinMPCPathFollower(Controller):
         obsx,
         obsy,
         N=20,  # timesteps in MPC Horizon
-        DT=0.2,  # discretization time between timesteps (s)
-        L_F=1.5213,  # distance from CoG to front axle (m)
-        L_R=1.4987,  # distance from CoG to rear axle (m)
-        V_MIN=0.0,  # min/max velocity constraint (m/s)
-        V_MAX=20.0,
-        A_MIN=-3.0,  # min/max acceleration constraint (m/s^2)
-        A_MAX=2.0,
-        DF_MIN=-0.78,  # min/max front steer angle constraint (rad)
-        DF_MAX=0.78,
+        DT=0.1,  # discretization time between timesteps (s)
+        L_F=Lf,  # distance from CoG to front axle (m)
+        L_R=Lf,  # distance from CoG to rear axle (m)
+        V_MIN=min_speed,  # min/max velocity constraint (m/s)
+        V_MAX=max_speed,
+        A_MIN=min_acc,  # min/max acceleration constraint (m/s^2)
+        A_MAX=max_acc,
+        DF_MIN=-max_steer,  # min/max front steer angle constraint (rad)
+        DF_MAX=max_steer,
         A_DOT_MIN=-1.5,  # min/max jerk constraint (m/s^3)
         A_DOT_MAX=1.5,
         DF_DOT_MIN=-0.5,  # min/max front steer angle rate constraint (rad/s)
         DF_DOT_MAX=0.5,
-        Q=[10.0, 10.0, 4.0, 0.1],  # weights on x, y, psi, and v.
+        Q=[4.0, 4.0, 10.0, 0.1],  # weights on x, y, psi, and v.
         R=[10.0, 10.0],
     ):  # weights on jerk and slew rate (steering angle derivative)
         for key in list(locals()):
@@ -154,7 +194,7 @@ class KinMPCPathFollower(Controller):
 
         # Ipopt with custom options: https://web.casadi.org/docs/ -> see sec 9.1 on Opti stack.
         p_opts = {"expand": True}
-        s_opts = {"max_cpu_time": 0.1, "print_level": 1}
+        s_opts = {"max_cpu_time": 1, "print_level": 1}
         self.opti.solver("ipopt", p_opts, s_opts)
 
         sol = self.solve()
@@ -477,26 +517,24 @@ def main2():
     for v in np.arange(0.5, 2.0+0.5, 0.5):
         temp[v] = {}
         k0 = 0.0
-        nxy = 5
+        nxy = 8
         nh = 3
         d = v*3
         print(f'distance: {d}')
 
-        if v == 0.5:
-            angle = 45
-            a_min = - np.deg2rad(angle)
-            a_max = np.deg2rad(angle)
-            p_min = - np.deg2rad(angle)
-            p_max = np.deg2rad(angle)
-        else:
-            angle = 60
-            a_min = - np.deg2rad(angle)
-            a_max = np.deg2rad(angle)
-            p_min = - np.deg2rad(angle)
-            p_max = np.deg2rad(angle)
+        angle = 80
+        a_min = - np.deg2rad(angle)
+        a_max = np.deg2rad(angle)
+        p_min = - np.deg2rad(angle)
+        p_max = np.deg2rad(angle)
         states = lt.calc_uniform_polar_states(nxy, nh, d, a_min, a_max, p_min, p_max)
         print(f'states: {states}')
 
+        plt.cla()
+        plt.gcf().canvas.mpl_connect(
+            "key_release_event",
+            lambda event: [exit(0) if event.key == "escape" else None],
+        )
         for state in states:
             kmpc._update_reference(
                 [state[0]] * kmpc.N, [state[1]] * kmpc.N, [state[2]] * kmpc.N, [v] * kmpc.N)

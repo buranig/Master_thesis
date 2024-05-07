@@ -256,11 +256,21 @@ def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax,
     Plots the robot and arrows for visualization.
 
     Args:
-        i (int): Index of the robot.
         x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
-        multi_control (numpy.ndarray): Control inputs of shape (2, N).
-        targets (list): List of target points.
+            The state vector contains the robot's position and orientation at each time step.
+        u (numpy.ndarray): Control inputs of shape (2, N).
+            The control inputs represent the robot's control actions at each time step.
+        predicted_trajectory (list): List of predicted trajectories for each robot.
+            Each predicted trajectory is a numpy array of shape (N, 2), where N is the number of time steps.
+        dilated_traj (list): List of dilated trajectories for each robot.
+            Each dilated trajectory is a numpy array of shape (N, 2), where N is the number of time steps.
+        targets (list): List of target points for each robot.
+            Each target point is a tuple (x, y) representing the coordinates of the target.
+        ax (matplotlib.axes.Axes): The axes object to plot on.
+        i (int): Index of the robot.
 
+    Returns:
+        None
     """
     plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-", color=color_dict[i])
     plot_polygon(dilated_traj[i], ax=ax, add_points=False, alpha=0.5, color=color_dict[i])

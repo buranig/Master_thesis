@@ -7,7 +7,6 @@
   <maintainer email="buranig@student.ethz.ch">giacomo</maintainer>
   <license>TODO: License declaration</license>
 
-  <depend>rclcpp</depend>
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>
   <depend>functools</depend>
@@ -27,11 +26,6 @@
   <depend>visualization_msgs</depend>
   <depend>tf2_ros</depend>
 
-  <depend>simulation_driving_ros2</depend>
-
-  <buildtool_depend>ament_cmake</buildtool_depend>
-  <buildtool_depend>ament_cmake_python</buildtool_depend>
-
   <!-- Custom dependencies -->
   <depend>lar_msgs</depend>
   <depend>lar_utils</depend>
@@ -45,6 +39,6 @@
   <test_depend>python3-pytest</test_depend>
 
   <export>
-    <build_type>ament_cmake</build_type>
+    <build_type>ament_python</build_type>
   </export>
 </package>

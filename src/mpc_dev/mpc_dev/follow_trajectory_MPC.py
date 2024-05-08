@@ -128,6 +128,7 @@ def main():
 
         # Apply control input to the kinematic bicycle model
         # TODO: Implement the kinematic bicycle model logic here
+        # x = utils.motion(x, u, dt)
         x = utils.motion_MPC_casadi(x, u, dt)
 
         # Print the current state and control input

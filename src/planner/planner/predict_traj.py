@@ -25,6 +25,8 @@ with open(path, 'r') as openfile:
 max_steer = json_object["Car_model"]["max_steer"] # [rad] max steering angle
 max_speed = json_object["Car_model"]["max_speed"] # [m/s]
 min_speed = json_object["Car_model"]["min_speed"] # [m/s]
+max_acc = json_object["Controller"]["max_acc"] # [m/ss]
+min_acc = json_object["Controller"]["min_acc"] # [m/ss]
 dt = json_object["Controller"]["dt"]  # [s] Time step
 L = json_object["Car_model"]["L"]  # [m] Wheel base of vehicle
 Lr = L / 2.0  # [m]
@@ -86,7 +88,7 @@ class Dynamic_params:
 
         
 
-def predict_trajectory(initial_state: State, target, dynamic_params: Dynamic_params, linear=True):
+def predict_trajectory(initial_state: State, target, dynamic_params: Dynamic_params, model='linear'):
     """
     Predicts the trajectory of a vehicle from an initial state to a target point.
 
@@ -109,21 +111,25 @@ def predict_trajectory(initial_state: State, target, dynamic_params: Dynamic_par
     cmd.throttle, cmd.delta = pure_pursuit_steer_control(target, initial_state)
 
     # Update the state using the linear model and append the new state coordinates to the trajectory
-    if linear:
-        new_state, old_time = linear_model_callback(initial_state, cmd)
+    if model == 'linear':
+            new_state, old_time = linear_model_callback(initial_state, cmd)
+    elif model == 'linear_improved':
+            new_state, old_time = linear_model_improved_callback(initial_state, cmd)
     else:
         new_state, old_time = nonlinear_model_callback(initial_state, cmd, dyn_param=dynamic_params)
     traj.append((new_state.x, new_state.y))
 
-    # Continue predicting the trajectory until the distance between the last point and the target is less than 10
-    while dist(point1=(traj[-1][0], traj[-1][1]), point2=target) > 0.5:
+    # Continue predicting the trajectory until the utils.distance between the last point and the target is less than 10
+    while utils.dist(point1=(traj[-1][0], traj[-1][1]), point2=target) > 0.5:
 
         # Calculate the control inputs for the new state
         cmd.throttle, cmd.delta = pure_pursuit_steer_control(target, new_state)
 
         # Update the state using the linear model and append the new state coordinates to the trajectory
-        if linear:
+        if model == 'linear':
             new_state, old_time = linear_model_callback(new_state, cmd)
+        elif model == 'linear_improved':
+            new_state, old_time = linear_model_improved_callback(new_state, cmd)
         else:
             new_state, old_time = nonlinear_model_callback(new_state, cmd, dyn_param=dynamic_params)
         traj.append((new_state.x, new_state.y))
@@ -178,7 +184,7 @@ def predict_trajectory_horizon(initial_state: State, target, linear=True, horizo
         new_state, old_time = nonlinear_model_callback(initial_state, cmd)
     traj.append((new_state.x, new_state.y))
 
-    # Continue predicting the trajectory until the distance between the last point and the target is less than 10
+    # Continue predicting the trajectory until the utils.distance between the last point and the target is less than 10
     t = 0
 
     while t < horizon:
@@ -242,7 +248,33 @@ def linear_model_callback(initial_state: State, cmd: ControlInputs):
     state.x = initial_state.x + initial_state.v * np.cos(initial_state.yaw) * dt
     state.y = initial_state.y + initial_state.v * np.sin(initial_state.yaw) * dt
     state.yaw = initial_state.yaw + initial_state.v / L * np.tan(cmd.delta) * dt
-    state.yaw = normalize_angle(state.yaw)
+    state.yaw = utils.normalize_angle(state.yaw)
+    state.v = initial_state.v + cmd.throttle * dt
+    state.v = np.clip(state.v, min_speed, max_speed)
+
+    return state, time.time()
+
+def linear_model_improved_callback(initial_state: State, cmd: ControlInputs):
+    """
+    Calculates the next state based on the linear model.
+
+    Args:
+        initial_state (State): The initial state of the vehicle.
+        cmd (ControlInputs): The control inputs for the vehicle.
+        old_time (float): The previous time.
+
+    Returns:
+        Tuple[State, float]: The next state and the current time.
+    """
+    state = State()
+    cmd.delta = np.clip(cmd.delta, -max_steer, max_steer)
+    cmd.trhottle = np.clip(cmd.throttle, min_acc, max_acc)
+    beta = math.atan2(Lr / (Lf + Lr) * math.tan(cmd.delta), 1.0)
+
+    state.x = initial_state.x + initial_state.v * np.cos(initial_state.yaw + beta) * dt
+    state.y = initial_state.y + initial_state.v * np.sin(initial_state.yaw + beta) * dt
+    state.yaw = initial_state.yaw + initial_state.v / L * np.tan(cmd.delta) * dt
+    state.yaw = utils.normalize_angle(state.yaw)
     state.v = initial_state.v + cmd.throttle * dt
     state.v = np.clip(state.v, min_speed, max_speed)
 
@@ -280,7 +312,7 @@ def nonlinear_model_callback(initial_state: State, cmd: ControlInputs, dyn_param
     vy = vy + (Fry / m + Ffy * math.cos(cmd.delta) / m - vx * state.omega) * dt
 
     state.yaw = initial_state.yaw + state.omega * dt
-    state.yaw = normalize_angle(state.yaw)
+    state.yaw = utils.normalize_angle(state.yaw)
 
     state.x = initial_state.x + vx * math.cos(state.yaw) * dt - vy * math.sin(state.yaw) * dt
     state.y = initial_state.y + vx * math.sin(state.yaw) * dt + vy * math.cos(state.yaw) * dt
@@ -302,7 +334,7 @@ def pure_pursuit_steer_control(target, pose):
         tuple: A tuple containing the throttle and steering angle (throttle, delta).
     """
         
-    alpha = normalize_angle(math.atan2(target[1] - pose.y, target[0] - pose.x) - pose.yaw)
+    alpha = utils.normalize_angle(math.atan2(target[1] - pose.y, target[0] - pose.x) - pose.yaw)
 
     # this if/else condition should fix the buf of the waypoint behind the car
     if alpha > np.pi/2.0:
@@ -311,7 +343,7 @@ def pure_pursuit_steer_control(target, pose):
         delta = -max_steer
     else:
         # ref: https://www.shuffleai.blog/blog/Three_Methods_of_Vehicle_Lateral_Control.html
-        delta = normalize_angle(math.atan2(2.0 * WB *  math.sin(alpha), L_d))
+        delta = utils.normalize_angle(math.atan2(2.0 * WB *  math.sin(alpha), L_d))
 
     # decreasing the desired speed when turning
     if delta > math.radians(10) or delta < -math.radians(10):
@@ -323,48 +355,11 @@ def pure_pursuit_steer_control(target, pose):
     throttle = 3 * (desired_speed-pose.v)
     return throttle, delta
 
-@staticmethod
-def dist(point1, point2):
-    """
-    Calculate the Euclidean distance between two points.
-
-    Args:
-        point1 (tuple): The coordinates of the first point in the form (x1, y1).
-        point2 (tuple): The coordinates of the second point in the form (x2, y2).
-
-    Returns:
-        float: The Euclidean distance between the two points.
-    """
-    x1, y1 = point1
-    x2, y2 = point2
-
-    x1 = float(x1)
-    x2 = float(x2)
-    y1 = float(y1)
-    y2 = float(y2)
-
-    distance = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-    return distance
-
-def normalize_angle(angle):
-    """
-    Normalize an angle to [-pi, pi].
-    :param angle: (float)
-    :return: (float) Angle in radian in [-pi, pi]
-    """
-    while angle > np.pi:
-        angle -= 2.0 * np.pi
-
-    while angle < -np.pi:
-        angle += 2.0 * np.pi
-
-    return angle
-
 def main():
     initial_state = State(x=0.0, y=0.0, yaw=0.0, v=0.0, omega=0.0)
     target = [-10, 0]
     # trajectory, tx, ty = predict_trajectory(initial_state, target)
-    trajectory = predict_trajectory(initial_state, target, True)
+    trajectory = predict_trajectory(initial_state, target, 'linear')
 
     fontsize = 10
     plt.rcParams['font.family'] = ['serif']
@@ -380,6 +375,23 @@ def main():
     
         x_kin.append(coord[0])
         y_kin.append(coord[1])
+    
+    trajectory = predict_trajectory(initial_state, target, 'linear_improved')
+
+    fontsize = 10
+    plt.rcParams['font.family'] = ['serif']
+    plt.rcParams['font.serif'] = ['Times New Roman']
+    plt.rcParams['font.size'] = fontsize
+
+    print(len(trajectory))
+
+    # Plot Improved Kinematic model Trajectory
+    x_imp = []
+    y_imp= []
+    for coord in trajectory:
+    
+        x_imp.append(coord[0])
+        y_imp.append(coord[1])
 
     # Plot Dynamic model Trajectory
     lb = 10000
@@ -392,7 +404,7 @@ def main():
     for i, Cf_i in enumerate(Cf_range):
         dyn_param.Cf = Cf_i
         dyn_param.Cr = Cf_i
-        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, linear=False, dynamic_params=dyn_param)
+        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, model='non_linear', dynamic_params=dyn_param)
 
         # print(f'Cf: {dyn_param.Cf}')
         x = []
@@ -406,6 +418,7 @@ def main():
     plt.plot(target[0], target[1], 'kx', label='Target', markersize=20)
     utils.plot_arrow(initial_state.x, initial_state.y, initial_state.yaw, length=L/2, width=0.7, label='Initial State')
     plt.plot(x_kin, y_kin, 'r', label='Kinematic model')
+    plt.plot(x_imp, y_imp, '--y', label='Improved kinematic model')
     plt.axis("equal")
     plt.xlabel("x [m]", fontdict={'size': fontsize, 'family': 'serif'})
     plt.ylabel("y [m]", fontdict={'size': fontsize, 'family': 'serif'})
@@ -428,7 +441,7 @@ def main():
     for i, m_i in enumerate(m_range):
         dyn_param.m = m_i
         dyn_param.Iz = 1/12 * m_i * (L**2 + WB**2)
-        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, linear=False, dynamic_params=dyn_param)
+        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, model='non_linear', dynamic_params=dyn_param)
 
         x = []
         y = []
@@ -441,6 +454,7 @@ def main():
     plt.plot(target[0], target[1], 'kx', label='Target', markersize=20)
     utils.plot_arrow(initial_state.x, initial_state.y, initial_state.yaw, length=L/2, width=0.7, label='Initial State')
     plt.plot(x_kin, y_kin, 'r', label='Kinematic model')  
+    plt.plot(x_imp, y_imp, '--y', label='Improved kinematic model')
     plt.axis("equal")
     plt.xlabel("x [m]", fontdict={'size': fontsize, 'family': 'serif'})
     plt.ylabel("y [m]", fontdict={'size': fontsize, 'family': 'serif'})
@@ -466,7 +480,7 @@ def main():
 
     for i, c_a_i in enumerate(c_a_range):
         dyn_param.c_a = c_a_i
-        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, linear=False, dynamic_params=dyn_param)
+        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, model='non_linear', dynamic_params=dyn_param)
 
         # print(f'c_a: {dyn_param.c_a}')
         x = []
@@ -480,6 +494,7 @@ def main():
     plt.plot(target[0], target[1], 'kx', label='Target', markersize=20)    
     utils.plot_arrow(initial_state.x, initial_state.y, initial_state.yaw, length=L/2, width=0.7, label='Initial State')
     plt.plot(x_kin, y_kin, 'r', label='Kinematic model')
+    plt.plot(x_imp, y_imp, '--y', label='Improved kinematic model')
     plt.axis("equal")
     plt.xlabel("x [m]", fontdict={'size': fontsize, 'family': 'serif'})
     plt.ylabel("y [m]", fontdict={'size': fontsize, 'family': 'serif'})
@@ -504,7 +519,7 @@ def main():
 
     for i, c_r1_i in enumerate(c_r1_range):
         dyn_param.c_r1 = c_r1_i
-        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, linear=False, dynamic_params=dyn_param)
+        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, model='non_linear', dynamic_params=dyn_param)
 
         # print(f'c_r1: {dyn_param.c_r1}')
         x = []
@@ -518,6 +533,7 @@ def main():
     plt.plot(target[0], target[1], 'kx', label='Target', markersize=20)
     utils.plot_arrow(initial_state.x, initial_state.y, initial_state.yaw, length=L/2, width=0.7, label='Initial State')
     plt.plot(x_kin, y_kin, 'r', label='Kinematic model')
+    plt.plot(x_imp, y_imp, '--y', label='Improved kinematic model')
     plt.axis("equal")
     plt.xlabel("x [m]", fontdict={'size': fontsize, 'family': 'serif'})
     plt.ylabel("y [m]", fontdict={'size': fontsize, 'family': 'serif'})

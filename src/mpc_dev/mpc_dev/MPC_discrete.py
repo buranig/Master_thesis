@@ -57,13 +57,28 @@ np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
 
-with open('/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/mpc_dev/mpc_dev/MPC_casadi.json', 'r') as file:
     data = json.load(file)
 
 with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_2.json', 'r') as file:
     seed = json.load(file)
 
-def lbp_control(x, goal, ob, u_buf, trajectory_buf):
+def find_nearest(array, value):
+    """
+    Find the nearest value in an array.
+
+    Args:
+        array (numpy.ndarray): Input array.
+        value: Value to find.
+
+    Returns:
+        float: Nearest value in the array.
+    """
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return array[idx]
+
+def mpc_discrete_control(x, goal, ob, u_buf, trajectory_buf):
     """
     Calculates the control input, trajectory, and control history for the LBP algorithm.
 
@@ -123,9 +138,11 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
     best_trajectory = np.array([x])
     u_history = {}
 
+    nearest = find_nearest(np.arange(min_speed, max_speed+v_resolution, v_resolution), x[3])
+
     # Calculate the cost of each possible trajectory and return the minimum
     for v in v_search:
-        dict = data[str(v)]
+        dict = data[str(nearest)][str(v)]
         for id, info in dict.items():
 
             # old_time = time.time()
@@ -156,14 +173,12 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
             if min_cost >= final_cost:
                 min_cost = final_cost
 
-                # interpolate the control inputs
-                a = (v-x[3])/dt
-
                 # print(f'v: {v}, id: {id}')
                 # print(f"Control seq. {len(info['ctrl'])}")
-                best_u = [a, info['ctrl'][1]]
+                best_u = [info['throttle'][0], info['steering'][0]]
                 best_trajectory = trajectory
-                u_history['ctrl'] = info['ctrl'].copy()
+                u_history['throttle'] = info['throttle'].copy()
+                u_history['steering'] = info['steering'].copy()
                 u_history['v_goal'] = v
 
     # Calculate cost of the previous best trajectory and compare it with that of the new trajectories
@@ -171,8 +186,9 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
     
     #TODO: this section has a small bug due to popping elements from the buffer, it gets to a point where there 
     # are no more elements in the buffer to use
-    if len(u_buf['ctrl']) > 4:
-        u_buf['ctrl'].pop(0)
+    if len(u_buf['throttle']) > 4 and len(u_buf['steering']) > 4:
+        u_buf['throttle'].pop(0)
+        u_buf['steering'].pop(0)
         
         trajectory_buf = trajectory_buf[1:]
 
@@ -184,10 +200,10 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
 
         if min_cost >= final_cost:
             min_cost = final_cost
-            # best_u = [(u_buf['v_goal']-x[3])/dt, u_buf['ctrl'][1]]
-            best_u = [0, u_buf['ctrl'][1]]
+            best_u = [u_buf['throttle'][0], u_buf['steering'][0]]
             best_trajectory = trajectory_buf
-            u_history['ctrl'] = u_buf['ctrl']
+            u_history['throttle'] = u_buf['throttle'].copy()
+            u_history['steering'] = u_buf['steering'].copy()
 
     elif min_cost == np.inf:
         # emergency stop
@@ -196,9 +212,11 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
             best_u = [min_acc, 0]
         else:
             best_u = [max_acc, 0]
-        best_trajectory = np.array([x[0:3], x[0:3]]*int(predict_time/dt))
-        u_history['ctrl'] = [min_acc, 0]*int(predict_time/dt)
 
+        # TODO: add prediction trajectory for emergency stop
+        best_trajectory = np.array([x[0:3], x[0:3]]*int(predict_time/dt))
+        u_history['throttle'] = [min_acc]*int(predict_time/dt)
+        u_history['steering'] = [0]*int(predict_time/dt)
 
     return best_u, best_trajectory, u_history
 
@@ -359,17 +377,18 @@ def update_robot_state(x, u, dt, targets, dilated_traj, u_hist, predicted_trajec
     if add_noise:
         noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(1, 2), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=1)
         noisy_pos = x1 + noise[0]
-        u1, predicted_trajectory1, u_history = lbp_control(noisy_pos, targets[i], ob, u_hist[i], predicted_trajectory[i])
+        u1, predicted_trajectory1, u_history = mpc_discrete_control(noisy_pos, targets[i], ob, u_hist[i], predicted_trajectory[i])
         plt.plot(noisy_pos[0], noisy_pos[1], "x", color=color_dict[i], markersize=10)
     else:
-        u1, predicted_trajectory1, u_history = lbp_control(x1, targets[i], ob, u_hist[i], predicted_trajectory[i])
+        u1, predicted_trajectory1, u_history = mpc_discrete_control(x1, targets[i], ob, u_hist[i], predicted_trajectory[i])
     dilated_traj[i] = LineString(zip(predicted_trajectory1[:, 0], predicted_trajectory1[:, 1])).buffer(dilation_factor, cap_style=3)
    
     # Collision check
     if check_collision_bool:
         if any([utils.dist([x1[0], x1[1]], [x[0, idx], x[1, idx]]) < WB for idx in range(robot_num) if idx != i]): raise Exception('Collision')
 
-    x1 = utils.motion(x1, u1, dt)
+    # x1 = utils.motion(x1, u1, dt)
+    x1 = utils.motion_MPC_casadi(x1, u1, dt)
     x[:, i] = x1
     u[:, i] = u1
 
@@ -398,7 +417,7 @@ def check_goal_reached(x, targets, i, distance=0.5):
         return True
     return False
 
-class LBP_algorithm():
+class MPC_DISCRETE_algorithm():
     def __init__(self, trajectories, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist, robot_num=robot_num):
         self.trajectories = trajectories
         self.paths = paths
@@ -505,225 +524,6 @@ class LBP_algorithm():
         
         return u, x
 
-def main():
-    """
-    This is the main function that controls the execution of the program.
-
-    The simulation if this function has a fixed amout of robots N. This main() is mainly used for debugging purposes.
-
-    It initializes the necessary variables, sets the targets, and updates the robot states.
-    The function also plots the robot trajectory and checks if the goal is reached.
-
-    Before using this main comment out the robot_num variable at the begginning of the file and
-    put the robot_num value equal to the value of the N variable.
-    """
-    print(__file__ + " start!!")
-    # initial state [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)]
-    iterations = 3000
-    break_flag = False
-
-    x = np.array([[-7, 7, 0.0], [0, 0, 7], [0, np.pi, -np.pi/2], [0, 0, 0]])
-    u = np.array([[0, 0, 0], [0, 0, 0]])
-    targets = [[7,7],[-7,7],[0.0,0.0]]
-
-    # create a trajcetory array to store the trajectory of the N robots
-    trajectory = np.zeros((x.shape[0], N, 1))
-    # append the firt state to the trajectory
-    trajectory[:, :, 0] = x
-
-    predicted_trajectory = dict.fromkeys(range(N),np.zeros([int(predict_time/dt), 3]))
-    for i in range(N):
-        predicted_trajectory[i][:, 0:3] = x[0:3, i]
-    u_hist = dict.fromkeys(range(N),[0]*int(predict_time/dt))
-
-    dilated_traj = []
-    for i in range(N):
-        dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
-
-    fig = plt.figure(1, dpi=90, figsize=(10,10))
-    ax = fig.add_subplot(111)
-    for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-        
-        for i in range(N):
-
-            x, u, predicted_trajectory, u_hist = update_robot_state(x, u, dt, targets, dilated_traj, u_hist, predicted_trajectory, i)
-
-            trajectory = np.dstack([trajectory, x])
-
-            if check_goal_reached(x, targets, i):
-                break_flag = True
-
-            if show_animation:
-                utils.plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax, i)
-
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
-
-        if break_flag:
-            break
-
-    print("Done")
-    if show_animation:
-        for i in range(N):
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-r")
-        plt.pause(0.0001)
-        plt.show()
-
-def main1():
-    """
-    This function runs the main loop for the LBP algorithm.
-    It initializes the necessary variables, updates the robot state, and plots the robot trajectory.
-
-    The simulation if this function has a variable amout of robots robot_num defined in the parameter file.
-    THis is the core a reference implementation of the LBP algorithm with random generation of goals that are updated when 
-    the robot reaches the current goal.
-    """
-    print(__file__ + " start!!")
-    iterations = 3000
-    break_flag = False
-
-    x, y, yaw, v, omega, model_type = utils.samplegrid(width_init, height_init, min_dist, robot_num, safety_init)
-    x = np.array([x, y, yaw, v])
-    u = np.zeros((2, robot_num))
-
-    trajectory = np.zeros((x.shape[0], robot_num, 1))
-    trajectory[:, :, 0] = x
-
-    predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 3]))
-    for i in range(robot_num):
-        predicted_trajectory[i] = np.full((int(predict_time/dt), 3), x[0:3,i])
-    
-    u_hist = dict.fromkeys(range(robot_num),[0]*int(predict_time/dt))
-
-    paths, targets, dilated_traj = initialize_paths_targets_dilated_traj(x)
-
-    fig = plt.figure(1, dpi=90, figsize=(10,10))
-    ax = fig.add_subplot(111)
-
-    for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-        
-        for i in range(robot_num):
-            
-            paths, targets = update_targets(paths, targets, x, i)
-
-            x, u, predicted_trajectory, u_hist = update_robot_state(x, u, dt, targets, dilated_traj, u_hist, predicted_trajectory, i)
-
-            trajectory = np.dstack([trajectory, x])
-
-            if check_goal_reached(x, targets, i):
-                break_flag = True
-
-            if show_animation:
-                utils.plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax, i)
-
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
-
-        if break_flag:
-            break
-
-    print("Done")
-    if show_animation:
-        for i in range(robot_num):
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-r")
-        plt.pause(0.0001)
-        plt.show() 
-
-def main2():
-    """
-    This function runs the main loop for the LBP algorithm.
-    It initializes the necessary variables, updates the robot state, and plots the robot trajectory.
-
-    The simulation if this function has a variable amout of robots robot_num defined in the parameter file.
-    THis is the core a reference implementation of the LBP algorithm with random generation of goals that are updated when 
-    the robot reaches the current goal.
-    """
-    print(__file__ + " start!!")
-    iterations = 3000
-    break_flag = False
-
-    # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
-    initial_state = seed['initial_position']
-    x0 = initial_state['x']
-    y = initial_state['y']
-    yaw = initial_state['yaw']
-    v = initial_state['v']
-
-    # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
-    u = np.zeros((2, robot_num))
-
-    trajectory = np.zeros((x.shape[0], robot_num, 1))
-    trajectory[:, :, 0] = x
-
-    predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 3]))
-    for i in range(robot_num):
-        predicted_trajectory[i] = np.full((int(predict_time/dt), 3), x[0:3,i])
-
-    # Step 4: Create paths for each robot
-    traj = seed['trajectories']
-    paths = [[Coordinate(x=traj[str(idx)][i][0], y=traj[str(idx)][i][1]) for i in range(len(traj[str(idx)]))] for idx in range(robot_num)]
-
-    # Step 5: Extract the target coordinates from the paths
-    targets = [[path[0].x, path[0].y] for path in paths]
-
-    # Step 6: Create dilated trajectories for each robot
-    dilated_traj = []
-    for i in range(robot_num):
-        dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
-
-    u_hist = dict.fromkeys(range(robot_num),[0]*int(predict_time/dt))
-    fig = plt.figure(1, dpi=90, figsize=(10,10))
-    ax = fig.add_subplot(111)
-
-    for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-        
-        for i in range(robot_num):
-            
-            # Step 9: Check if the distance between the current position and the target is less than 5
-            if utils.dist(point1=(x[0,i], x[1,i]), point2=targets[i]) < 5:
-                # Perform some action when the condition is met
-                paths[i].pop(0)
-                if not paths[i]:
-                    print("Path complete")
-                    return
-                targets[i] = (paths[i][0].x, paths[i][0].y)
-
-            x, u, predicted_trajectory, u_hist = update_robot_state(x, u, dt, targets, dilated_traj, u_hist, predicted_trajectory, i)
-
-            trajectory = np.dstack([trajectory, x])
-
-            if check_goal_reached(x, targets, i):
-                break_flag = True
-
-            if show_animation:
-                utils.plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax, i)
-
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
-
-        if break_flag:
-            break
-
-    print("Done")
-    if show_animation:
-        for i in range(robot_num):
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-r")
-        plt.pause(0.0001)
-        plt.show()
-
 def main_seed():
     """
     This function runs the main loop for the LBP algorithm.
@@ -768,11 +568,11 @@ def main_seed():
     for i in range(robot_num):
         dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
 
-    u_hist = dict.fromkeys(range(robot_num),{'ctrl': [0]*int(predict_time/dt), 'v_goal': 0})
+    u_hist = dict.fromkeys(range(robot_num),{'throttle': [0]*int(predict_time/dt), 'steering': [0]*int(predict_time/dt), 'v_goal': 0})
     fig = plt.figure(1, dpi=90, figsize=(10,10))
     ax = fig.add_subplot(111)
     
-    lbp = LBP_algorithm(predicted_trajectory, paths, targets, dilated_traj,
+    lbp = MPC_DISCRETE_algorithm(predicted_trajectory, paths, targets, dilated_traj,
                         predicted_trajectory, ax, u_hist)
     
     for z in range(iterations):

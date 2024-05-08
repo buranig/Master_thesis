@@ -102,7 +102,7 @@ def plot_robot(x, y, yaw):  # pragma: no cover
 def main():
     v = -1.0 # [m/s] reference speed
     x = [0.0, 0.0, 0.0, v] #[x, y, yaw, v]   
-    ref = data[str(v)]['-1.0']['1']
+    ref = data[str(v)]['-1.0']['0']
     trajectory = np.zeros((len(ref['x']),3))
     trajectory[:,0] = ref['x']
     trajectory[:,1] = ref['y']

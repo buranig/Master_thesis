@@ -69,6 +69,24 @@ color_dict = {
     15: "tab:green",
 }
 
+def uniform_sampling(d, a_max, a_min, nxy):
+    """
+    Uniform sampling of states
+
+    Args:
+        d (float): distance
+        a_max (float): maximum angle
+        a_min (float): minimum angle
+        nxy (int): number of states
+
+    Returns:
+        states (list): list of states
+    """
+    states = []
+    for i in range(nxy+1):
+        angle = a_min + (a_max - a_min) * i / (nxy - 1)
+        states.append([d*np.cos(angle), d*np.sin(angle), utils.normalize_angle(angle+np.pi)])
+    return states
 
 class Controller:
     """Abstract Base Class for control implementation."""
@@ -91,9 +109,7 @@ class Controller:
         """Updates the state of the controller with feedback info contained in update_dict."""
         raise NotImplementedError
 
-
 # XY Nonlinear Kinematic MPC Module.
-
 
 class KinMPCPathFollower(Controller):
 
@@ -115,8 +131,8 @@ class KinMPCPathFollower(Controller):
         A_DOT_MAX=1.5,
         DF_DOT_MIN=-0.5,  # min/max front steer angle rate constraint (rad/s)
         DF_DOT_MAX=0.5,
-        Q=[4.0, 4.0, 10.0, 0.1],  # weights on x, y, psi, and v.
-        R=[10.0, 10.0],
+        Q=[4.0, 4.0, 10.0, 4.0],  # weights on x, y, psi, and v.
+        R=[0.0, 0.0],
     ):  # weights on jerk and slew rate (steering angle derivative)
         for key in list(locals()):
             if key == "self":
@@ -539,12 +555,18 @@ def main2():
             d = v*3
             # print(f'distance: {d}')
 
-            angle = 80
-            a_min = - np.deg2rad(angle)
-            a_max = np.deg2rad(angle)
-            p_min = - np.deg2rad(angle)
-            p_max = np.deg2rad(angle)
-            states = lt.calc_uniform_polar_states(nxy, nh, d, a_min, a_max, p_min, p_max)
+            if v<0.0:
+                angle = 80
+                a_min = - np.deg2rad(180 - angle)
+                a_max = np.deg2rad(180 + angle)
+                states = uniform_sampling(-d, a_max, a_min, nxy)
+            else:
+                angle = 80
+                a_min = - np.deg2rad(angle)
+                a_max = np.deg2rad(angle)
+                p_min = - np.deg2rad(angle)
+                p_max = np.deg2rad(angle)
+                states = lt.calc_uniform_polar_states(nxy, nh, d, a_min, a_max, p_min, p_max)
             # print(f'states: {states}')
 
             plt.cla()
@@ -579,6 +601,7 @@ def main2():
                     # plt.scatter(sol_dict['z_ref'][-1,0], sol_dict['z_ref'][-1,1], marker="x", color=color_dict[0], s=200)
                     print('\n')
             if debug:
+                utils.plot_robot(0.0, 0.0, 0.0, 0)
                 plt.show()
 
             traj[v0][v] = temp[v]

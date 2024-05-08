@@ -49,15 +49,6 @@ class CollisionAvoidance(Node):
         self.gen_traj = self.get_parameter('gen_traj').value
         self.source = self.get_parameter('source').value
 
-        # # # print("############################")
-        # # # print("############################")
-        # # # print("car_alg:", self.car_alg)
-        # # # print("gen_traj:", self.gen_traj)
-        # # # print("sim:", self.source)
-        # # # print("car_i:", self.car_i)
-        # # # print("############################")
-        # # # print("############################")
-
         with open(self.car_yaml, 'r') as openfile:
             yaml_object = yaml.safe_load(openfile)
         # Simulation params
@@ -74,7 +65,7 @@ class CollisionAvoidance(Node):
             self.algorithm.compute_traj()
 
         # Service to query state
-        self.state_cli = self.create_client(EnvState, 'env_state')
+        self.state_cli = self.create_client(EnvState, 'env_state' + self.car_str)
         self.cmd_cli = self.create_client(CarCommand, 'car_cmd')
         while not self.state_cli.wait_for_service(timeout_sec=1.0) or not self.cmd_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
@@ -101,7 +92,9 @@ class CollisionAvoidance(Node):
 
     def state_request(self):
         self.future = self.state_cli.call_async(self.state_req)
-        rclpy.spin_until_future_complete(self, self.future)
+        rclpy.spin_until_future_complete(self, self.future, timeout_sec=self.dt)
+        if not self.future.done():
+            print("Timeout")
         return self.future.result()
         
     def cmd_request(self):
@@ -117,7 +110,7 @@ class CollisionAvoidance(Node):
                 curr_car = curr_state.env_state[self.car_i - 1] # Select desired car
                 updated_state = carStateStamped_to_State(curr_car)
                 self.algorithm.set_state(updated_state)
-            except:
+            except:                
                 continue
 
             # Skip rest if no update
@@ -142,6 +135,7 @@ class CollisionAvoidance(Node):
 
             # Wait for next period
             self.update_time = False
+
             
     def goal_marker(self, next_state):
         marker = Marker()

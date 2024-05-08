@@ -520,8 +520,19 @@ def main2():
     for v0 in np.arange(min_speed, max_speed+0.5, 0.5):
         traj[v0] = {}
         for v in np.arange(min_speed, max_speed+0.5, 0.5):
+            if v==0.0 and v0==0.0:
+                temp[v][i] = {}
+                temp[v][i]['x'] = [0.0]*kmpc.N
+                temp[v][i]['y'] = [0.0]*kmpc.N
+                temp[v][i]['yaw'] = [0.0]*kmpc.N
+                temp[v][i]['v'] = [0.0]*kmpc.N
+                temp[v][i]['throttle'] = [0.0]*kmpc.N
+                temp[v][i]['steering'] = [0.0]*kmpc.N
+                traj[v0][v] = temp[v]
+                continue
             print(f'velocity: {v}')
             temp[v] = {}
+            
             k0 = 0.0
             nxy = 8
             nh = 3

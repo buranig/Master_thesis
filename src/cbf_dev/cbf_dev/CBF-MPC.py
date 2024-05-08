@@ -42,7 +42,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
 
-robot_num = 12 #json_object["robot_num"]
+robot_num = 15 # json_object["robot_num"]
 safety_init = json_object["safety"]
 min_dist = json_object["min_dist"]
 width_init = json_object["width"]
@@ -59,7 +59,7 @@ dilation_factor = json_object["LBP"]["dilation_factor"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_6.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_10.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -183,6 +183,7 @@ class CBF_algorithm():
                     self.computational_time.append((time.time() - t_prev))
             
                     x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+
 
             utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
@@ -572,6 +573,7 @@ class CBF_algorithm():
             plot_polygon(self.mpc.dilated_traj[i], ax=self.mpc.ax, add_points=False, alpha=0.5, color=color_dict[i])
 
         else: 
+            print(f'Solver failed for robot {i}')
             # ob = [self.lbp.dilated_traj[idx] for idx in range(len(self.lbp.dilated_traj)) if idx != i]
             # self.dxu[:, i], self.predicted_trajectory[i], self.lbp.u_hist[i] = LBP.lbp_control(x[:,i], self.targets[i], ob, self.lbp.u_hist[i], self.predicted_trajectory[i])
             # self.dxu[0, i] = np.clip((self.lbp.u_hist[i]['v_goal']-x[3,i])/dt, car_min_acc, car_max_acc)
@@ -898,8 +900,8 @@ def main_seed(args=None):
             'key_release_event',
             lambda event: [exit(0) if event.key == 'escape' else None])
         
-        # x, break_flag = cbf.run_cbf(x, break_flag)
-        x, break_flag = cbf.go_to_goal(x, break_flag)
+        x, break_flag = cbf.run_cbf(x, break_flag)
+        # x, break_flag = cbf.go_to_goal(x, break_flag)
         
         trajectory = np.dstack([trajectory, np.concatenate((x, cbf.dxu))])
 

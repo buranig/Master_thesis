@@ -9,7 +9,11 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 def add_car(context, ld):
-    param_value = LaunchConfiguration('carNumber').perform(context)
+    """
+    Function that adds the Nodes required to control any car
+    """
+    carAmount_value = LaunchConfiguration('carNumber').perform(context)
+    offset_value = LaunchConfiguration('carNumOffset').perform(context)
 
     car_yaml = os.path.join(
         get_package_share_directory('bumper_cars'),
@@ -24,31 +28,50 @@ def add_car(context, ld):
         'la_track.yaml'
     )
 
+    # One *state buffer* / *controller* / *safety controller* per car
+    for car_num in range(int(carAmount_value)):
 
-    for i in range(int(param_value)):
-        #
-        node = Node(
+        # Assign names and numbers to each car
+        car_i = car_num + int(offset_value)
+        car_str = '' if car_i == 0 else str(car_i + 1)
+        
+        # State buffer
+        stateBuffer_node = Node(
             package='bumper_cars',
-            executable='collision_avoidance_ros2.py',
-            name='ca_node' + str(i + 1),
+            executable='state_buffer',
+            name='state_buffer_node' + car_str,
+            parameters=[
+                    {'carNumber': int(carAmount_value)}
+            ],
+            remappings=[('/env_state', '/env_state' + car_str),
+                        ('/car_cmd', '/car_cmd' + car_str)],
+            emulate_tty=True,
+            output='both'
+        )
+        ld.add_action(stateBuffer_node)
+
+        # Collision avoidance controller
+        collisionAvoidance_node = Node(
+            package='bumper_cars',
+            executable='collision_avoidance_ros2',
+            name='ca_node' + car_str,
             parameters=[
                     {'car_yaml': car_yaml},
                     {'alg': LaunchConfiguration('alg')},
-                    {'car_i': i + 1},
+                    {'car_i': car_i},
                     {'gen_traj': LaunchConfiguration('gen_traj')},
                     {'source': LaunchConfiguration('source_target')}
             ],
             emulate_tty=True,
             output='both'
         )
-        ld.add_action(node)
+        ld.add_action(collisionAvoidance_node)
 
         # Control node
-        car_i = '' if i==0 else str(i+1)
         node = Node(
             package='main_control_racing_ros2',
             executable='amzmini_control_node2',
-            name='main_control_node' + str(i + 1),
+            name='main_control_node' + car_str,
             parameters=[
                     {'track_yaml': track_yaml},
                     # {'static_throttle': 0.5},
@@ -56,10 +79,10 @@ def add_car(context, ld):
                     {'state_source': LaunchConfiguration('source_target')},
                     {'control_target': LaunchConfiguration('source_target')},
                     {'arm_mpc': False},
-                    {'carNumber': i + 1}
+                    {'carNumber': car_i}
             ],
-                remappings=[('/sim/car'+car_i+'/set/control', '/sim/car'+car_i+'/desired_control'),
-                            ('/car'+car_i+'/set/control', '/car'+car_i+'/desired_control') ],
+                remappings=[('/sim/car'+car_str+'/set/control', '/sim/car'+car_str+'/desired_control'),
+                            ('/car'+car_str+'/set/control', '/car'+car_str+'/desired_control') ],
             emulate_tty=True,
             output='both'
         )
@@ -74,6 +97,12 @@ def generate_launch_description():
         'carNumber',
         description='number of cars to be controlled, can be sim or real',
         default_value='1'
+    )
+
+    carNumOffset_arg = DeclareLaunchArgument(
+        'carNumOffset',
+        description='offset to be added to the numbers of the cars to be controlled',
+        default_value='0'
     )
 
     car_alg = DeclareLaunchArgument(
@@ -94,50 +123,34 @@ def generate_launch_description():
         default_value='False'
     )
 
-    sim = DeclareLaunchArgument(
-        'sim',
-        description='boolean to select whether we are working in simulation or real world',
-        default_value='False'
-    )
+    #######################################################################################
+    ##### Node containing the dynamic model of the vehicle in Johanness' simulation #######
+    #######################################################################################
 
+    # # # amz_mini = os.path.join(
+    # # #     get_package_share_directory('bumper_cars'),
+    # # #     'lib','model-driving','config',
+    # # #     'amz_mini_car5.yaml'
+    # # # )
+    # # # ld.add_action(sim)
 
-    node = Node(
-        package='bumper_cars',
-        executable='state_buffer.py',
-        name='state_buffer_node',
-        parameters=[
-                {'carNumber': LaunchConfiguration('carNumber')}
-        ],
-        emulate_tty=True,
-        output='both'
-    )
-
-    amz_mini = os.path.join(
-        get_package_share_directory('bumper_cars'),
-        'lib','model-driving','config',
-        'amz_mini_car5.yaml'
-    )
-
-
-
-    model_stepper = Node(
-        package='bumper_cars',
-        executable='modelStep',
-        name='model_stepper_node',
-        parameters=[
-                {'car_path': amz_mini}
-        ],
-        emulate_tty=True,
-        output='both'
-    )
+    # # # model_stepper = Node(
+    # # #     package='bumper_cars',
+    # # #     executable='bumper_car_model',
+    # # #     name='model_stepper_node',
+    # # #     parameters=[
+    # # #             {'car_path': amz_mini}
+    # # #     ],
+    # # #     emulate_tty=True,
+    # # #     output='both'
+    # # # )
+    # # # ld.add_action(model_stepper)
 
     ld.add_action(carNumber_arg)
+    ld.add_action(carNumOffset_arg)
     ld.add_action(source_target_arg)
     ld.add_action(car_alg)
     ld.add_action(gen_traj)
-    ld.add_action(sim)
-    ld.add_action(node)
-    ld.add_action(model_stepper)
     ld.add_action(OpaqueFunction(function=add_car, args=[ld]))
 
     return ld

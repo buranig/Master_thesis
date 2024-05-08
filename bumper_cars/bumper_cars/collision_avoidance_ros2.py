@@ -43,7 +43,7 @@ class CollisionAvoidance(Node):
         ### Global variables
 
         # Init variables
-        self.car_i = self.get_parameter('car_i').value
+        self.car_i = int(self.get_parameter('car_i').value)
         self.car_yaml = self.get_parameter('car_yaml').value
         self.car_alg = self.get_parameter('alg').value
         self.gen_traj = self.get_parameter('gen_traj').value
@@ -51,11 +51,11 @@ class CollisionAvoidance(Node):
 
         with open(self.car_yaml, 'r') as openfile:
             yaml_object = yaml.safe_load(openfile)
+
         # Simulation params
         self.dt = yaml_object["Controller"]["dt"]
-        print(self.dt)
 
-        self.car_str = '' if self.car_i == 1 else str(self.car_i)
+        self.car_str = '' if self.car_i == 0 else str(self.car_i + 1)
 
         # Init controller
         self.algorithm = controller_map[self.car_alg.lower()](self.car_yaml,self.car_i)
@@ -73,7 +73,7 @@ class CollisionAvoidance(Node):
         # Initialize service messages
         self.state_req = EnvState.Request()
         self.cmd_req = CarCommand.Request()
-        self.cmd_req.car = self.car_i - 1
+        self.cmd_req.car = self.car_i
 
         if self.source:
             self.publisher_ = self.create_publisher(CarControlStamped, '/sim/car'+self.car_str+'/set/control', 10)
@@ -92,7 +92,7 @@ class CollisionAvoidance(Node):
 
     def state_request(self):
         self.future = self.state_cli.call_async(self.state_req)
-        rclpy.spin_until_future_complete(self, self.future, timeout_sec=self.dt)
+        rclpy.spin_until_future_complete(self, self.future)
         if not self.future.done():
             print("Timeout")
         return self.future.result()
@@ -107,7 +107,7 @@ class CollisionAvoidance(Node):
             # Update the current state of the car (and do rcply spin to update timer)
             try:
                 curr_state = self.state_request() # Might return empty list
-                curr_car = curr_state.env_state[self.car_i - 1] # Select desired car
+                curr_car = curr_state.env_state[self.car_i] # Select desired car
                 updated_state = carStateStamped_to_State(curr_car)
                 self.algorithm.set_state(updated_state)
             except:                

@@ -10,7 +10,7 @@ class StateBuffer(Node):
         super().__init__('state_buffer')
 
         # Initialise car number
-        self.declare_parameter('carNumber', 1)
+        self.declare_parameter('carNumber', 0)
         self.car_amount = self.get_parameter('carNumber').value
 
         # Establish publishing service

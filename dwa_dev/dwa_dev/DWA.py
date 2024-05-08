@@ -57,9 +57,9 @@ class DWA_algorithm(Controller):
     
     dir_path = os.path.dirname(os.path.realpath(__file__))
 
-    def __init__(self, controller_path:str, robot_num = 1):
+    def __init__(self, controller_path:str, robot_num = 0):
         super().__init__(controller_path)
-        self.robot_num = robot_num - 1
+        self.robot_num = robot_num 
         self.dilated_traj = []
         self.predicted_trajectory = None
         self.u_hist = []

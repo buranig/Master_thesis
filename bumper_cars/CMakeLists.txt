@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(bumper_cars)
 
+
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
@@ -56,7 +57,9 @@ install(DIRECTORY launch/
 install(DIRECTORY config/
   DESTINATION share/${PROJECT_NAME}/config/
 )
-
-
+# Install driving_model files
+install(DIRECTORY lib/
+  DESTINATION share/${PROJECT_NAME}/lib/
+)
 
 ament_package()

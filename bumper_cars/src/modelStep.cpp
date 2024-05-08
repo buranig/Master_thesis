@@ -1,25 +1,36 @@
 #include "rclcpp/rclcpp.hpp"
 #include "lar_msgs/srv/car_predict.hpp"
 #include "model_driving/DrivingDynamicsEigen.hpp"
+#include <iostream>
 
-// using namespace ;
-using Model = driving_model::eigen_model::KinematicBicycleWithActuators;
+using Model = driving_model::eigen_model::FtBicycleWithActuators;
 
+class VehicleStateServiceNode : public rclcpp::Node
+{
+public:
+    VehicleStateServiceNode(): Node("vehicle_predict_state")
+    {
+        // Get the car_path parameter
+        std::string car_path_;
+        this->declare_parameter<std::string>("car_path", "");
+        this->get_parameter("car_path", car_path_);
 
+        model.load_params_from_yaml(car_path_);
 
+        service_ = this->create_service<lar_msgs::srv::CarPredict>("car_next_state",  std::bind(&VehicleStateServiceNode::handle_vehicle_state, this, std::placeholders::_1, std::placeholders::_2));
+    }
 
+private:
+    rclcpp::Service<lar_msgs::srv::CarPredict>::SharedPtr service_;
+    Model model;
 
-
-
-
-
-
-
-void handle_vehicle_state(
+    void handle_vehicle_state(
         const std::shared_ptr<lar_msgs::srv::CarPredict::Request> request,
         std::shared_ptr<lar_msgs::srv::CarPredict::Response> response)
     {
         std::cout << "Received request" << std::endl;
+        request->x ++;
+        response->x++;
         // Model::State x0({request->x, request->y, request->theta, request->v, request->omega});
         // Model::Input u({request->u1, request->u2});
 
@@ -29,7 +40,7 @@ void handle_vehicle_state(
         // x_dot = model.dynamics<double>(x0, u, p, dyn_out);
 
         // // Update the state with the time step
-        // Model::State x1 = x0 + request->deltaT * x_dot;
+        // Model::State x1 = x0 + request->dt * x_dot;
 
         // response->x = x1[0];
         // response->y = x1[1];
@@ -37,35 +48,12 @@ void handle_vehicle_state(
         // response->v = x1[3];
         // response->omega = x1[4];
     }
-
-
-
-class VehicleStateService : public rclcpp::Node
-{
-public:
-    VehicleStateService(): Node("vehicle_predict_state")
-    {
-        std::string car_path_;
-        // Get the car_path parameter
-        this->declare_parameter<std::string>("car_path", "");
-        this->get_parameter("car_path", car_path_);
-
-        model.load_params_from_yaml(car_path_);
-
-        service_ = 
-             this->create_service<lar_msgs::srv::CarPredict>("add_three_ints",  &handle_vehicle_state);
-    }
-
-    
-
-    rclcpp::Service<lar_msgs::srv::CarPredict>::SharedPtr service_;
-    Model model;
 };
 
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
-    std::shared_ptr<rclcpp::Node> node = std::make_shared<VehicleStateService>();
+    std::shared_ptr<VehicleStateServiceNode> node = std::make_shared<VehicleStateServiceNode>();
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;

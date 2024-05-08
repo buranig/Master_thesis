@@ -47,6 +47,7 @@ class CBF_algorithm(Controller):
     ################# PUBLIC METHODS
 
     def compute_cmd(self, car_list : List[CarStateStamped]) -> CarControlStamped:
+
         # Init empty command
         car_cmd = CarControlStamped()
 
@@ -55,6 +56,7 @@ class CBF_algorithm(Controller):
 
         # Compute control   
         u = self.__CBF(self.robot_num, self.curr_state)
+
         # If solver did not fail
         if u is not None:
             car_cmd.throttle = u[0]
@@ -73,6 +75,7 @@ class CBF_algorithm(Controller):
             plt.grid(True)
             plt.pause(0.00001)
             # plt.plot(self.goal[0], self.goal[1], "x", color = color_dict[0])
+
         return car_cmd
 
     def set_goal(self, goal: CarControlStamped) -> None:
@@ -152,9 +155,6 @@ class CBF_algorithm(Controller):
         # minimize    (1/2)*x'*P*x + q'*x
         # subject to  G*x <= h
         #             A*x = b.
-        print("Safety radius:", self.safety_radius)
-        print("Kv:", self.Kv)
-        print("Barrier gain:", self.barrier_gain)
 
         count = 0
         for j in range(N):
@@ -184,10 +184,6 @@ class CBF_algorithm(Controller):
 
 
             count += 1
-
-        if self.robot_num ==0:
-            print("G\n",G)
-            print("H\n",H)
 
         # Add the input constraint
         G = np.vstack([G, [[0, 1], [0, -1]]])
@@ -255,7 +251,8 @@ class CBF_algorithm(Controller):
             return self.dxu
         
         except:
-            print("QP solver failed")
+            if self.robot_num ==3:
+                print("QP solver failed")
             self.solver_failure += 1
             return None
 

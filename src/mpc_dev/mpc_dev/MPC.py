@@ -757,51 +757,6 @@ def generate_reference_trajectory(x, dl):
         plt.show()
     return cx, cy, cyaw, ref, target_ind
 
-def plot_arrow(x, y, yaw, length=0.5, width=0.1):  # pragma: no cover
-    plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
-              head_length=width, head_width=width)
-    plt.plot(x, y)
-
-def plot_robot(x, y, yaw, i): 
-    """
-    Plot the robot.
-
-    Args:
-        x (float): X-coordinate of the robot.
-        y (float): Y-coordinate of the robot.
-        yaw (float): Yaw angle of the robot.
-        i (int): Index of the robot.
-    """
-    outline = np.array([[-L / 2, L / 2,
-                            (L / 2), -L / 2,
-                            -L / 2],
-                        [WB / 2, WB / 2,
-                            - WB / 2, -WB / 2,
-                            WB / 2]])
-    Rot1 = np.array([[math.cos(yaw), math.sin(yaw)],
-                        [-math.sin(yaw), math.cos(yaw)]])
-    outline = (outline.T.dot(Rot1)).T
-    outline[0, :] += x
-    outline[1, :] += y
-    plt.plot(np.array(outline[0, :]).flatten(),
-                np.array(outline[1, :]).flatten(), color_dict[i])
-    
-def plot_robot_trajectory(x, u, cx, cy, predicted_trajectory, targets, i):
-    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-", color=color_dict[i], label="Trajectory")
-    # plt.plot(x[0, i], x[1, i], "xr")
-    plt.plot(targets[i][0], targets[i][1], "x", color=color_dict[i], label="Target")
-    plt.plot(cx[i], cy[i], "--", color=color_dict[i], label="Course")
-    plot_robot(x[0, i], x[1, i], x[2, i], i)
-    plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-    plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
-
-def plot_robot_seed(x, u, predicted_trajectory, targets, i):
-    plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-", color=color_dict[i])
-    plt.plot(targets[i][0], targets[i][1], "x", color=color_dict[i])
-    plot_robot(x[0, i], x[1, i], x[2, i], i)
-    plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-    plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
-
 def main():
     """
     Main function for controlling multiple robots using Model Predictive Control (MPC).

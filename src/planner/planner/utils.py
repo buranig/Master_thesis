@@ -310,6 +310,22 @@ def plot_path(path: Path):
         plt.scatter(x, y, marker='.', s=10)
         plt.scatter(x[0], y[0], marker='x', s=20)
 
+def plot_robot_and_arrows(i, x, multi_control, targets):
+    """
+    Plots the robot and arrows for visualization.
+
+    Args:
+        i (int): Index of the robot.
+        x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
+        multi_control (numpy.ndarray): Control inputs of shape (2, N).
+        targets (list): List of target points.
+
+    """
+    plot_robot(x[0, i], x[1, i], x[2, i], i)
+    plot_arrow(x[0, i], x[1, i], x[2, i] + multi_control.multi_control[i].delta, length=3, width=0.5)
+    plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
+    plt.plot(targets[i][0], targets[i][1], "x", color = color_dict[i])
+
 def normalize_angle_array(angle):
     """
     Normalize an angle to [-pi, pi].

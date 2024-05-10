@@ -69,46 +69,6 @@ def update_paths(paths):
         updated_paths.append(utils.update_path(path))
     return updated_paths
 
-def plot_robot(x, y, yaw, i): 
-    """
-    Plot the robot.
-
-    Args:
-        x (float): X-coordinate of the robot.
-        y (float): Y-coordinate of the robot.
-        yaw (float): Yaw angle of the robot.
-        i (int): Index of the robot.
-    """
-    outline = np.array([[-L / 2, L / 2,
-                            (L / 2), -L / 2,
-                            -L / 2],
-                        [WB / 2, WB / 2,
-                            - WB / 2, -WB / 2,
-                            WB / 2]])
-    Rot1 = np.array([[math.cos(yaw), math.sin(yaw)],
-                        [-math.sin(yaw), math.cos(yaw)]])
-    outline = (outline.T.dot(Rot1)).T
-    outline[0, :] += x
-    outline[1, :] += y
-    plt.plot(np.array(outline[0, :]).flatten(),
-                np.array(outline[1, :]).flatten(), color_dict[i], label="Robot " + str(i))
-
-def plot_robot_and_arrows(i, x, multi_control, targets):
-    """
-    Plots the robot and arrows for visualization.
-
-    Args:
-        i (int): Index of the robot.
-        x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
-        multi_control (numpy.ndarray): Control inputs of shape (2, N).
-        targets (list): List of target points.
-
-    """
-    plot_robot(x[0, i], x[1, i], x[2, i], i)
-    utils.plot_arrow(x[0, i], x[1, i], x[2, i] + multi_control.multi_control[i].delta, length=3, width=0.5)
-    utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-    plt.plot(targets[i][0], targets[i][1], "x", color = color_dict[i])
-
 def update_robot_state(i, x, dxu, multi_control, targets):
     """
     Updates the state of all robots.
@@ -132,7 +92,7 @@ def update_robot_state(i, x, dxu, multi_control, targets):
     x[:, i] = x1
     multi_control.multi_control[i] = cmd
 
-    plot_robot_and_arrows(i, x, multi_control, targets)
+    utils.plot_robot_and_arrows(i, x, multi_control, targets)
     
     return x, multi_control
 
@@ -237,7 +197,7 @@ class C3BF_algorithm():
             if all(self.reached_goal):
                 break_flag = True
 
-            plot_robot(x[0, i], x[1, i], x[2, i], i)
+            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
             plt.scatter(self.targets[i][0], self.targets[i][1], marker="x", color=color_dict[i], s=200)

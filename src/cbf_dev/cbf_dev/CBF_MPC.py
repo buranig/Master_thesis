@@ -4,6 +4,7 @@ from cvxopt import matrix, solvers
 from cvxopt import matrix
 from planner import utils as utils
 import lbp_dev.LBP as LBP
+import mpc_dev.MPC_discrete as MPC
 from shapely.geometry import Point, LineString
 from shapely.plotting import plot_polygon
 
@@ -41,7 +42,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
 
-robot_num = 15 #json_object["robot_num"]
+robot_num = 15 # json_object["robot_num"]
 safety_init = json_object["safety"]
 min_dist = json_object["min_dist"]
 width_init = json_object["width"]
@@ -77,22 +78,6 @@ def update_paths(paths):
         updated_paths.append(utils.update_path(path))
     return updated_paths
 
-def plot_robot_and_arrows(i, x, multi_control, targets):
-    """
-    Plots the robot and arrows for visualization.
-
-    Args:
-        i (int): Index of the robot.
-        x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
-        multi_control (numpy.ndarray): Control inputs of shape (2, N).
-        targets (list): List of target points.
-
-    """
-    utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
-    utils.plot_arrow(x[0, i], x[1, i], x[2, i] + multi_control.multi_control[i].delta, length=3, width=0.5)
-    utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-    plt.plot(targets[i][0], targets[i][1], "x", color = color_dict[i])
-
 def update_robot_state(i, x, dxu, multi_control, targets):
     """
     Updates the state of all robots.
@@ -116,7 +101,7 @@ def update_robot_state(i, x, dxu, multi_control, targets):
     x[:, i] = x1
     multi_control.multi_control[i] = cmd
 
-    plot_robot_and_arrows(i, x, multi_control, targets)
+    utils.plot_robot_and_arrows(i, x, multi_control, targets)
     
     return x, multi_control
 
@@ -138,7 +123,7 @@ def check_goal_reached(x, targets, i, distance=0.5):
         return True
     return False
 
-class CBF_algorithm():
+class CBF_MPC_algorithm():
     def __init__(self, targets, paths, x, dilated_traj, ax, u_hist, robot_num=robot_num):
         self.targets = targets
         self.paths = paths
@@ -151,6 +136,7 @@ class CBF_algorithm():
         for i in range(robot_num):
             self.predicted_trajectory[i] = np.full((int(predict_time/dt), 3), x[0:3,i])
         self.lbp = LBP.LBP_algorithm(self.predicted_trajectory, paths, targets, dilated_traj, self.predicted_trajectory, ax, u_hist, robot_num=robot_num)
+        self.mpc = MPC.MPC_DISCRETE_algorithm(self.predicted_trajectory, paths, targets, dilated_traj, self.predicted_trajectory, ax, u_hist, robot_num=robot_num)
 
     def run_cbf(self, x, break_flag):
         for i in range(self.robot_num):
@@ -181,6 +167,7 @@ class CBF_algorithm():
                     self.computational_time.append((time.time() - t_prev))
             
                     x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+
 
             utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
@@ -296,7 +283,7 @@ class CBF_algorithm():
             v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
             scalar_prod = v @ arr
 
-            if j == i or dist > 3 * safety_radius or scalar_prod < 0: 
+            if j == i or dist > 3 * safety_radius: 
                 continue
 
             P = np.identity(2) * 2
@@ -397,27 +384,19 @@ class CBF_algorithm():
             self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
             self.dxu[1,i] = utils.beta_to_delta(self.dxu[1,i])
             self.predicted_trajectory[i] = utils.predict_trajectory(x[:,i], self.dxu[0,i], self.dxu[1,i])
-            self.lbp.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
-            self.lbp.u_hist[i]['ctrl'] = [self.dxu[1,i]]*int(predict_time/dt)
 
-            self.lbp.u_hist[i]['v_goal'] = np.clip(x[3,i] + self.dxu[0,i]*dt, min_speed, max_speed)
+            self.mpc.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
+            self.mpc.u_hist[i]['ctrl'] = [self.dxu[1,i]]*int(predict_time/dt)
+            self.mpc.u_hist[i]['v_goal'] = np.clip(x[3,i] + self.dxu[0,i]*dt, min_speed, max_speed)
+            plot_polygon(self.mpc.dilated_traj[i], ax=self.mpc.ax, add_points=False, alpha=0.5, color=color_dict[i])
             
-            plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
-            # plt.plot(self.predicted_trajectory[i][:,0], self.predicted_trajectory[i][:,1], color=color_dict[i], linestyle='--')
-            # print(f'Solver successful for robot {i}')
         else: 
-            ob = [self.lbp.dilated_traj[idx] for idx in range(len(self.lbp.dilated_traj)) if idx != i]
-            
-            self.dxu[:, i], self.predicted_trajectory[i], self.lbp.u_hist[i] = LBP.lbp_control(x[:,i], self.targets[i], ob, self.lbp.u_hist[i], self.predicted_trajectory[i])
-            self.dxu[0, i] = np.clip((self.lbp.u_hist[i]['v_goal']-x[3,i])/dt, car_min_acc, car_max_acc)
-
-            self.lbp.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
-            self.lbp.predicted_trajectory = self.predicted_trajectory
-            # plt.plot(self.predicted_trajectory[i][:,0], self.predicted_trajectory[i][:,1], color=color_dict[i], linestyle='--')
-            plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
-            # if i ==0:
-            #     print(f'Robot {i} - LBP control, throttle: {self.dxu[0,i]}, delta: {self.dxu[1,i]}')
-            #     print(f'u_hist: {self.lbp.u_hist[i]}')
+            ob = [self.mpc.dilated_traj[idx] for idx in range(len(self.mpc.dilated_traj)) if idx != i]
+            self.dxu[:, i], self.predicted_trajectory[i], self.mpc.u_hist[i] = MPC.mpc_discrete_control(x[:,i], self.targets[i], ob, self.mpc.u_hist[i], self.predicted_trajectory[i])
+            self.dxu[0, i] = np.clip((self.mpc.u_hist[i]['v_goal']-x[3,i])/dt, car_min_acc, car_max_acc)
+            self.mpc.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
+            self.mpc.predicted_trajectory = self.predicted_trajectory
+            plot_polygon(self.mpc.dilated_traj[i], ax=self.mpc.ax, add_points=False, alpha=0.5, color=color_dict[i])
 
     def C3BF(self, i, x):
         """
@@ -547,8 +526,8 @@ class CBF_algorithm():
         G = np.vstack([G, [[0, 1], [0, -1]]])
         H = np.vstack([H, utils.delta_to_beta(max_steer), -utils.delta_to_beta(-max_steer)])
         # TODO: Keeping the following constraints for solves some problem with the circular_seed_10.json --> why??
-        # G = np.vstack([G, [[0, x[3,i]/Lr], [0, x[3,i]/Lr]]])
-        # H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
+        G = np.vstack([G, [[0, x[3,i]/Lr], [0, x[3,i]/Lr]]])
+        H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
         # G = np.vstack([G, [[0, 1], [0, -1]]])
         # H = np.vstack([H, self.dxu[1,i]+delta_to_beta(5), -self.dxu[1,i]+delta_to_beta(5)])
         G = np.vstack([G, [[1, 0], [-1, 0]]])
@@ -566,22 +545,31 @@ class CBF_algorithm():
             self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
             self.dxu[1,i] = utils.beta_to_delta(self.dxu[1,i])
             self.predicted_trajectory[i] = utils.predict_trajectory(x[:,i], self.dxu[0,i], self.dxu[1,i])
-            self.lbp.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
-            self.lbp.u_hist[i]['ctrl'] = [self.dxu[1,i]]*int(predict_time/dt)
+            # self.lbp.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
+            # self.lbp.u_hist[i]['ctrl'] = [self.dxu[1,i]]*int(predict_time/dt)
+            # self.lbp.u_hist[i]['v_goal'] = np.clip(x[3,i] + self.dxu[0,i]*dt, min_speed, max_speed)
+            # plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
 
-            self.lbp.u_hist[i]['v_goal'] = np.clip(x[3,i] + self.dxu[0,i]*dt, min_speed, max_speed)
-            
-            plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
+            self.mpc.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
+            self.mpc.u_hist[i]['ctrl'] = [self.dxu[1,i]]*int(predict_time/dt)
+            self.mpc.u_hist[i]['v_goal'] = np.clip(x[3,i] + self.dxu[0,i]*dt, min_speed, max_speed)
+            plot_polygon(self.mpc.dilated_traj[i], ax=self.mpc.ax, add_points=False, alpha=0.5, color=color_dict[i])
 
         else: 
-            ob = [self.lbp.dilated_traj[idx] for idx in range(len(self.lbp.dilated_traj)) if idx != i]
-            
-            self.dxu[:, i], self.predicted_trajectory[i], self.lbp.u_hist[i] = LBP.lbp_control(x[:,i], self.targets[i], ob, self.lbp.u_hist[i], self.predicted_trajectory[i])
-            self.dxu[0, i] = np.clip((self.lbp.u_hist[i]['v_goal']-x[3,i])/dt, car_min_acc, car_max_acc)
+            print(f'Solver failed for robot {i}')
+            # ob = [self.lbp.dilated_traj[idx] for idx in range(len(self.lbp.dilated_traj)) if idx != i]
+            # self.dxu[:, i], self.predicted_trajectory[i], self.lbp.u_hist[i] = LBP.lbp_control(x[:,i], self.targets[i], ob, self.lbp.u_hist[i], self.predicted_trajectory[i])
+            # self.dxu[0, i] = np.clip((self.lbp.u_hist[i]['v_goal']-x[3,i])/dt, car_min_acc, car_max_acc)
+            # self.lbp.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
+            # self.lbp.predicted_trajectory = self.predicted_trajectory
+            # plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
 
-            self.lbp.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
-            self.lbp.predicted_trajectory = self.predicted_trajectory
-            plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
+            ob = [self.mpc.dilated_traj[idx] for idx in range(len(self.mpc.dilated_traj)) if idx != i]
+            self.dxu[:, i], self.predicted_trajectory[i], self.mpc.u_hist[i] = MPC.mpc_discrete_control(x[:,i], self.targets[i], ob, self.mpc.u_hist[i], self.predicted_trajectory[i])
+            self.dxu[0, i] = np.clip((self.mpc.u_hist[i]['v_goal']-x[3,i])/dt, car_min_acc, car_max_acc)
+            self.mpc.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
+            self.mpc.predicted_trajectory = self.predicted_trajectory
+            plot_polygon(self.mpc.dilated_traj[i], ax=self.mpc.ax, add_points=False, alpha=0.5, color=color_dict[i])
 
     def check_collision(self, x, i):
         """
@@ -654,7 +642,7 @@ def main(args=None):
     # Step 5: Extract the target coordinates from the paths
     targets = [[path[0].x, path[0].y] for path in paths]
 
-    cbf = CBF_algorithm(targets, paths, robot_num)
+    cbf = CBF_MPC_algorithm(targets, paths, robot_num)
 
     # Step 6: Create a MultiControl object
     multi_control = MultiControl()
@@ -732,7 +720,7 @@ def main1(args=None):
     # Step 5: Extract the target coordinates from the paths
     # targets = [[path[0].x, path[0].y] for path in paths]
 
-    cbf = CBF_algorithm(targets, paths, x=x, robot_num=x.shape[1])
+    cbf = CBF_MPC_algorithm(targets, paths, x=x, robot_num=x.shape[1])
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
         plt.cla()
@@ -799,7 +787,7 @@ def main2(args=None):
     # Step 5: Extract the target coordinates from the paths
     targets = [[path[0].x, path[0].y] for path in paths]
 
-    cbf = CBF_algorithm(targets, paths, robot_num)
+    cbf = CBF_MPC_algorithm(targets, paths, robot_num)
 
     # Step 6: Create a MultiControl object
     multi_control = MultiControl()
@@ -882,9 +870,9 @@ def main_seed(args=None):
     for i in range(robot_num):
         dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
     
-    u_hist = dict.fromkeys(range(robot_num),{'ctrl': [0]*int(predict_time/dt), 'v_goal': 0})
+    u_hist = dict.fromkeys(range(robot_num),{'throttle': [0]*int(predict_time/dt), 'steering': [0]*int(predict_time/dt), 'v_goal': 0})
 
-    cbf = CBF_algorithm(targets, paths, x=x, dilated_traj=dilated_traj, ax=ax, u_hist=u_hist)
+    cbf = CBF_MPC_algorithm(targets, paths, x=x, dilated_traj=dilated_traj, ax=ax, u_hist=u_hist)
 
     predicted_trajectory = {}
     
@@ -913,11 +901,11 @@ def main_seed(args=None):
         if break_flag:  
             break
     
-    print("Saving the trajectories to /src/cbf_dev/cbf_dev/CBF_LBP_trajectories.pkl\n")
-    with open('/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_LBP_trajectories.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+    print("Saving the trajectories to /src/mpc_dev/mpc_dev/CBF_MPC_trajectories.pkl\n")
+    with open('/home/giacomo/thesis_ws/src/mpc_dev/mpc_dev/CBF_MPC_trajectories.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
         pickle.dump([trajectory, targets], f) 
-    print("Saving the trajectories to /src/cbf_dev/cbf_dev/CBF_LBP_dilated_traj")
-    with open('/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_LBP_dilated_traj.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+    print("Saving the trajectories to /src/mpc_dev/mpc_dev/CBF_MPC_dilated_traj")
+    with open('/home/giacomo/thesis_ws/src/mpc_dev/mpc_dev/CBF_MPC_dilated_traj.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
         pickle.dump([predicted_trajectory], f) 
 
     print("Done")

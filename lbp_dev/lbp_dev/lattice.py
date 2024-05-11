@@ -22,14 +22,13 @@ from matplotlib import pyplot as plt
 import numpy as np
 import math
 import pathlib
-from custom_message.msg import State, ControlInputs
+# from custom_message.msg import State, ControlInputs
 from planner import utils as utils
 sys.path.append(str(pathlib.Path(__file__).parent.parent))
 
-import lattice_planner as planner
-import lattice_motion_model as motion_model
+import lbp_dev.lattice_planner as planner
+import lbp_dev.lattice_motion_model as motion_model
 
-TABLE_PATH = os.path.dirname(os.path.abspath(__file__)) + "/lookup_table.csv"
 
 show_animation = True
 
@@ -49,6 +48,7 @@ def search_nearest_one_from_lookup_table(t_x, t_y, t_yaw, lookup_table):
 
     return lookup_table[minid]
 
+TABLE_PATH = os.path.dirname(os.path.abspath(__file__)) + "/lookup_table.csv"
 
 def get_lookup_table(table_path):
     return np.loadtxt(table_path, delimiter=',', skiprows=1)
@@ -97,37 +97,6 @@ def generate_path(target_states, k0, v, k=False):
     return result
 
 
-def calc_uniform_polar_states(nxy, nh, d, a_min, a_max, p_min, p_max):
-    """
-    Calculate the uniform polar states based on the given parameters.
-
-    Parameters
-    ----------
-    nxy : int
-        Number of position sampling.
-    nh : int
-        Number of heading sampling.
-    d : float
-        Distance of terminal state.
-    a_min : float
-        Position sampling min angle.
-    a_max : float
-        Position sampling max angle.
-    p_min : float
-        Heading sampling min angle.
-    p_max : float
-        Heading sampling max angle.
-
-    Returns
-    -------
-    list
-        List of uniform polar states.
-
-    """
-    angle_samples = [i / (nxy - 1) for i in range(nxy)]
-    states = sample_states(angle_samples, a_min, a_max, d, p_max, p_min, nh)
-
-    return states
 
 
 def calc_biased_polar_states(goal_angle, ns, nxy, nh, d, a_min, a_max, p_min, p_max):
@@ -200,38 +169,6 @@ def calc_lane_states(l_center, l_heading, l_width, v_width, d, nxy):
         yf = yc + delta * math.cos(l_heading)
         yawf = l_heading
         states.append([xf, yf, yawf])
-
-    return states
-
-
-def sample_states(angle_samples, a_min, a_max, d, p_max, p_min, nh):
-    """
-    Generate a list of states based on the given parameters.
-
-    Args:
-        angle_samples (list): List of angle samples.
-        a_min (float): Minimum angle value.
-        a_max (float): Maximum angle value.
-        d (float): Distance value.
-        p_max (float): Maximum yaw value.
-        p_min (float): Minimum yaw value.
-        nh (int): Number of yaw samples.
-
-    Returns:
-        list: List of states, each represented as [xf, yf, yawf].
-    """
-    states = []
-    for i in angle_samples:
-        a = a_min + (a_max - a_min) * i
-
-        for j in range(nh):
-            xf = d * math.cos(a)
-            yf = d * math.sin(a)
-            if nh == 1:
-                yawf = (p_max - p_min) / 2 + a
-            else:
-                yawf = p_min + (p_max - p_min) * j / (nh - 1) + a
-            states.append([xf, yf, yawf])
 
     return states
 

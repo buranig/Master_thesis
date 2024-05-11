@@ -22,6 +22,28 @@ import os
 TABLE_PATH = os.path.dirname(os.path.abspath(__file__)) + "/lookup_table.csv"
 
 
+
+# TODO remove this
+class State:
+    def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0):
+        self.x = x
+        self.y = y
+        self.yaw = yaw
+        self.v = v
+
+
+    def update(self, state, v, delta):
+        state.v = v
+        delta = np.clip(delta, -np.radians(45), np.radians(45)) #TODO remove hardcoded limits
+        state.x = state.x + state.v * math.cos(state.yaw) * self.dt
+        state.y = state.y + state.v * math.sin(state.yaw) * self.dt
+        state.yaw = state.yaw + state.v / self.car_model.L * math.tan(delta) * self.dt
+        state.yaw = utils.normalize_angle(state.yaw)
+        # state.yaw = pi_2_pi(state.yaw)
+
+        return state
+
+
 class TrajectoryGenerator(LBP):
     def __init__(self) -> None:
         super().__init__()
@@ -44,7 +66,7 @@ class TrajectoryGenerator(LBP):
 
     def generate_lookup_table(self):
         temp = {}
-        for v in np.arange(0.5, 2.0+0.5, 0.5):
+        for v in np.arange(0.5, 2.0+0.5, 0.5): # TODO: Remove this hard-coded velocity range    
             temp[v] = {}
             k0 = 0.0
             nxy = 5
@@ -52,7 +74,7 @@ class TrajectoryGenerator(LBP):
             d = v*self.ph
             print(f'distance: {d}')
 
-            if v == 0.5:
+            if v == 0.5:    # TODO: Remove this hard-coded velocity limit
                 angle = 45
                 a_min = - np.deg2rad(angle)
                 a_max = np.deg2rad(angle)
@@ -121,26 +143,6 @@ class TrajectoryGenerator(LBP):
         # saving the complete trajectories to a csv file
         with open('src/lbp_dev/lbp_dev/LBP.json', 'w') as file:
             json.dump(temp, file, indent=4)
-
-# TODO remove this
-class State:
-    def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0):
-        self.x = x
-        self.y = y
-        self.yaw = yaw
-        self.v = v
-
-
-    def update(self, state, v, delta):
-        state.v = v
-        delta = np.clip(delta, -np.radians(45), np.radians(45)) #TODO remove hardcoded limits
-        state.x = state.x + state.v * math.cos(state.yaw) * self.dt
-        state.y = state.y + state.v * math.sin(state.yaw) * self.dt
-        state.yaw = state.yaw + state.v / self.car_model.L * math.tan(delta) * self.dt
-        state.yaw = utils.normalize_angle(state.yaw)
-        # state.yaw = pi_2_pi(state.yaw)
-
-        return state
 
     def generate_trajectory(self, s, km, kf, k0, v):
         """

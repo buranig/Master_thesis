@@ -116,7 +116,7 @@ def check_goal_reached(x, targets, i, distance=0.5):
     return False
 
 class CBF_algorithm():
-    def __init__(self, targets, paths, robot_num=robot_num):
+    def __init__(self, targets, paths, ax, robot_num=robot_num):
         self.targets = targets
         self.paths = paths
         self.robot_num = robot_num
@@ -124,6 +124,7 @@ class CBF_algorithm():
         self.reached_goal = [False]*robot_num
         self.computational_time = []
         self.solver_failure = 0
+        self.ax = ax
         
     def run_cbf(self, x, break_flag):
         for i in range(self.robot_num):
@@ -160,10 +161,7 @@ class CBF_algorithm():
             
                     x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
 
-            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.plot(self.targets[i][0], self.targets[i][1], "x", color=color_dict[i])
+            utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
 
         if all(self.reached_goal):
             break_flag = True
@@ -199,11 +197,7 @@ class CBF_algorithm():
             if all(self.reached_goal):
                 break_flag = True
 
-            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.scatter(self.targets[i][0], self.targets[i][1], marker="x", color=color_dict[i], s=200)
-            # print(f"Speed of robot {i}: {x[3, i]}")
+            utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
 
         return x, break_flag
 
@@ -264,6 +258,9 @@ class CBF_algorithm():
                       [0, x[3, i] * np.cos(x[2, i])],
                       [0, x[3, i] / Lr],
                       [1, 0]]).reshape(4, 2)
+        
+        P = np.identity(2) * 2
+        q = np.array([-2 * self.dxu[0, i], - 2 * self.dxu[1, i]])
 
         for j in range(N):
             arr = np.array([x[0, j] - x[0, i], x[1, j] - x[1,i]])
@@ -271,11 +268,9 @@ class CBF_algorithm():
             v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
             scalar_prod = v @ arr
 
-            if j == i or dist > 3 * safety_radius or scalar_prod < 0: 
+            if j == i or dist > 3* safety_radius or scalar_prod < 0: 
+                plt.plot
                 continue
-
-            P = np.identity(2) * 2
-            q = np.array([-2 * self.dxu[0, i], - 2 * self.dxu[1, i]])
 
             Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
             Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - x[1, j]) - np.sin(x[2, i]) * (x[0, i] - x[0, j]))
@@ -351,8 +346,11 @@ class CBF_algorithm():
             sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
             self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
         except:
-            print("QP solver failed")
+            print(f"QP solver failed for robot {i}! Emergency stop.") 
+            self.dxu[0,i] = min_acc 
             self.solver_failure += 1
+            circle2 = plt.Circle((x[0,i], x[1,i]), 3*safety_radius, color='b', fill=False)
+            self.ax.add_patch(circle2)
 
         if self.dxu[0,i] > max_acc or self.dxu[0,i] < min_acc:
             print("Throttle out of bounds: ")
@@ -655,7 +653,7 @@ def main_seed(args=None):
     # Step 5: Extract the target coordinates from the paths
     targets = [[path[0].x, path[0].y] for path in paths]
 
-    cbf = CBF_algorithm(targets, paths)
+    cbf = CBF_algorithm(targets, paths, ax=ax)
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
         plt.cla()

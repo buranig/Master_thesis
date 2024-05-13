@@ -37,7 +37,7 @@ Kv = json_object["C3BF"]["Kv"] # interval [0.5-1]
 Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
-robot_num = 5 #json_object["robot_num"]
+robot_num = 15 #json_object["robot_num"]
 safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
@@ -50,7 +50,7 @@ noise_scale_param = json_object["noise_scale_param"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_4.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_10.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -116,7 +116,7 @@ def check_goal_reached(x, targets, i, distance=0.5):
 
 class C3BF_algorithm():
     
-    def __init__(self, targets, paths, robot_num=robot_num):
+    def __init__(self, targets, paths, ax, robot_num=robot_num):
         self.targets = targets
         self.paths = paths
         self.robot_num = robot_num
@@ -124,6 +124,7 @@ class C3BF_algorithm():
         self.reached_goal = [False]*robot_num
         self.computational_time = []
         self.solver_failure = 0
+        self.ax = ax
 
     def run_3cbf(self, x, break_flag):
         for i in range(self.robot_num):
@@ -160,13 +161,11 @@ class C3BF_algorithm():
             
                     # x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
                     x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
-                
+                    if x[3,i] < 0.0:
+                        print(f"Negative speed for robot {i}!")
                 x = self.check_collision(x, i)
 
-            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.plot(self.targets[i][0], self.targets[i][1], "x", color=color_dict[i])
+            utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
 
         if all(self.reached_goal):
             break_flag = True
@@ -194,17 +193,14 @@ class C3BF_algorithm():
                     self.dxu[:,i]= 0
                     x[3,i] = 0
                 else:
-                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i], dt)
 
                 x = self.check_collision(x, i) 
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if all(self.reached_goal):
                 break_flag = True
 
-            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.scatter(self.targets[i][0], self.targets[i][1], marker="x", color=color_dict[i], s=200)
+            utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
             # print(f"Speed of robot {i}: {x[3, i]}")
 
         return x, break_flag
@@ -419,7 +415,8 @@ class C3BF_algorithm():
             sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
             self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
         except:
-            print("QP solver failed")   
+            print(f"QP solver failed for robot {i}! Emergency stop.") 
+            self.dxu[0,i] = min_acc 
             self.solver_failure += 1         
         
         if self.dxu[0,i] > max_acc or self.dxu[0,i] < min_acc:
@@ -720,7 +717,7 @@ def main_seed(args=None):
     # Step 5: Extract the target coordinates from the paths
     targets = [[path[0].x, path[0].y] for path in paths]
 
-    c3bf = C3BF_algorithm(targets, paths)
+    c3bf = C3BF_algorithm(targets, paths, ax=ax)
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
         plt.cla()

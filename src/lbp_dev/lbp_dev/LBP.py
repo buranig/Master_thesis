@@ -39,7 +39,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 
 WB = json_object["Controller"]["WB"] # Wheel base
-robot_num = json_object["robot_num"]
+robot_num = 15 #json_object["robot_num"]
 safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
@@ -60,7 +60,7 @@ color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:or
 with open('/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP.json', 'r') as file:
     data = json.load(file)
 
-with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_2.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_10.json', 'r') as file:
     seed = json.load(file)
 
 def lbp_control(x, goal, ob, u_buf, trajectory_buf):
@@ -369,7 +369,8 @@ def update_robot_state(x, u, dt, targets, dilated_traj, u_hist, predicted_trajec
     if check_collision_bool:
         if any([utils.dist([x1[0], x1[1]], [x[0, idx], x[1, idx]]) < WB for idx in range(robot_num) if idx != i]): raise Exception('Collision')
 
-    x1 = utils.motion(x1, u1, dt)
+    # x1 = utils.motion(x1, u1, dt)
+    x1 = utils.nonlinear_model_numpy_stable(x1, u1, dt)
     x[:, i] = x1
     u[:, i] = u1
 
@@ -435,6 +436,8 @@ class LBP_algorithm():
                     t_prev = time.time()
                     x, u, self.predicted_trajectory, self.u_hist = update_robot_state(x, u, dt, self.targets, self.dilated_traj, self.u_hist, self.predicted_trajectory, i)
                     self.computational_time.append(time.time()-t_prev)
+                
+                u, x = self.check_collision(x, u, i) 
 
             if show_animation:
                 utils.plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
@@ -743,10 +746,11 @@ def main_seed():
     y = initial_state['y']
     yaw = initial_state['yaw']
     v = initial_state['v']
+    omega = [0.0]*len(initial_state['x'])
 
     assert robot_num == len(seed['initial_position']['x']), "The number of robots in the seed file does not match the number of robots in the seed file"
     # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
+    x = np.array([x0, y, yaw, v, omega])
     u = np.zeros((2, robot_num))
 
     trajectory = np.zeros((x.shape[0], robot_num, 1))

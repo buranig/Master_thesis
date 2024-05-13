@@ -127,7 +127,7 @@ def nonlinear_model_callback(initial_state: State, cmd: ControlInputs, old_time:
     dt = 0.1
     state = State()
     #dt = time.time() - old_time
-    cmd.delta = np.clip(cmd.delta, -max_steer, max_steer)
+    cmd.throttle = np.clip(cmd.throttle, car_min_acc, car_max_acc)
     cmd.delta = np.clip(cmd.delta, -max_steer, max_steer)
 
     beta = math.atan2((Lr * math.tan(cmd.delta) / L), 1.0)
@@ -153,6 +153,104 @@ def nonlinear_model_callback(initial_state: State, cmd: ControlInputs, old_time:
     state.v = np.clip(state.v, min_speed, max_speed)
 
     return state, time.time()
+
+def nonlinear_model_numpy(x, u, dt=dt):
+    """
+    Calculates the state of the system using a nonlinear dynamic model.
+
+    Args:
+        x (numpy.ndarray): The state of the system.
+        u (numpy.ndarray): The control inputs for the system.
+        dt (float): The time step.
+
+    Returns:
+        numpy.ndarray: The updated state of the system.
+    """
+
+    
+    initial_state = State(x=x[0], y=x[1], yaw=x[2], v=x[3], omega=x[4])
+    cmd = ControlInputs(throttle=u[0], delta=u[1])
+    state = State()
+
+    #dt = time.time() - old_time
+    cmd.throttle = np.clip(cmd.throttle, car_min_acc, car_max_acc)
+    cmd.delta = np.clip(cmd.delta, -max_steer, max_steer)
+
+    beta = math.atan2((Lr * math.tan(cmd.delta) / L), 1.0)
+    vx = initial_state.v * math.cos(beta)
+    vy = initial_state.v * math.sin(beta)
+
+    Ffy = -Cf * ((vy + Lf * initial_state.omega) / (vx + 0.1) - cmd.delta)
+    Fry = -Cr * (vy - Lr * initial_state.omega) / (vx + 0.1)
+    R_x = c_r1 * abs(vx)
+    F_aero = c_a * vx ** 2 # 
+    F_load = F_aero + R_x #
+    state.omega = initial_state.omega + (Ffy * Lf * math.cos(cmd.delta) - Fry * Lr) / Iz * dt
+    vx = vx + (cmd.throttle - Ffy * math.sin(cmd.delta) / m - F_load / m + vy * state.omega) * dt
+    vy = vy + (Fry / m + Ffy * math.cos(cmd.delta) / m - vx * state.omega) * dt
+
+    state.yaw = initial_state.yaw + state.omega * dt
+    state.yaw = normalize_angle(state.yaw)
+
+    state.x = initial_state.x + vx * math.cos(state.yaw) * dt - vy * math.sin(state.yaw) * dt
+    state.y = initial_state.y + vx * math.sin(state.yaw) * dt + vy * math.cos(state.yaw) * dt
+
+    state.v = math.sqrt(vx ** 2 + vy ** 2)
+    state.v = np.clip(state.v, min_speed, max_speed)
+
+    x[0] = state.x
+    x[1] = state.y
+    x[2] = state.yaw
+    x[3] = state.v
+    x[4] = state.omega
+
+    return x
+
+def nonlinear_model_numpy_stable(x, u, dt=dt):
+    """
+    Calculates the state of the system using a nonlinear dynamic model.
+
+    Args:
+        x (numpy.ndarray): The state of the system.
+        u (numpy.ndarray): The control inputs for the system.
+        dt (float): The time step.
+
+    Returns:
+        numpy.ndarray: The updated state of the system.
+    """
+
+    
+    initial_state = State(x=x[0], y=x[1], yaw=x[2], v=x[3], omega=x[4])
+    cmd = ControlInputs(throttle=float(u[0]), delta=float(u[1]))
+    state = State()
+
+    #dt = time.time() - old_time
+    cmd.throttle = np.clip(cmd.throttle, car_min_acc, car_max_acc)
+    cmd.delta = np.clip(cmd.delta, -max_steer, max_steer)
+
+    beta = math.atan2((Lr * math.tan(cmd.delta) / L), 1.0)
+    ux = initial_state.v * math.cos(beta)
+    v = initial_state.v * math.sin(beta)
+
+    kf = -Cf
+    kr = -Cr
+
+    state.x = initial_state.x + ux * math.cos(initial_state.yaw) * dt - v * math.sin(initial_state.yaw) * dt
+    state.y = initial_state.y + ux * math.sin(initial_state.yaw) * dt + v * math.cos(initial_state.yaw) * dt
+    state.yaw = initial_state.yaw + initial_state.omega * dt
+    ux = ux + cmd.throttle * dt
+    v = (m*ux*v+dt*(Lf*kf-Lr*kr)*initial_state.omega - dt*kf*cmd.delta*ux - dt*m*ux**2*initial_state.omega)/(m*ux - dt*(kf+kr))
+    state.v = math.sqrt(ux**2 + v**2)
+    state.v = np.clip(state.v, min_speed, max_speed)
+    state.omega = (Iz*ux*initial_state.omega+ dt*(Lf*kf-Lr*kr)*v - dt*Lf*kf*cmd.delta*ux)/(Iz*ux - dt*(Lf**2*kf+Lr**2*kr))
+
+    x[0] = state.x
+    x[1] = state.y
+    x[2] = state.yaw
+    x[3] = state.v
+    x[4] = state.omega
+
+    return x
 
 def pure_pursuit_steer_control(target, pose):
     """
@@ -659,3 +757,24 @@ def predict_trajectory(x_init, a, delta, predict_time=predict_time, dt=dt):
         trajectory = np.vstack((trajectory, x))
         time += dt
     return trajectory
+
+
+def pacejka_magic_formula(alpha):
+    """
+    Calculates lateral force using Pacejka Magic Formula.
+    
+    Parameters:
+        alpha (float): Slip angle (radians).
+        Fz (float): Vertical load on the tire (N).
+        C, D, B, E (float): Pacejka Magic Formula parameters.
+    
+    Returns:
+        float: Lateral force (N).
+    """
+    C = 1.3
+    D = 2500
+    B = 10
+    E = 0.97
+    Fz = m * 9.81
+    mu = D * math.sin(C * math.atan(B * alpha - E * (B * alpha - math.atan(B * alpha))))
+    return mu * Fz

@@ -37,7 +37,7 @@ Kv = json_object["C3BF"]["Kv"] # interval [0.5-1]
 Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
-robot_num = 15 #json_object["robot_num"]
+robot_num = 5 #json_object["robot_num"]
 safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
@@ -50,7 +50,7 @@ noise_scale_param = json_object["noise_scale_param"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_7.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_4.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -149,7 +149,7 @@ class C3BF_algorithm():
                 else:
                     t_prev = time.time()
                     if add_noise:
-                        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
+                        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.02*noise_scale_param, 1).reshape(1,1)], axis=0)
                         noisy_pos = x + noise
                         self.control_robot(i, noisy_pos)
                         plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
@@ -158,7 +158,10 @@ class C3BF_algorithm():
 
                     self.computational_time.append((time.time() - t_prev))
             
-                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    # x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
+                
+                x = self.check_collision(x, i)
 
             utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
             utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
@@ -192,7 +195,8 @@ class C3BF_algorithm():
                     x[3,i] = 0
                 else:
                     x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
-                  
+
+                x = self.check_collision(x, i) 
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if all(self.reached_goal):
                 break_flag = True
@@ -224,7 +228,7 @@ class C3BF_algorithm():
 
         cmd = ControlInputs()
         
-        x = self.check_collision(x, i)
+        # x = self.check_collision(x, i)
         x1 = utils.array_to_state(x[:, i])
         cmd.throttle, cmd.delta = utils.pure_pursuit_steer_control(self.targets[i], x1)
         self.dxu[0, i], self.dxu[1, i] = cmd.throttle, cmd.delta
@@ -421,9 +425,8 @@ class C3BF_algorithm():
         if self.dxu[0,i] > max_acc or self.dxu[0,i] < min_acc:
             print("Throttle out of bounds: ")
             print(self.dxu[0,i])
-            # self.dxu[0,i] = np.clip(self.dxu[0,i], -min_acc, max_acc)
+            self.dxu[0,i] = np.clip(self.dxu[0,i], -min_acc, max_acc)
         self.dxu[1,i] = utils.beta_to_delta(self.dxu[1,i])    
-
 
     def check_collision(self, x, i):
         """
@@ -705,9 +708,10 @@ def main_seed(args=None):
     y = initial_state['y']
     yaw = initial_state['yaw']
     v = initial_state['v']
+    omega = [0.0]*len(initial_state['x'])
 
     # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
+    x = np.array([x0, y, yaw, v, omega])
     
     # Step 4: Create paths for each robot
     traj = data['trajectories']

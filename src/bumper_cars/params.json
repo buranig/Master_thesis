@@ -59,7 +59,7 @@
             "predict_time": 1.5,
             "to_goal_cost_gain": 20,
             "speed_cost_gain": 1,
-            "obstacle_cost_gain": 30,
+            "obstacle_cost_gain": 50,
             "heading_cost_gain": 1,
             "robot_stuck_flag_cons": 0.001,
             "dilation_factor": 0.35
@@ -81,9 +81,9 @@
             "max_speed": 2,
             "min_speed": -1.0,
             "L": 1.0, 
-            "Cf": 320.0,
-            "Cr": 340.0, 
-            "Iz": 225.0,
+            "Cf": 50000.0,
+            "Cr": 50000.0, 
+            "Iz": 25.0,
             "m": 150.0,
             "c_a": 1.36,
             "c_r1": 0.01
@@ -107,8 +107,8 @@
     "timer_freq": 0.01,
     "plot_traj": false,
     "to_goal_stop_distance": 2.5,
-    "show_animation": false,
-    "add_noise": true,
+    "show_animation": true,
+    "add_noise": false,
     "noise_scale_param": 0.0
     
 }

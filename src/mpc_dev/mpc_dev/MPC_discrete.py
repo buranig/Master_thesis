@@ -388,7 +388,8 @@ def update_robot_state(x, u, dt, targets, dilated_traj, u_hist, predicted_trajec
         if any([utils.dist([x1[0], x1[1]], [x[0, idx], x[1, idx]]) < WB for idx in range(robot_num) if idx != i]): raise Exception('Collision')
 
     # x1 = utils.motion(x1, u1, dt)
-    x1 = utils.motion_MPC_casadi(x1, u1, dt)
+    # x1 = utils.motion_MPC_casadi(x1, u1, dt)
+    x1 = utils.nonlinear_model_numpy_stable(x1, u1, dt)
     x[:, i] = x1
     u[:, i] = u1
 
@@ -430,7 +431,7 @@ class MPC_DISCRETE_algorithm():
         self.reached_goal = [False]*robot_num
         self.computational_time = []
 
-    def run_lbp(self, x, u, break_flag):
+    def run_mpc(self, x, u, break_flag):
         for i in range(self.robot_num):
             if not self.reached_goal[i]:
                 # Step 9: Check if the distance between the current position and the target is less than 5
@@ -454,6 +455,8 @@ class MPC_DISCRETE_algorithm():
                     t_prev = time.time()
                     x, u, self.predicted_trajectory, self.u_hist = update_robot_state(x, u, dt, self.targets, self.dilated_traj, self.u_hist, self.predicted_trajectory, i)
                     self.computational_time.append(time.time()-t_prev)
+                
+                u, x = self.check_collision(x, u, i) 
 
             if show_animation:
                 utils.plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
@@ -543,10 +546,11 @@ def main_seed():
     y = initial_state['y']
     yaw = initial_state['yaw']
     v = initial_state['v']
+    omega = [0.0]*len(initial_state['x'])
 
     assert robot_num == len(seed['initial_position']['x']), "The number of robots in the seed file does not match the number of robots in the seed file"
     # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
+    x = np.array([x0, y, yaw, v, omega])
     u = np.zeros((2, robot_num))
 
     trajectory = np.zeros((x.shape[0], robot_num, 1))
@@ -572,14 +576,14 @@ def main_seed():
     fig = plt.figure(1, dpi=90, figsize=(10,10))
     ax = fig.add_subplot(111)
     
-    lbp = MPC_DISCRETE_algorithm(predicted_trajectory, paths, targets, dilated_traj,
+    mpc = MPC_DISCRETE_algorithm(predicted_trajectory, paths, targets, dilated_traj,
                         predicted_trajectory, ax, u_hist)
     
     for z in range(iterations):
         plt.cla()
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
         
-        x, u, break_flag = lbp.run_lbp(x, u, break_flag)
+        x, u, break_flag = mpc.run_mpc(x, u, break_flag)
         # x, u, break_flag = lbp.go_to_goal(x, u, break_flag)
 
         trajectory = np.dstack([trajectory, x])

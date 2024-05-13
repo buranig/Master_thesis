@@ -2,7 +2,6 @@ import json
 import numpy as np
 import pathlib
 import math
-from LBP import normalize_angle
 from shapely.geometry import Point, Polygon, LineString
 import matplotlib.pyplot as plt
 from planner import utils as utils
@@ -101,9 +100,9 @@ def plot_robot(x, y, yaw):  # pragma: no cover
 
 # Implement kinematic bicycle model to follow the trajectory
 def main():
-    v = 2.0 # [m/s] reference speed
-    x = [0.0, 0.0, 0.0, 0.0] #[x, y, yaw, v]   
-    ref = data[str(v)]['10']
+    v = -1.0 # [m/s] reference speed
+    x = [0.0, 0.0, 0.0, 0.0, 0.0] #[x, y, yaw, v, omega]   
+    ref = data[str(v)]['1']
     trajectory = np.zeros((len(ref['x']),3))
     trajectory[:,0] = ref['x']
     trajectory[:,1] = ref['y']
@@ -129,7 +128,8 @@ def main():
 
         # Apply control input to the kinematic bicycle model
         # TODO: Implement the kinematic bicycle model logic here
-        x = utils.motion(x, u, dt)
+        # x = utils.motion(x, u, dt)
+        x = utils.nonlinear_model_numpy_stable(x, u, dt)
 
         # Print the current state and control input
         print(f"Control Input: {u}")

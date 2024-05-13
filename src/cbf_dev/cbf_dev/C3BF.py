@@ -133,7 +133,7 @@ class C3BF_algorithm():
                     # Perform some action when the condition is met
                     self.paths[i].pop(0)
                     if not self.paths[i]:
-                        print("Path complete")
+                        print("Path complete for vehicle {i}!")
                         self.dxu[:, i] = 0
                         x[3,i] = 0
                         self.reached_goal[i] = True
@@ -664,7 +664,7 @@ def main2(args=None):
                 # Perform some action when the condition is met
                 paths[i].pop(0)
                 if not paths[i]:
-                    print("Path complete")
+                    print("Path complete for vehicle {i}!")
                     return
                 c3bf.targets[i] = (paths[i][0].x, paths[i][0].y)
 

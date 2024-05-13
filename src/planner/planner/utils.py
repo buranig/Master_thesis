@@ -388,6 +388,7 @@ def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax,
     plot_robot(x[0, i], x[1, i], x[2, i], i)
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
     plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
+    ax.annotate(str(i), (float(predicted_trajectory[i][0, 0]), float(predicted_trajectory[i][0, 1])))
 
 def plot_arrow(x, y, yaw, label=None, length=0.5, width=0.1, color='k'):  # pragma: no cover
     plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),

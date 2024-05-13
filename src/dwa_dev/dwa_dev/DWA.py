@@ -248,24 +248,6 @@ def initialize_paths_targets_dilated_traj(x):
 
     return paths, targets, dilated_traj
 
-def check_goal_reached(x, targets, i, distance=0.5):
-    """
-    Check if the robot has reached the goal.
-
-    Parameters:
-    x (numpy.ndarray): Robot's current position.
-    targets (list): List of target positions.
-    i (int): Index of the current target.
-
-    Returns:
-    bool: True if the robot has reached the goal, False otherwise.
-    """
-    dist_to_goal = math.hypot(x[0, i] - targets[i][0], x[1, i] - targets[i][1])
-    if dist_to_goal <= distance:
-        print("Goal!!")
-        return True
-    return False
-
 class DWA_algorithm():
     """
     Class representing the Dynamic Window Approach algorithm.
@@ -332,7 +314,7 @@ class DWA_algorithm():
                     # Perform some action when the condition is met
                     self.paths[i].pop(0)
                     if not self.paths[i]:
-                        print("Path complete")
+                        print("Path complete for vehicle {i}!")
                         u[:, i] = np.zeros(2)
                         x[3, i] = 0
                         self.reached_goal[i] = True
@@ -340,7 +322,7 @@ class DWA_algorithm():
                     else: 
                         self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
 
-                if check_goal_reached(x, self.targets, i):
+                if self.check_goal_reached(x, i):
                     print(f"Vehicle {i} reached goal!!")
                     u[:, i] = np.zeros(2)
                     x[3, i] = 0
@@ -374,7 +356,7 @@ class DWA_algorithm():
             # Step 9: Check if the distance between the current position and the target is less than 5
             if not self.reached_goal[i]:                
                 # If goal is reached, stop the robot
-                if check_goal_reached(x, self.targets, i, distance=to_goal_stop_distance):
+                if self.check_goal_reached(x, i, distance=to_goal_stop_distance):
                     u[:, i] = np.zeros(2)
                     x[3, i] = 0
                     self.reached_goal[i] = True
@@ -586,181 +568,26 @@ class DWA_algorithm():
                     u[:, i] = np.zeros(2)
                     x[3, i] = 0
         return u, x
-
-def main():
-    """
-    Main function that controls the execution of the program.
-
-    Steps:
-    1. Initialize the necessary variables and arrays.
-    2. Generate initial robot states and trajectories.
-    3. Initialize paths, targets, and dilated trajectories.
-    4. Start the main loop for a specified number of iterations.
-    5. Update targets and robot states for each robot.
-    6. Calculate the right input using the Dynamic Window Approach method.
-    7. Predict the future trajectory using the calculated input.
-    8. Check if the goal is reached for each robot.
-    9. Plot the robot trajectories and the map.
-    11. Break the loop if the goal is reached for any robot.
-    12. Print "Done" when the loop is finished.
-    13. Plot the final trajectories if animation is enabled.
-    """
     
-    print(__file__ + " start!!")
-    iterations = 3000
-    break_flag = False
-    
-    x0, y, yaw, v, omega, model_type = utils.samplegrid(width_init, height_init, min_dist, robot_num, safety_init)
-    x = np.array([x0, y, yaw, v])
-    u = np.zeros((2, robot_num))
+    def check_goal_reached(self, x, i, distance=0.5):
+        """
+        Check if the given point has reached the goal.
 
-    trajectory = np.zeros((x.shape[0], robot_num, 1))
-    trajectory[:, :, 0] = x
+        Args:
+            x (numpy.ndarray): Array of x-coordinates.
+            targets (list): List of target points.
+            i (int): Index of the current point.
 
-    predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 3]))
-    for i in range(robot_num):
-        predicted_trajectory[i] = np.full((int(predict_time/dt), 3), x[0:3,i])
-
-    paths, targets, dilated_traj = initialize_paths_targets_dilated_traj(x)
-    
-    fig = plt.figure(1, dpi=90, figsize=(10,10))
-    ax = fig.add_subplot(111)
-
-    u_hist = dict.fromkeys(range(robot_num),[[0,0] for _ in range(int(predict_time/dt))])
-
-    dwa = DWA_algorithm(robot_num, paths, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist)
-        
-    for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-        
-        for i in range(robot_num):
-            
-            paths, targets = update_targets(paths, targets, x, i)
-
-            x, u = dwa.update_robot_state(x, u, dt, i)
-
-            trajectory = np.dstack([trajectory, x])
-
-            if check_goal_reached(x, targets, i):
-                break_flag = True
-
-            if show_animation:
-                utils.plot_robot_trajectory(x, u, dwa.predicted_trajectory, dilated_traj, targets, ax, i)
-
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
-
-        if break_flag:
-            break
-
-    print("Done")
-    if show_animation:
-        for i in range(robot_num):
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-r")
-        plt.pause(0.0001)
-        plt.show()
-
-def main1():
-    """
-    Main function that controls the execution of the program.
-
-    Steps:
-    1. Initialize the necessary variables and arrays.
-    2. Generate initial robot states and trajectories.
-    3. Initialize paths, targets, and dilated trajectories.
-    4. Start the main loop for a specified number of iterations.
-    5. Update targets and robot states for each robot.
-    6. Calculate the right input using the Dynamic Window Approach method.
-    7. Predict the future trajectory using the calculated input.
-    8. Check if the goal is reached for each robot.
-    9. Plot the robot trajectories and the map.
-    11. Break the loop if the goal is reached for any robot.
-    12. Print "Done" when the loop is finished.
-    13. Plot the final trajectories if animation is enabled.
-    """
-    
-    print(__file__ + " start!!")
-    iterations = 3000
-    break_flag = False
-    
-    # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
-    initial_state = seed['initial_position']
-    x0 = initial_state['x']
-    y = initial_state['y']
-    yaw = initial_state['yaw']
-    v = initial_state['v']
-
-    # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
-    u = np.zeros((2, robot_num))
-
-    trajectory = np.zeros((x.shape[0], robot_num, 1))
-    trajectory[:, :, 0] = x
-
-    predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 3]))
-    for i in range(robot_num):
-        predicted_trajectory[i] = np.full((int(predict_time/dt), 3), x[0:3,i])
-
-    # Step 4: Create paths for each robot
-    traj = seed['trajectories']
-    paths = [[Coordinate(x=traj[str(idx)][i][0], y=traj[str(idx)][i][1]) for i in range(len(traj[str(idx)]))] for idx in range(robot_num)]
-
-    # Step 5: Extract the target coordinates from the paths
-    targets = [[path[0].x, path[0].y] for path in paths]
-
-    # Step 6: Create dilated trajectories for each robot
-    dilated_traj = []
-    for i in range(robot_num):
-        dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
-    
-    fig = plt.figure(1, dpi=90, figsize=(10,10))
-    ax = fig.add_subplot(111)
-    u_hist = dict.fromkeys(range(robot_num),[[0,0] for _ in range(int(predict_time/dt))])
-
-    dwa = DWA_algorithm(robot_num, paths, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist)
-    
-    for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-        
-        for i in range(robot_num):
-            
-            # Step 9: Check if the distance between the current position and the target is less than 5
-            if utils.dist(point1=(x[0,i], x[1,i]), point2=targets[i]) < 5:
-                # Perform some action when the condition is met
-                paths[i].pop(0)
-                if not paths[i]:
-                    print("Path complete")
-                    return
-                targets[i] = (paths[i][0].x, paths[i][0].y)
-
-            x, u = dwa.update_robot_state(x, u, dt, i)
-
-            trajectory = np.dstack([trajectory, x])
-
-            if check_goal_reached(x, targets, i):
-                break_flag = True
-
-            if show_animation:
-                utils.plot_robot_trajectory(x, u, dwa.predicted_trajectory, dilated_traj, targets, ax, i)
-
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
-
-        if break_flag:
-            break
-
-    print("Done")
-    if show_animation:
-        for i in range(robot_num):
-            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-r")
-        plt.pause(0.0001)
-        plt.show()
+        Returns:
+            bool: True if the point has reached the goal, False otherwise.
+        """
+        dist_to_goal = math.hypot(x[0, i] - self.targets[i][0], x[1, i] - self.targets[i][1])
+        if dist_to_goal <= distance:
+            print("Goal!!")
+            self.dilated_traj[i] = Point(x[0, i], x[1, i]).buffer(L/2, cap_style=3)
+            self.predicted_trajectory[i] = np.array([x[0:-1, i]]*int(predict_time/dt))
+            return True
+        return False
 
 def main_seed():
     """
@@ -827,6 +654,7 @@ def main_seed():
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
         
         x, u, break_flag = dwa.run_dwa(x, u, break_flag)
+        # x, u, break_flag = dwa.go_to_goal(x, u, break_flag)
         trajectory = np.dstack([trajectory, x])
             
         utils.plot_map(width=width_init, height=height_init)

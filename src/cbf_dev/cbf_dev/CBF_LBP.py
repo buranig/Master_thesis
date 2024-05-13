@@ -144,7 +144,7 @@ class CBF_algorithm():
                     # Perform some action when the condition is met
                     self.paths[i].pop(0)
                     if not self.paths[i]:
-                        print("Path complete")
+                        print("Path complete for vehicle {i}!")
                         self.dxu[:, i] = 0
                         x[3,i] = 0
                         self.reached_goal[i] = True
@@ -166,10 +166,7 @@ class CBF_algorithm():
             
                     x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i], dt)
 
-            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.plot(self.targets[i][0], self.targets[i][1], "x", color=color_dict[i])
+            utils.plot_robot_trajectory(x, self.dxu, self.predicted_trajectory, self.lbp.dilated_traj, self.targets, self.lbp.ax, i)
 
         if all(self.reached_goal):
             break_flag = True
@@ -206,11 +203,7 @@ class CBF_algorithm():
             if all(self.reached_goal):
                 break_flag = True
 
-            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.scatter(self.targets[i][0], self.targets[i][1], marker="x", color=color_dict[i], s=200)
-            # print(f"Speed of robot {i}: {x[3, i]}")
+            utils.plot_robot_trajectory(x, self.dxu, self.predicted_trajectory, self.lbp.dilated_traj, self.targets, self.lbp.ax, i)
 
         return x, break_flag
 
@@ -385,10 +378,6 @@ class CBF_algorithm():
             self.lbp.u_hist[i]['ctrl'] = [self.dxu[1,i]]*int(predict_time/dt)
 
             self.lbp.u_hist[i]['v_goal'] = np.clip(x[3,i] + self.dxu[0,i]*dt, min_speed, max_speed)
-            
-            plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
-            # plt.plot(self.predicted_trajectory[i][:,0], self.predicted_trajectory[i][:,1], color=color_dict[i], linestyle='--')
-            # print(f'Solver successful for robot {i}')
         else: 
             ob = [self.lbp.dilated_traj[idx] for idx in range(len(self.lbp.dilated_traj)) if idx != i]
             
@@ -397,11 +386,6 @@ class CBF_algorithm():
 
             self.lbp.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
             self.lbp.predicted_trajectory = self.predicted_trajectory
-            # plt.plot(self.predicted_trajectory[i][:,0], self.predicted_trajectory[i][:,1], color=color_dict[i], linestyle='--')
-            plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
-            # if i ==0:
-            #     print(f'Robot {i} - LBP control, throttle: {self.dxu[0,i]}, delta: {self.dxu[1,i]}')
-            #     print(f'u_hist: {self.lbp.u_hist[i]}')
 
     def C3BF(self, i, x):
         """
@@ -554,18 +538,15 @@ class CBF_algorithm():
             self.lbp.u_hist[i]['ctrl'] = [self.dxu[1,i]]*int(predict_time/dt)
 
             self.lbp.u_hist[i]['v_goal'] = np.clip(x[3,i] + self.dxu[0,i]*dt, min_speed, max_speed)
-            
-            plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
 
         else: 
             ob = [self.lbp.dilated_traj[idx] for idx in range(len(self.lbp.dilated_traj)) if idx != i]
             
-            self.dxu[:, i], self.predicted_trajectory[i], self.lbp.u_hist[i] = LBP.lbp_control(x[:,i], self.targets[i], ob, self.lbp.u_hist[i], self.predicted_trajectory[i])
+            self.dxu[:, i], self.predicted_trajectory[i], self.lbp.u_hist[i] = self.lbp.lbp_control(x[:,i], ob, i)
             self.dxu[0, i] = np.clip((self.lbp.u_hist[i]['v_goal']-x[3,i])/dt, car_min_acc, car_max_acc)
 
             self.lbp.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
             self.lbp.predicted_trajectory = self.predicted_trajectory
-            plot_polygon(self.lbp.dilated_traj[i], ax=self.lbp.ax, add_points=False, alpha=0.5, color=color_dict[i])
 
     def check_collision(self, x, i):
         """
@@ -803,7 +784,7 @@ def main2(args=None):
                 # Perform some action when the condition is met
                 paths[i].pop(0)
                 if not paths[i]:
-                    print("Path complete")
+                    print("Path complete for vehicle {i}!")
                     return
                 cbf.targets[i] = (paths[i][0].x, paths[i][0].y)
 

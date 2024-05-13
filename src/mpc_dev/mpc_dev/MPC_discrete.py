@@ -235,24 +235,6 @@ def initialize_paths_targets_dilated_traj(x):
 
     return paths, targets, dilated_traj
 
-def check_goal_reached(x, targets, i, distance=0.5):
-    """
-    Check if the given point has reached the goal.
-
-    Args:
-        x (numpy.ndarray): Array of x-coordinates.
-        targets (list): List of target points.
-        i (int): Index of the current point.
-
-    Returns:
-        bool: True if the point has reached the goal, False otherwise.
-    """
-    dist_to_goal = math.hypot(x[0, i] - targets[i][0], x[1, i] - targets[i][1])
-    if dist_to_goal <= distance:
-        print("Goal!!")
-        return True
-    return False
-
 class MPC_DISCRETE_algorithm():
     def __init__(self, trajectories, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist, robot_num=robot_num):
         self.trajectories = trajectories
@@ -274,14 +256,14 @@ class MPC_DISCRETE_algorithm():
                     # Perform some action when the condition is met
                     self.paths[i].pop(0)
                     if not self.paths[i]:
-                        print("Path complete")
+                        print("Path complete for vehicle {i}!")
                         u[:, i] = np.zeros(2)
                         x[3, i] = 0
                         self.reached_goal[i] = True
                     else: 
                         self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
 
-                if check_goal_reached(x, self.targets, i):
+                if self.check_goal_reached(x, i):
                     print(f"Vehicle {i} reached goal!!")
                     u[:, i] = np.zeros(2)
                     x[3, i] = 0
@@ -306,7 +288,7 @@ class MPC_DISCRETE_algorithm():
             # Step 9: Check if the distance between the current position and the target is less than 5
             if not self.reached_goal[i]:        
                 # If goal is reached, stop the robot
-                if check_goal_reached(x, self.targets, i, distance=to_goal_stop_distance):
+                if self.check_goal_reached(x, i, distance=to_goal_stop_distance):
                     u[:, i] = np.zeros(2)
                     x[3, i] = 0
                     self.reached_goal[i] = True
@@ -533,6 +515,26 @@ class MPC_DISCRETE_algorithm():
                     x[3, i] = 0
         
         return u, x
+    
+    def check_goal_reached(self, x, i, distance=0.5):
+        """
+        Check if the given point has reached the goal.
+
+        Args:
+            x (numpy.ndarray): Array of x-coordinates.
+            targets (list): List of target points.
+            i (int): Index of the current point.
+
+        Returns:
+            bool: True if the point has reached the goal, False otherwise.
+        """
+        dist_to_goal = math.hypot(x[0, i] - self.targets[i][0], x[1, i] - self.targets[i][1])
+        if dist_to_goal <= distance:
+            print("Goal!!")
+            self.dilated_traj[i] = Point(x[0, i], x[1, i]).buffer(L/2, cap_style=3)
+            self.predicted_trajectory[i] = np.array([x[0:-1, i]]*int(predict_time/dt))
+            return True
+        return False
 
 def main_seed():
     """

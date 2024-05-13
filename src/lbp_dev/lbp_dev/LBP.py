@@ -45,6 +45,7 @@ width_init = json_object["width"]
 height_init = json_object["height"]
 min_dist = json_object["min_dist"]
 to_goal_stop_distance = json_object["to_goal_stop_distance"]
+emergency_brake_distance = json_object["LBP"]["emergency_brake_distance"]
 update_dist = 2
 N=3
 
@@ -445,10 +446,15 @@ class LBP_algorithm():
         
         #TODO: this section has a small bug due to popping elements from the buffer, it gets to a point where there 
         # are no more elements in the buffer to use
-        if len(u_buf['ctrl']) > 7:
+        if len(u_buf['ctrl']) > emergency_brake_distance:
             u_buf['ctrl'].pop(0)
             
             trajectory_buf = trajectory_buf[1:]
+            # Even when following the old trajectory, we need to update it to the position of the robot
+            trajectory_buf[:,0:2] += [x[0]-trajectory_buf[0,0],x[1]-trajectory_buf[0,1]]
+            trajectory_buf[:,2] += x[2]- trajectory_buf[0,2]
+
+            # trajectory_buf[:,2] = trajectory_buf[:,2] + x[2]
 
             to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
             # speed_cost = speed_cost_gain * np.sign(trajectory[-1, 3]) * trajectory[-1, 3]

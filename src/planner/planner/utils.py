@@ -240,6 +240,7 @@ def nonlinear_model_numpy_stable(x, u, dt=dt):
     state.yaw = initial_state.yaw + initial_state.omega * dt
     ux = ux + cmd.throttle * dt
     v = (m*ux*v+dt*(Lf*kf-Lr*kr)*initial_state.omega - dt*kf*cmd.delta*ux - dt*m*ux**2*initial_state.omega)/(m*ux - dt*(kf+kr))
+    # Added sign(ux) to allow for reverse motion
     state.v = math.sqrt(ux**2 + v**2)*np.sign(ux)
     state.v = np.clip(state.v, min_speed, max_speed)
     state.omega = (Iz*ux*initial_state.omega+ dt*(Lf*kf-Lr*kr)*v - dt*Lf*kf*cmd.delta*ux)/(Iz*ux - dt*(Lf**2*kf+Lr**2*kr))

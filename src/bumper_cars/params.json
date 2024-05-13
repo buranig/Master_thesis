@@ -44,7 +44,8 @@
             "obstacle_cost_gain": 30,
             "heading_cost_gain": 1,
             "robot_stuck_flag_cons": 0.001,
-            "dilation_factor": 0.35
+            "dilation_factor": 0.35,
+            "emergency_brake_distance": 5
         },
     "LBP":
         {
@@ -62,7 +63,8 @@
             "obstacle_cost_gain": 50,
             "heading_cost_gain": 1,
             "robot_stuck_flag_cons": 0.001,
-            "dilation_factor": 0.35
+            "dilation_factor": 0.35,
+            "emergency_brake_distance": 8
         },
     "MPC":
         {

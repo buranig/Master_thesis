@@ -50,6 +50,7 @@ width_init = json_object["width"]
 height_init = json_object["height"]
 min_dist = json_object["min_dist"]
 to_goal_stop_distance = json_object["to_goal_stop_distance"]
+emergency_brake_distance = json_object["DWA"]["emergency_brake_distance"]
 update_dist = 2
 # N=3
 
@@ -519,9 +520,13 @@ class DWA_algorithm():
                             best_trajectory = trajectory
                             u_history = [delta]*len(trajectory)
             # print(time.time()-old_time)
-            if len(u_buf) > 4:              
+            if len(u_buf) > emergency_brake_distance:              
                 u_buf.pop(0)
-                trajectory_buf = trajectory_buf[1:]
+
+                trajectory_buf = trajectory_buf[0:]
+                # Even when following the old trajectory, we need to update it to the position of the robot
+                trajectory_buf[:,0:2] += [x[0]-trajectory_buf[0,0],x[1]-trajectory_buf[0,1]]
+                trajectory_buf[:,2] += x[2]- trajectory_buf[0,2]
 
                 to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
                 # speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])

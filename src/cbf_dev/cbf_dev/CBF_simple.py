@@ -36,7 +36,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
 
-robot_num = 15 #json_object["robot_num"]
+robot_num = 14 #json_object["robot_num"]
 safety_init = json_object["safety"]
 min_dist = json_object["min_dist"]
 width_init = json_object["width"]
@@ -51,7 +51,7 @@ show_animation = json_object["show_animation"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_10.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_62.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -134,7 +134,7 @@ class CBF_algorithm():
                     # Perform some action when the condition is met
                     self.paths[i].pop(0)
                     if not self.paths[i]:
-                        print("Path complete for vehicle {i}!")
+                        print(f"Path complete for vehicle {i}!")
                         self.dxu[:, i] = 0
                         x[3,i] = 0
                         self.reached_goal[i] = True
@@ -159,7 +159,7 @@ class CBF_algorithm():
 
                     self.computational_time.append((time.time() - t_prev))
             
-                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i], dt)
 
             utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
 
@@ -191,7 +191,7 @@ class CBF_algorithm():
                     self.dxu[:, i] = 0
                     x[3,i] = 0
                 else:
-                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i], dt)
                     
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if all(self.reached_goal):
@@ -268,7 +268,7 @@ class CBF_algorithm():
             v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
             scalar_prod = v @ arr
 
-            if j == i or dist > 3* safety_radius or scalar_prod < 0: 
+            if j == i or dist > 3 * safety_radius: 
                 plt.plot
                 continue
 
@@ -345,6 +345,8 @@ class CBF_algorithm():
         try:
             sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
             self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
+            circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius+ Kv * abs(x[3, i]), color='b', fill=False)
+            self.ax.add_patch(circle2)
         except:
             print(f"QP solver failed for robot {i}! Emergency stop.") 
             if x[3,i] > 0:
@@ -352,8 +354,6 @@ class CBF_algorithm():
             else:
                 self.dxu[0,i] = (x[3,i] - 0)/dt
             self.solver_failure += 1
-            # circle2 = plt.Circle((x[0,i], x[1,i]), 3*safety_radius, color='b', fill=False)
-            # self.ax.add_patch(circle2)
 
         if self.dxu[0,i] > max_acc or self.dxu[0,i] < min_acc:
             print("Throttle out of bounds: ")
@@ -499,7 +499,7 @@ def main1(args=None):
     v = initial_state['v']
 
     # Step 3: Create an array x with the initial values
-    x = np.array([[-5.0, 5.0], [0.0, 0.0], [0.0, -np.pi], [0.0, 0.0]])
+    x = np.array([[-5.0, 5.0], [0.0, 0.1], [-np.pi, 0.0], [0.0, 0.0], [0.0, 0.0]])
     u = np.array([[0, 0], [0, 0]])
     targets = [[5.0, 0.0], [-5.0, 0.0]]
 
@@ -510,7 +510,7 @@ def main1(args=None):
     # Step 5: Extract the target coordinates from the paths
     # targets = [[path[0].x, path[0].y] for path in paths]
 
-    cbf = CBF_algorithm(targets, paths, robot_num=x.shape[1])
+    cbf = CBF_algorithm(targets, paths, robot_num=x.shape[1], ax=ax)
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
         plt.cla()
@@ -597,7 +597,7 @@ def main2(args=None):
                 # Perform some action when the condition is met
                 paths[i].pop(0)
                 if not paths[i]:
-                    print("Path complete for vehicle {i}!")
+                    print(f"Path complete for vehicle {i}!")
                     return
                 cbf.targets[i] = (paths[i][0].x, paths[i][0].y)
 
@@ -641,9 +641,10 @@ def main_seed(args=None):
     y = initial_state['y']
     yaw = initial_state['yaw']
     v = initial_state['v']
+    omega = [0.0]*len(initial_state['x'])
 
     # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
+    x = np.array([x0, y, yaw, v, omega])
     u = np.zeros((2, robot_num))
     
     trajectory = np.zeros((x.shape[0]+u.shape[0], robot_num, 1))

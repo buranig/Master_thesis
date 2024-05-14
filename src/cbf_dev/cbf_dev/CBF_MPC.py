@@ -41,8 +41,7 @@ Kv = json_object["CBF_simple"]["Kv"] # interval [0.5-1]
 Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
-
-robot_num = 15 # json_object["robot_num"]
+robot_num = 14 # json_object["robot_num"]
 safety_init = json_object["safety"]
 min_dist = json_object["min_dist"]
 width_init = json_object["width"]
@@ -59,7 +58,7 @@ dilation_factor = json_object["LBP"]["dilation_factor"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_10.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_63.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -135,7 +134,6 @@ class CBF_MPC_algorithm():
         self.predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 3]))
         for i in range(robot_num):
             self.predicted_trajectory[i] = np.full((int(predict_time/dt), 3), x[0:3,i])
-        self.lbp = LBP.LBP_algorithm(self.predicted_trajectory, paths, targets, dilated_traj, self.predicted_trajectory, ax, u_hist, robot_num=robot_num)
         self.mpc = MPC.MPC_DISCRETE_algorithm(self.predicted_trajectory, paths, targets, dilated_traj, self.predicted_trajectory, ax, u_hist, robot_num=robot_num)
 
     def run_cbf(self, x, break_flag):
@@ -146,7 +144,7 @@ class CBF_MPC_algorithm():
                     # Perform some action when the condition is met
                     self.paths[i].pop(0)
                     if not self.paths[i]:
-                        print("Path complete")
+                        print(f"Robot {i} reached the goal!")
                         self.dxu[:, i] = 0
                         x[3,i] = 0
                         self.reached_goal[i] = True
@@ -166,7 +164,7 @@ class CBF_MPC_algorithm():
 
                     self.computational_time.append((time.time() - t_prev))
             
-                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i], dt)
 
             utils.plot_robot_trajectory(x, self.dxu, self.predicted_trajectory, self.mpc.dilated_traj, self.targets, self.mpc.ax, i)
  
@@ -199,7 +197,7 @@ class CBF_MPC_algorithm():
                     x[3,i] = 0
                 else:
                     # print(f'Robot {i} - Throttle: {self.dxu[0,i]}, Delta: {self.dxu[1,i]}, speed: {x[3,i]}')
-                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i], dt)
                     
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if all(self.reached_goal):
@@ -278,7 +276,7 @@ class CBF_MPC_algorithm():
             v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
             scalar_prod = v @ arr
 
-            if j == i or dist > 3 * safety_radius or scalar_prod < 0: 
+            if j == i or dist > 3 * safety_radius: 
                 continue
 
             Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
@@ -427,7 +425,7 @@ class CBF_MPC_algorithm():
             v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
             scalar_prod = v @ arr
 
-            if j == i or dist > 3 * safety_radius or scalar_prod < 0: 
+            if j == i or dist > 2 * safety_radius: 
                 continue
 
             v_rel = np.array([x[3,j]*np.cos(x[2,j]) - x[3,i]*np.cos(x[2,i]), 
@@ -503,14 +501,6 @@ class CBF_MPC_algorithm():
         Lg_h = np.dot(gradH.T, g)
         G = np.vstack([G, -Lg_h])
         H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
-        
-        # safety = 1
-        # G = np.vstack([G, [[0, -x[3,i]*np.sin(x[2,i])], [0, x[3,i]*np.cos(x[2,i])]]])
-        # h1 = ((np.array([boundary_points[1]-safety, boundary_points[3]-safety])-x[0:2,i])/dt - np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])).reshape(2,1)
-        # H = np.vstack([H, h1])
-        # G = np.vstack([G, [[0, x[3,i]*np.sin(x[2,i])], [0, -x[3,i]*np.cos(x[2,i])]]])
-        # h1 = ((x[0:2,i] - np.array([boundary_points[0]+safety, boundary_points[2]+safety]))/dt + np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])).reshape(2,1)
-        # H = np.vstack([H, h1])
         
         # Input constraints
         G = np.vstack([G, [[0, 1], [0, -1]]])
@@ -753,9 +743,10 @@ def main2(args=None):
     y = initial_state['y']
     yaw = initial_state['yaw']
     v = initial_state['v']
+    omega = [0.0]*len(initial_state['x'])
 
     # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
+    x = np.array([x0, y, yaw, v, omega])
     
     # Step 4: Create paths for each robot
     traj = data['trajectories']
@@ -828,9 +819,10 @@ def main_seed(args=None):
     y = initial_state['y']
     yaw = initial_state['yaw']
     v = initial_state['v']
+    omega = [0.0]*len(initial_state['x'])
 
     # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
+    x = np.array([x0, y, yaw, v, omega])
     u = np.zeros((2, robot_num))
     
     trajectory = np.zeros((x.shape[0]+u.shape[0], robot_num, 1))

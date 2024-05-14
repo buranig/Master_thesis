@@ -161,8 +161,8 @@ class C3BF_algorithm():
             
                     # x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
                     x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
-                    if x[3,i] < 0.0:
-                        print(f"Negative speed for robot {i}!")
+                    # if x[3,i] < 0.0:
+                    #     print(f"Negative speed for robot {i}!")
                 x = self.check_collision(x, i)
 
             utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
@@ -272,7 +272,7 @@ class C3BF_algorithm():
             v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
             scalar_prod = v @ arr
 
-            if j == i or dist > 3 * safety_radius or scalar_prod < 0: 
+            if j == i or dist > 3 * safety_radius: 
                 continue
 
             v_rel = np.array([x[3,j]*np.cos(x[2,j]) - x[3,i]*np.cos(x[2,i]), 
@@ -416,7 +416,10 @@ class C3BF_algorithm():
             self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
         except:
             print(f"QP solver failed for robot {i}! Emergency stop.") 
-            self.dxu[0,i] = min_acc 
+            if x[3,i] > 0:
+                self.dxu[0,i] = (0 - x[3,i])/dt 
+            else:
+                self.dxu[0,i] = (x[3,i] - 0)/dt
             self.solver_failure += 1         
         
         if self.dxu[0,i] > max_acc or self.dxu[0,i] < min_acc:

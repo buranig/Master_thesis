@@ -163,7 +163,7 @@ def generate_lookup_table():
 
         i = 0
         for table in result:
-            xc, yc, yawc, kp = motion_model.generate_trajectory(
+            xc, yc, yawc, vc, kp = motion_model.generate_trajectory(
                 table[3], table[4], table[5], k0, v)
             for id, element in enumerate(kp): kp[id] = np.clip(element, -max_steer, max_steer) # clipping elements withing feasible bounds
             temp[v][i] = {}
@@ -171,6 +171,7 @@ def generate_lookup_table():
             temp[v][i]['x'] = xc
             temp[v][i]['y'] = yc
             temp[v][i]['yaw'] = yawc
+            temp[v][i]['v'] = vc
             i +=1
 
             if show_animation:
@@ -184,7 +185,7 @@ def generate_lookup_table():
             result = generate_path(target, k0, v, k=True)
             i = 0
             for table in result:
-                xc, yc, yawc, kp = motion_model.generate_trajectory(
+                xc, yc, yawc, vc, kp = motion_model.generate_trajectory(
                     table[3], table[4], table[5], k0, v)
                 for id, element in enumerate(kp): kp[id] = np.clip(element, -max_steer, max_steer) # clipping elements withing feasible bounds
                 temp[v][i] = {}
@@ -192,6 +193,7 @@ def generate_lookup_table():
                 temp[v][i]['x'] = xc
                 temp[v][i]['y'] = yc
                 temp[v][i]['yaw'] = yawc
+                temp[v][i]['v'] = vc
                 i +=1
 
                 if show_animation:
@@ -219,6 +221,7 @@ def generate_lookup_table():
             xc = traj[:, 0]
             yc = traj[:, 1]
             yawc = traj[:, 2]
+            vc = traj[:, 3]
             kp = [delta]*len(xc)
 
             temp[v][i] = {}
@@ -226,6 +229,7 @@ def generate_lookup_table():
             temp[v][i]['x'] = list(xc)
             temp[v][i]['y'] = list(yc)
             temp[v][i]['yaw'] = list(yawc)
+            temp[v][i]['v'] = list(vc)
             i +=1
             # print(f'len: {len(xc)}')
 

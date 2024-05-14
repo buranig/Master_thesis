@@ -269,17 +269,17 @@ class CBF_MPC_algorithm():
                       [0, x[3, i] / Lr],
                       [1, 0]]).reshape(4, 2)
 
+        P = np.identity(2) * 2
+        q = np.array([-2 * self.dxu[0, i], - 2 * self.dxu[1, i]])
+        
         for j in range(N):
             arr = np.array([x[0, j] - x[0, i], x[1, j] - x[1,i]])
             dist = np.linalg.norm(arr)
             v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
             scalar_prod = v @ arr
 
-            if j == i or dist > 3 * safety_radius: 
+            if j == i or dist > 3 * safety_radius or scalar_prod < 0: 
                 continue
-
-            P = np.identity(2) * 2
-            q = np.array([-2 * self.dxu[0, i], - 2 * self.dxu[1, i]])
 
             Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
             Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - x[1, j]) - np.sin(x[2, i]) * (x[0, i] - x[0, j]))

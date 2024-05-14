@@ -56,7 +56,7 @@ dt = 0.1
 WB = json_object["Controller"]["WB"] 
 L_d = json_object["Controller"]["L_d"] 
 
-debug = False
+debug = True
 
 color_dict = {
     0: "r",
@@ -88,7 +88,7 @@ class Dynamic_params:
 
         
 
-def predict_trajectory(initial_state: State, target, dynamic_params: Dynamic_params, model='linear'):
+def predict_trajectory(initial_state: State, target, dynamic_params: Dynamic_params, model='linear', ax=None):
     """
     Predicts the trajectory of a vehicle from an initial state to a target point.
 
@@ -141,8 +141,10 @@ def predict_trajectory(initial_state: State, target, dynamic_params: Dynamic_par
                 'key_release_event',
                 lambda event: [exit(0) if event.key == 'escape' else None])
             
-            plot_path(traj)
             plt.plot(initial_state.x, initial_state.y, 'k.')
+            utils.plot_robot(new_state.x, new_state.y, new_state.yaw, 0)
+            utils.plot_arrow(new_state.x, new_state.y, new_state.yaw, length=1, width=0.5, color='k')
+            utils.plot_arrow(new_state.x, new_state.y, new_state.yaw + cmd.delta, length=1, width=0.5, color='k')
             plt.plot(target[0], target[1], 'b.')
             plt.axis("equal")
             plt.grid(True)
@@ -380,18 +382,24 @@ def pure_pursuit_steer_control(target, pose):
 
     # this if/else condition should fix the buf of the waypoint behind the car
     if alpha > np.pi/2.0:
-        delta = max_steer
+        alpha = np.pi - alpha
+        desired_speed = -2
+        # delta = max_steer
     elif alpha < -np.pi/2.0:
-        delta = -max_steer
+        alpha = -np.pi - alpha
+        desired_speed = -2
+        # delta = -max_steer
     else:
+        desired_speed = 2
         # ref: https://www.shuffleai.blog/blog/Three_Methods_of_Vehicle_Lateral_Control.html
-        delta = utils.normalize_angle(math.atan2(2.0 * WB *  math.sin(alpha), L_d))
+    
+    delta = utils.normalize_angle(math.atan2(2.0 * WB *  math.sin(alpha), L_d))
 
     # decreasing the desired speed when turning
-    if delta > math.radians(10) or delta < -math.radians(10):
-        desired_speed = 2
-    else:
-        desired_speed = max_speed
+    # if delta > math.radians(10) or delta < -math.radians(10):
+    #     desired_speed = 2
+    # else:
+    #     desired_speed = max_speed
 
     # print(f'Steering angle: {delta} and desired speed: {desired_speed}')
     throttle = 3 * (desired_speed-pose.v)
@@ -399,7 +407,7 @@ def pure_pursuit_steer_control(target, pose):
 
 def main():
     initial_state = State(x=0.0, y=0.0, yaw=0.0, v=0.0, omega=0.0)
-    target = [-5, 0]
+    target = [5, 0]
     # trajectory, tx, ty = predict_trajectory(initial_state, target)
     trajectory = predict_trajectory(initial_state, target, 'linear')
 
@@ -443,10 +451,11 @@ def main():
     dyn_param = Dynamic_params()
 
     fig = plt.figure(0, figsize=(10, 10))
+    ax = fig.add_subplot(111)
     for i, Cf_i in enumerate(Cf_range):
         dyn_param.Cf = Cf_i
         dyn_param.Cr = Cf_i
-        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, model='non_linear', dynamic_params=dyn_param)
+        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, model='non_linear', dynamic_params=dyn_param, ax=ax)
 
         # print(f'Cf: {dyn_param.Cf}')
         x = []

@@ -51,7 +51,7 @@ show_animation = json_object["show_animation"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_7.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_10.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -347,10 +347,13 @@ class CBF_algorithm():
             self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
         except:
             print(f"QP solver failed for robot {i}! Emergency stop.") 
-            self.dxu[0,i] = min_acc 
+            if x[3,i] > 0:
+                self.dxu[0,i] = (0 - x[3,i])/dt 
+            else:
+                self.dxu[0,i] = (x[3,i] - 0)/dt
             self.solver_failure += 1
-            circle2 = plt.Circle((x[0,i], x[1,i]), 3*safety_radius, color='b', fill=False)
-            self.ax.add_patch(circle2)
+            # circle2 = plt.Circle((x[0,i], x[1,i]), 3*safety_radius, color='b', fill=False)
+            # self.ax.add_patch(circle2)
 
         if self.dxu[0,i] > max_acc or self.dxu[0,i] < min_acc:
             print("Throttle out of bounds: ")

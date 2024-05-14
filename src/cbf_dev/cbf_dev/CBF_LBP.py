@@ -131,9 +131,9 @@ class CBF_algorithm():
         self.reached_goal = [False]*robot_num
         self.computational_time = []
         self.solver_failure = 0
-        self.predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 3]))
+        self.predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 4]))
         for i in range(robot_num):
-            self.predicted_trajectory[i] = np.full((int(predict_time/dt), 3), x[0:3,i])
+            self.predicted_trajectory[i] = np.full((int(predict_time/dt), 4), x[0:4,i])
         self.lbp = LBP.LBP_algorithm(self.predicted_trajectory, paths, targets, dilated_traj, self.predicted_trajectory, ax, u_hist, robot_num=robot_num)
 
     def run_cbf(self, x, break_flag):
@@ -144,7 +144,7 @@ class CBF_algorithm():
                     # Perform some action when the condition is met
                     self.paths[i].pop(0)
                     if not self.paths[i]:
-                        print("Path complete for vehicle {i}!")
+                        print(f"Path complete for vehicle {i}!")
                         self.dxu[:, i] = 0
                         x[3,i] = 0
                         self.reached_goal[i] = True
@@ -163,10 +163,13 @@ class CBF_algorithm():
                         self.control_robot(i, x)
 
                     self.computational_time.append((time.time() - t_prev))
-            
+
                     x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i], dt)
 
             utils.plot_robot_trajectory(x, self.dxu, self.predicted_trajectory, self.lbp.dilated_traj, self.targets, self.lbp.ax, i)
+            # if self.predicted_trajectory[i][-1, 3]<0.0:
+            #     print(f'Vehicle {i} going backwards')
+            #     print('\n')
 
         if all(self.reached_goal):
             break_flag = True
@@ -197,7 +200,7 @@ class CBF_algorithm():
                     x[3,i] = 0
                 else:
                     # print(f'Robot {i} - Throttle: {self.dxu[0,i]}, Delta: {self.dxu[1,i]}, speed: {x[3,i]}')
-                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i], dt)
                     
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if all(self.reached_goal):
@@ -266,6 +269,9 @@ class CBF_algorithm():
                       [0, x[3, i] * np.cos(x[2, i])],
                       [0, x[3, i] / Lr],
                       [1, 0]]).reshape(4, 2)
+        
+        P = np.identity(2) * 2
+        q = np.array([-2 * self.dxu[0, i], - 2 * self.dxu[1, i]])
 
         for j in range(N):
             arr = np.array([x[0, j] - x[0, i], x[1, j] - x[1,i]])
@@ -273,11 +279,8 @@ class CBF_algorithm():
             v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
             scalar_prod = v @ arr
 
-            if j == i or dist > 3 * safety_radius or scalar_prod < 0: 
+            if j == i or dist > 3 * safety_radius: 
                 continue
-
-            P = np.identity(2) * 2
-            q = np.array([-2 * self.dxu[0, i], - 2 * self.dxu[1, i]])
 
             Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
             Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - x[1, j]) - np.sin(x[2, i]) * (x[0, i] - x[0, j]))
@@ -381,7 +384,7 @@ class CBF_algorithm():
         else: 
             ob = [self.lbp.dilated_traj[idx] for idx in range(len(self.lbp.dilated_traj)) if idx != i]
             
-            self.dxu[:, i], self.predicted_trajectory[i], self.lbp.u_hist[i] = LBP.lbp_control(x[:,i], self.targets[i], ob, self.lbp.u_hist[i], self.predicted_trajectory[i])
+            self.dxu[:, i], self.predicted_trajectory[i], self.lbp.u_hist[i] = self.lbp.lbp_control(x[:,i], ob, i)
             self.dxu[0, i] = np.clip((self.lbp.u_hist[i]['v_goal']-x[3,i])/dt, car_min_acc, car_max_acc)
 
             self.lbp.dilated_traj[i] = LineString(zip(self.predicted_trajectory[i][:, 0], self.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
@@ -426,7 +429,7 @@ class CBF_algorithm():
             v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
             scalar_prod = v @ arr
 
-            if j == i or dist > 3 * safety_radius or scalar_prod < 0: 
+            if j == i or dist > 3 * safety_radius: 
                 continue
 
             v_rel = np.array([x[3,j]*np.cos(x[2,j]) - x[3,i]*np.cos(x[2,i]), 
@@ -784,7 +787,7 @@ def main2(args=None):
                 # Perform some action when the condition is met
                 paths[i].pop(0)
                 if not paths[i]:
-                    print("Path complete for vehicle {i}!")
+                    print(f"Path complete for vehicle {i}!")
                     return
                 cbf.targets[i] = (paths[i][0].x, paths[i][0].y)
 

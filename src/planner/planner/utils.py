@@ -268,48 +268,39 @@ def pure_pursuit_steer_control(target, pose):
         
     alpha = normalize_angle(math.atan2(target[1] - pose.y, target[0] - pose.x) - pose.yaw)
 
-    # this if/else condition should fix the buf of the waypoint behind the car
-    if alpha > np.pi/2.0:
-        delta = max_steer
-    elif alpha < -np.pi/2.0:
-        delta = -max_steer
-    else:
-        # ref: https://www.shuffleai.blog/blog/Three_Methods_of_Vehicle_Lateral_Control.html
-        delta = normalize_angle(math.atan2(2.0 * WB *  math.sin(alpha), Lf))
+    # # this if/else condition should fix the bug of the waypoint behind the car
+    # if alpha > np.pi/2.0:
+    #     delta = max_steer
+    # elif alpha < -np.pi/2.0:
+    #     delta = -max_steer
+    # else:
+    #     # ref: https://www.shuffleai.blog/blog/Three_Methods_of_Vehicle_Lateral_Control.html
+    #     delta = normalize_angle(math.atan2(2.0 * WB *  math.sin(alpha), Lf))
 
-    # decreasing the desired speed when turning
-    if delta > math.radians(10) or delta < -math.radians(10):
-        desired_speed = 2
+    # # decreasing the desired speed when turning
+    # if delta > math.radians(10) or delta < -math.radians(10):
+    #     desired_speed = 2
+    # else:
+    #     desired_speed = max_speed
+
+    if alpha > np.pi/2.0:
+        alpha = np.pi - alpha
+        desired_speed = -2
+        # delta = max_steer
+    elif alpha < -np.pi/2.0:
+        alpha = -np.pi - alpha
+        desired_speed = -2
+        # delta = -max_steer
     else:
-        desired_speed = max_speed
+        desired_speed = 2
+        # ref: https://www.shuffleai.blog/blog/Three_Methods_of_Vehicle_Lateral_Control.html
+    
+    delta = normalize_angle(math.atan2(2.0 * WB *  math.sin(alpha), Lf))
 
     delta = np.clip(delta, -max_steer, max_steer)
     # delta = delta
     throttle = 3 * (desired_speed-pose.v)
     return throttle, delta
-
-@staticmethod
-def dist(point1, point2):
-    """
-    Calculate the Euclidean distance between two points.
-
-    Args:
-        point1 (tuple): The coordinates of the first point in the form (x1, y1).
-        point2 (tuple): The coordinates of the second point in the form (x2, y2).
-
-    Returns:
-        float: The Euclidean distance between the two points.
-    """
-    x1, y1 = point1
-    x2, y2 = point2
-
-    x1 = float(x1)
-    x2 = float(x2)
-    y1 = float(y1)
-    y2 = float(y2)
-
-    distance = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-    return float(distance)
 
 def normalize_angle(angle):
     """
@@ -756,11 +747,11 @@ def predict_trajectory(x_init, a, delta, predict_time=predict_time, dt=dt):
     trajectory = np.array(x)
     time = 0
     while time < predict_time:
-        x = motion(x, [a, delta], dt)
+        # x = motion(x, [a, delta], dt)
+        x = nonlinear_model_numpy_stable(x, [a, delta], dt)
         trajectory = np.vstack((trajectory, x))
         time += dt
     return trajectory
-
 
 def pacejka_magic_formula(alpha):
     """

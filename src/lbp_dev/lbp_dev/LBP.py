@@ -387,10 +387,11 @@ class LBP_algorithm():
             for id, info in dict.items():
 
                 # old_time = time.time()
-                geom = np.zeros((len(info['x']),3))
+                geom = np.zeros((len(info['x']),4))
                 geom[:,0] = info['x']
                 geom[:,1] = info['y']
                 geom[:,2] = info['yaw']
+                geom[:,3] = info['v']
                 geom[:,0:2] = (geom[:,0:2]) @ utils.rotateMatrix(-x[2]) + [x[0],x[1]]
                 
                 geom[:,2] = geom[:,2] + x[2] #bringing also the yaw angle in the new frame
@@ -549,9 +550,9 @@ def main_seed():
     trajectory = np.zeros((x.shape[0], robot_num, 1))
     trajectory[:, :, 0] = x
 
-    predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 3]))
+    predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 4]))
     for i in range(robot_num):
-        predicted_trajectory[i] = np.full((int(predict_time/dt), 3), x[0:3,i])
+        predicted_trajectory[i] = np.full((int(predict_time/dt), 4), x[0:4,i])
 
     # Step 4: Create paths for each robot
     traj = seed['trajectories']

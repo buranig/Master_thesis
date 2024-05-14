@@ -36,7 +36,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
 
-robot_num = 14 #json_object["robot_num"]
+robot_num = 5 #json_object["robot_num"]
 safety_init = json_object["safety"]
 min_dist = json_object["min_dist"]
 width_init = json_object["width"]
@@ -51,7 +51,7 @@ show_animation = json_object["show_animation"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_62.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_2.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -111,7 +111,7 @@ def check_goal_reached(x, targets, i, distance=0.5):
     """
     dist_to_goal = math.hypot(x[0, i] - targets[i][0], x[1, i] - targets[i][1])
     if dist_to_goal <= distance:
-        print("Goal!!")
+        print(f"Vehicle {i} reached goal!")
         return True
     return False
 
@@ -345,8 +345,9 @@ class CBF_algorithm():
         try:
             sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
             self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
-            circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius+ Kv * abs(x[3, i]), color='b', fill=False)
-            self.ax.add_patch(circle2)
+            if show_animation:
+                circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius+ Kv * abs(x[3, i]), color='b', fill=False)
+                self.ax.add_patch(circle2)
         except:
             print(f"QP solver failed for robot {i}! Emergency stop.") 
             if x[3,i] > 0:

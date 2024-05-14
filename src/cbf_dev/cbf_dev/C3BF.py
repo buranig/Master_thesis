@@ -47,10 +47,11 @@ boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_
 check_collision_bool = False
 add_noise = json_object["add_noise"]
 noise_scale_param = json_object["noise_scale_param"]
+show_animation = json_object["show_animation"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_63.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_60.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -110,7 +111,7 @@ def check_goal_reached(x, targets, i, distance=0.5):
     """
     dist_to_goal = math.hypot(x[0, i] - targets[i][0], x[1, i] - targets[i][1])
     if dist_to_goal <= distance:
-        print("Goal!!")
+        print(f"Vehicle {i} reached goal!")
         return True
     return False
 
@@ -369,8 +370,9 @@ class C3BF_algorithm():
             else:
                 self.dxu[0,i] = (x[3,i] - 0)/dt
             self.solver_failure += 1         
-        circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius, color='b', fill=False)
-        self.ax.add_patch(circle2)
+        if show_animation:
+            circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius, color='b', fill=False)
+            self.ax.add_patch(circle2)
         if self.dxu[0,i] > max_acc or self.dxu[0,i] < min_acc:
             print("Throttle out of bounds: ")
             print(self.dxu[0,i])
@@ -518,6 +520,10 @@ def main_seed(args=None):
 
     # Step 3: Create an array x with the initial values
     x = np.array([x0, y, yaw, v, omega])
+    u = np.zeros((2, robot_num))
+
+    trajectory = np.zeros((x.shape[0]+u.shape[0], robot_num, 1))
+    trajectory[:, :, 0] = np.concatenate((x,u))
     
     # Step 4: Create paths for each robot
     traj = data['trajectories']
@@ -536,6 +542,8 @@ def main_seed(args=None):
         
         x, break_flag = c3bf.run_3cbf(x, break_flag) 
         # x, break_flag = c3bf.go_to_goal(x, break_flag) 
+
+        trajectory = np.dstack([trajectory, np.concatenate((x, c3bf.dxu))])
         
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")
@@ -544,6 +552,13 @@ def main_seed(args=None):
 
         if break_flag:
             break
+    
+    print("Done")
+    if show_animation:
+        for i in range(robot_num):
+            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
+        plt.pause(0.0001)
+        plt.show()
         
 if __name__=='__main__':
     main_seed()

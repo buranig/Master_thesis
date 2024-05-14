@@ -468,14 +468,14 @@ class MPC_DISCRETE_algorithm():
 
         elif min_cost == np.inf:
             # emergency stop
-            print("Emergency stop")
+            print(f"Emergency stop for vehicle {i}")
             if x[3]>0:
                 best_u = [min_acc, 0]
             else:
                 best_u = [max_acc, 0]
-
-            # TODO: add prediction trajectory for emergency stop
-            best_trajectory = np.array([x[0:3], x[0:3]]*int(predict_time/dt))
+            
+            best_trajectory = utils.predict_trajectory(x, best_u[0], best_u[1], predict_time)
+            
             u_history['throttle'] = [min_acc]*int(predict_time/dt)
             u_history['steering'] = [0]*int(predict_time/dt)
 
@@ -530,7 +530,7 @@ class MPC_DISCRETE_algorithm():
         """
         dist_to_goal = math.hypot(x[0, i] - self.targets[i][0], x[1, i] - self.targets[i][1])
         if dist_to_goal <= distance:
-            print("Goal!!")
+            print(f"Vehicle {i} reached goal!")
             self.dilated_traj[i] = Point(x[0, i], x[1, i]).buffer(L/2, cap_style=3)
             self.predicted_trajectory[i] = np.array([x[0:-1, i]]*int(predict_time/dt))
             return True

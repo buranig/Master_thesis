@@ -5,7 +5,7 @@ import seaborn as sns
 import numpy as np
 
 # Read the CSV file
-data = pd.read_csv('src/seed_simulation/seed_simulation/seed_sim.csv')
+data = pd.read_csv('src/seed_simulation/seed_simulation/seed_sim1.csv')
 filename = 'src/seed_simulation/seed_simulation/seed_sim.csv'
 # data = data.to_numpy()
 fontsize = 25

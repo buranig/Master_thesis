@@ -46,6 +46,7 @@ c_a = json_object["Car_model"]["c_a"]
 c_r1 = json_object["Car_model"]["c_r1"]
 WB = json_object["Controller"]["WB"]
 predict_time = json_object["LBP"]["predict_time"] # [s]
+show_animation = json_object["show_animation"]
 
 def motion(x, u, dt):
     """
@@ -379,7 +380,8 @@ def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax,
     plot_robot(x[0, i], x[1, i], x[2, i], i)
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
     plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
-    ax.annotate(str(i), (float(predicted_trajectory[i][0, 0]), float(predicted_trajectory[i][0, 1])))
+    if show_animation:
+        ax.annotate(str(i), (float(predicted_trajectory[i][0, 0]), float(predicted_trajectory[i][0, 1])))
 
 def plot_arrow(x, y, yaw, label=None, length=0.5, width=0.1, color='k'):  # pragma: no cover
     plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
@@ -416,7 +418,8 @@ def plot_robot_and_arrows(i, x, u, targets, ax):
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
     plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
     plt.plot(targets[i][0], targets[i][1], "x", color = color_dict[i])
-    ax.annotate(str(i), (float(x[0, i]), float(x[1, i])))
+    if show_animation:
+        ax.annotate(str(i), (float(x[0, i]), float(x[1, i])))
 
 def normalize_angle_array(angle):
     """

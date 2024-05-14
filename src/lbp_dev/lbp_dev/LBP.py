@@ -39,7 +39,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 
 WB = json_object["Controller"]["WB"] # Wheel base
-robot_num = 15 #json_object["robot_num"]
+robot_num = 5 #json_object["robot_num"]
 safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
@@ -61,7 +61,7 @@ color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:or
 with open('/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP.json', 'r') as file:
     data = json.load(file)
 
-with open('/home/giacomo/thesis_ws/src/seeds/seed_10.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_1.json', 'r') as file:
     seed = json.load(file)
 
 def calc_dynamic_window(x):
@@ -249,7 +249,7 @@ class LBP_algorithm():
                         self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
 
                 if self.check_goal_reached(x, i):
-                    print(f"Vehicle {i} reached goal!!")
+                    # print(f"Vehicle {i} reached goal!!")
                     u[:, i] = np.zeros(2)
                     x[3, i] = 0
                     self.reached_goal[i] = True
@@ -448,20 +448,23 @@ class LBP_algorithm():
 
             if min_cost >= final_cost:
                 min_cost = final_cost
-                # best_u = [(u_buf['v_goal']-x[3])/dt, u_buf['ctrl'][1]]
-                best_u = [0, u_buf['ctrl'][1]]
+                best_u = [(u_buf['v_goal']-x[3])/dt, u_buf['ctrl'][1]]
+                # best_u = [0, u_buf['ctrl'][1]]
                 best_trajectory = trajectory_buf
                 u_history['ctrl'] = u_buf['ctrl']
 
         elif min_cost == np.inf:
             # emergency stop
-            print("Emergency stop")
+            print(f"Emergency stop for vehicle {i}")
             if x[3]>0:
                 best_u = [min_acc, 0]
             else:
                 best_u = [max_acc, 0]
-            best_trajectory = np.array([x[0:3], x[0:3]]*int(predict_time/dt))
-            u_history['ctrl'] = [min_acc, 0]*int(predict_time/dt)
+            
+            best_trajectory = utils.predict_trajectory(x, best_u[0], best_u[1], predict_time)
+            # best_trajectory = np.array([x[0:3], x[0:3]]*int(predict_time/dt))
+            u_history['ctrl'] = [0.0]*int(predict_time/dt)
+            u_history['v_goal'] = 0.0
 
 
         return best_u, best_trajectory, u_history
@@ -515,7 +518,7 @@ class LBP_algorithm():
         """
         dist_to_goal = math.hypot(x[0, i] - self.targets[i][0], x[1, i] - self.targets[i][1])
         if dist_to_goal <= distance:
-            print("Goal!!")
+            print(f"Vehicle {i} reached goal!")
             self.dilated_traj[i] = Point(x[0, i], x[1, i]).buffer(L/2, cap_style=3)
             self.predicted_trajectory[i] = np.array([x[0:-1, i]]*int(predict_time/dt))
             return True

@@ -25,23 +25,23 @@ with open(path, 'r') as openfile:
     json_object = json.load(openfile)
 
 L = json_object["Car_model"]["L"]
-max_steer = json_object["CBF_simple"]["max_steer"]  # [rad] max steering angle
+max_steer = json_object["C3BF"]["max_steer"]  # [rad] max steering angle
 max_speed = json_object["Car_model"]["max_speed"] # [m/s]
 min_speed = json_object["Car_model"]["min_speed"] # [m/s]
-max_acc = json_object["CBF_simple"]["max_acc"] 
-min_acc = json_object["CBF_simple"]["min_acc"] 
+max_acc = json_object["C3BF"]["max_acc"] 
+min_acc = json_object["C3BF"]["min_acc"] 
 car_max_acc = json_object["Controller"]["max_acc"]
 car_min_acc = json_object["Controller"]["min_acc"]
 dt = json_object["Controller"]["dt"]
-safety_radius = json_object["CBF_simple"]["safety_radius"]
-barrier_gain = json_object["CBF_simple"]["barrier_gain"]
-arena_gain = json_object["CBF_simple"]["arena_gain"]
-Kv = json_object["CBF_simple"]["Kv"] # interval [0.5-1]
+safety_radius = json_object["C3BF"]["safety_radius"]
+barrier_gain = json_object["C3BF"]["barrier_gain"]
+arena_gain = json_object["C3BF"]["arena_gain"]
+Kv = json_object["C3BF"]["Kv"] # interval [0.5-1]
 Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
 
-robot_num = 14 #json_object["robot_num"]
+robot_num = 5 #json_object["robot_num"]
 safety_init = json_object["safety"]
 min_dist = json_object["min_dist"]
 width_init = json_object["width"]
@@ -58,7 +58,7 @@ dilation_factor = json_object["LBP"]["dilation_factor"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_63.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_2.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -118,7 +118,7 @@ def check_goal_reached(x, targets, i, distance=0.5):
     """
     dist_to_goal = math.hypot(x[0, i] - targets[i][0], x[1, i] - targets[i][1])
     if dist_to_goal <= distance:
-        print("Goal!!")
+        print(f"Vehicle {i} reached goal!")
         return True
     return False
 

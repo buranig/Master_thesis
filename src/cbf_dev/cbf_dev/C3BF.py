@@ -127,6 +127,16 @@ class C3BF_algorithm():
         self.solver_failure = 0
         self.ax = ax
 
+    def debug_info(self):
+        print(f"Solver failure: {self.solver_failure}\n")
+        print(f'Paths: {self.paths}\n')
+        print(f'Targets: {self.targets}\n')
+        print(f'Robot num: {self.robot_num}\n')
+        print(f'Computational time: {self.computational_time}\n')
+        print(f'Reached goal: {self.reached_goal}\n')
+        print(f'dxu: {self.dxu}\n')
+        print(f'Solver failure: {self.solver_failure}\n')
+
     def run_3cbf(self, x, break_flag):
         for i in range(self.robot_num):
             if not self.reached_goal[i]:
@@ -144,7 +154,7 @@ class C3BF_algorithm():
                         self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
                 
                 if check_goal_reached(x, self.targets, i):
-                    print(f"Vehicle {i} reached goal!!")
+                    # print(f"Vehicle {i} reached goal!!")
                     self.dxu[:, i] = 0
                     x[3,i] = 0
                     self.reached_goal[i] = True
@@ -176,26 +186,27 @@ class C3BF_algorithm():
         for i in range(self.robot_num):
             # Step 9: Check if the distance between the current position and the target is less than 5
             if not self.reached_goal[i]:
-                if add_noise: 
-                    noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
-                    noisy_pos = x + noise
-                    t_prev = time.time()
-                    self.control_robot(i, noisy_pos)
-                    self.computational_time.append((time.time() - t_prev))
-                    plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
-                else:
-                    t_prev = time.time()
-                    self.control_robot(i, x)
-                    self.computational_time.append((time.time() - t_prev)) 
-                                              
-                # If goal is reached, stop the robot
-                if check_goal_reached(x, self.targets, i, distance=to_goal_stop_distance):
-                    self.reached_goal[i] = True
-                    self.dxu[:,i]= 0
+                if check_goal_reached(x, self.targets, i):
+                    # print(f"Vehicle {i} reached goal!!")
+                    self.dxu[:, i] = 0
                     x[3,i] = 0
+                    self.reached_goal[i] = True
                 else:
-                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i], dt)
+                    t_prev = time.time()
+                    if add_noise:
+                        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.02*noise_scale_param, 1).reshape(1,1)], axis=0)
+                        noisy_pos = x + noise
+                        self.control_robot(i, noisy_pos)
+                        plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
+                    else:
+                        self.control_robot(i, x)
 
+                    self.computational_time.append((time.time() - t_prev))
+            
+                    # x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
+                    # if x[3,i] < 0.0:
+                    #     print(f"Negative speed for robot {i}!")
                 x = self.check_collision(x, i) 
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if all(self.reached_goal):
@@ -540,8 +551,8 @@ def main_seed(args=None):
             'key_release_event',
             lambda event: [exit(0) if event.key == 'escape' else None])
         
-        x, break_flag = c3bf.run_3cbf(x, break_flag) 
-        # x, break_flag = c3bf.go_to_goal(x, break_flag) 
+        # x, break_flag = c3bf.run_3cbf(x, break_flag) 
+        x, break_flag = c3bf.go_to_goal(x, break_flag) 
 
         trajectory = np.dstack([trajectory, np.concatenate((x, c3bf.dxu))])
         

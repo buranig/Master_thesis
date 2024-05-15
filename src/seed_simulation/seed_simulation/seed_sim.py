@@ -731,8 +731,8 @@ def main():
     # time. sleep(5) # delays for 5 seconds
     # Load the seed from a file
     path = pathlib.Path('/home/giacomo/thesis_ws/src/seeds/')
-    dir_list = os.listdir(path)
-    # dir_list = ['circular_seed_58.json']
+    # dir_list = os.listdir(path)
+    dir_list = ['circular_seed_60.json']
 
     csv_file = '/home/giacomo/thesis_ws/src/seed_simulation/seed_simulation/seed_sim1.csv'
     df = pd.read_csv(csv_file)
@@ -756,106 +756,106 @@ def main():
         data_process = DataProcessor(robot_num, file_name=filename, seed=seed)
         data = []
 
-        if filename in list(df["File Name"]):   
-            print(f"File {filename} already exists in the csv file, checking for single methods...\n")      
-            df_temp = df.loc[df["File Name"] == filename]
-            # if 'DWA' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
-            #     dwa_trajectory, dwa_computational_time = dwa_sim(seed, robot_num)   
-            #     print(f"DWA average computational time: {sum(dwa_computational_time) / len(dwa_computational_time)}\n")
-            #     dwa_data = data_process.post_process_simultation(dwa_trajectory, dwa_computational_time, method='DWA')
-            #     data.append(dwa_data)
-            #     plt.close()
-            # else: 
-            #     print(f"\tDWA already executed for {filename}, for noise scaling {noise_scale_param}.\n")
+        # if filename in list(df["File Name"]):   
+        #     print(f"File {filename} already exists in the csv file, checking for single methods...\n")      
+        #     df_temp = df.loc[df["File Name"] == filename]
+        #     # if 'DWA' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
+        #     #     dwa_trajectory, dwa_computational_time = dwa_sim(seed, robot_num)   
+        #     #     print(f"DWA average computational time: {sum(dwa_computational_time) / len(dwa_computational_time)}\n")
+        #     #     dwa_data = data_process.post_process_simultation(dwa_trajectory, dwa_computational_time, method='DWA')
+        #     #     data.append(dwa_data)
+        #     #     plt.close()
+        #     # else: 
+        #     #     print(f"\tDWA already executed for {filename}, for noise scaling {noise_scale_param}.\n")
 
-            # if 'MPC' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
-            #     mpc_trajectory, mpc_computational_time = mpc_sim(seed, robot_num)
-            #     print(f"MPC average computational time: {sum(mpc_computational_time) / len(mpc_computational_time)}\n")
-            #     mpc_data = data_process.post_process_simultation(mpc_trajectory, mpc_computational_time, method="MPC")
-            #     data.append(mpc_data)
-            #     plt.close()
-            # else:
-            #     print(f"\tMPC already executed for {filename}, for noise scaling {noise_scale_param}.\n")
+        #     # if 'MPC' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
+        #     #     mpc_trajectory, mpc_computational_time = mpc_sim(seed, robot_num)
+        #     #     print(f"MPC average computational time: {sum(mpc_computational_time) / len(mpc_computational_time)}\n")
+        #     #     mpc_data = data_process.post_process_simultation(mpc_trajectory, mpc_computational_time, method="MPC")
+        #     #     data.append(mpc_data)
+        #     #     plt.close()
+        #     # else:
+        #     #     print(f"\tMPC already executed for {filename}, for noise scaling {noise_scale_param}.\n")
             
-            if 'C3BF' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
-                c3bf_trajectory, c3bf_computational_time, c3bf_solver_failure = c3bf_sim(seed, robot_num)
-                print(f"C3BF average computational time: {sum(c3bf_computational_time) / len(c3bf_computational_time)}\n")
-                c3bf_data = data_process.post_process_simultation(c3bf_trajectory, c3bf_computational_time, method='C3BF', 
-                                                                solver_failure=c3bf_solver_failure)
-                data.append(c3bf_data)
-                plt.close()
-            else:
-                print(f"\tC3BF already executed for {filename}, for noise scaling {noise_scale_param}.\n")
+        #     if 'C3BF' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
+        #         c3bf_trajectory, c3bf_computational_time, c3bf_solver_failure = c3bf_sim(seed, robot_num)
+        #         print(f"C3BF average computational time: {sum(c3bf_computational_time) / len(c3bf_computational_time)}\n")
+        #         c3bf_data = data_process.post_process_simultation(c3bf_trajectory, c3bf_computational_time, method='C3BF', 
+        #                                                         solver_failure=c3bf_solver_failure)
+        #         data.append(c3bf_data)
+        #         plt.close()
+        #     else:
+        #         print(f"\tC3BF already executed for {filename}, for noise scaling {noise_scale_param}.\n")
 
-            if 'CBF' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
-                cbf_trajectory, cbf_computational_time, cbf_solver_failure = cbf_sim(seed, robot_num)
-                print(f"CBF average computational time: {sum(cbf_computational_time) / len(cbf_computational_time)}\n")
-                cbf_data = data_process.post_process_simultation(cbf_trajectory, cbf_computational_time, method="CBF", 
-                                                                solver_failure=cbf_solver_failure)
-                data.append(cbf_data)
-                plt.close()
-            else:
-                print(f"\tCBF already executed for {filename}, for noise scaling {noise_scale_param}.\n")
+        #     if 'CBF' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
+        #         cbf_trajectory, cbf_computational_time, cbf_solver_failure = cbf_sim(seed, robot_num)
+        #         print(f"CBF average computational time: {sum(cbf_computational_time) / len(cbf_computational_time)}\n")
+        #         cbf_data = data_process.post_process_simultation(cbf_trajectory, cbf_computational_time, method="CBF", 
+        #                                                         solver_failure=cbf_solver_failure)
+        #         data.append(cbf_data)
+        #         plt.close()
+        #     else:
+        #         print(f"\tCBF already executed for {filename}, for noise scaling {noise_scale_param}.\n")
 
-            if 'LBP' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
-                lbp_trajectory, lbp_computational_time = lbp_sim(seed, robot_num)
-                print(f"LBP average computational time: {sum(lbp_computational_time) / len(lbp_computational_time)}\n")
-                lbp_data = data_process.post_process_simultation(lbp_trajectory, lbp_computational_time, method="LBP")
-                data.append(lbp_data)
-                plt.close()
-            else:
-                print(f"\tLBP already executed for {filename}, for noise scaling {noise_scale_param}.\n")
+        #     if 'LBP' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
+        #         lbp_trajectory, lbp_computational_time = lbp_sim(seed, robot_num)
+        #         print(f"LBP average computational time: {sum(lbp_computational_time) / len(lbp_computational_time)}\n")
+        #         lbp_data = data_process.post_process_simultation(lbp_trajectory, lbp_computational_time, method="LBP")
+        #         data.append(lbp_data)
+        #         plt.close()
+        #     else:
+        #         print(f"\tLBP already executed for {filename}, for noise scaling {noise_scale_param}.\n")
             
-            if 'C3BF_MPC' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
-                cbf_mpc_trajectory, cbf_mpc_computational_time, cbf_mpc_solver_failure = cbf_mpc_sim(seed, robot_num)
-                print(f"C3BF_MPC average computational time: {sum(cbf_mpc_computational_time) / len(cbf_mpc_computational_time)}\n")
-                cbf_mpc_data = data_process.post_process_simultation(cbf_mpc_trajectory, cbf_mpc_computational_time, method="C3BF_MPC", 
-                                                                     solver_failure=cbf_mpc_solver_failure)
-                data.append(cbf_mpc_data)
-                plt.close()
-            else:
-                print(f"\tC3BF_MPC already executed for {filename}, for noise scaling {noise_scale_param}.\n")
+        #     if 'C3BF_MPC' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
+        #         cbf_mpc_trajectory, cbf_mpc_computational_time, cbf_mpc_solver_failure = cbf_mpc_sim(seed, robot_num)
+        #         print(f"C3BF_MPC average computational time: {sum(cbf_mpc_computational_time) / len(cbf_mpc_computational_time)}\n")
+        #         cbf_mpc_data = data_process.post_process_simultation(cbf_mpc_trajectory, cbf_mpc_computational_time, method="C3BF_MPC", 
+        #                                                              solver_failure=cbf_mpc_solver_failure)
+        #         data.append(cbf_mpc_data)
+        #         plt.close()
+        #     else:
+        #         print(f"\tC3BF_MPC already executed for {filename}, for noise scaling {noise_scale_param}.\n")
 
-        else:
-            # print(f"File {filename}, for noise scaling {noise_scale_param} does not exist in the csv file, executing all methods...\n")
-            # dwa_trajectory, dwa_computational_time = dwa_sim(seed, robot_num)   
-            # print(f"DWA average computational time: {sum(dwa_computational_time) / len(dwa_computational_time)}\n")
-            # dwa_data = data_process.post_process_simultation(dwa_trajectory, dwa_computational_time, method='DWA')
-            # data.append(dwa_data)
-            # plt.close()
+        # else:
+        #     # print(f"File {filename}, for noise scaling {noise_scale_param} does not exist in the csv file, executing all methods...\n")
+        #     # dwa_trajectory, dwa_computational_time = dwa_sim(seed, robot_num)   
+        #     # print(f"DWA average computational time: {sum(dwa_computational_time) / len(dwa_computational_time)}\n")
+        #     # dwa_data = data_process.post_process_simultation(dwa_trajectory, dwa_computational_time, method='DWA')
+        #     # data.append(dwa_data)
+        #     # plt.close()
 
-            # mpc_trajectory, mpc_computational_time = mpc_sim(seed, robot_num)
-            # print(f"MPC average computational time: {sum(mpc_computational_time) / len(mpc_computational_time)}\n")
-            # mpc_data = data_process.post_process_simultation(mpc_trajectory, mpc_computational_time, method="MPC")
-            # data.append(mpc_data)
-            # plt.close()
+        #     # mpc_trajectory, mpc_computational_time = mpc_sim(seed, robot_num)
+        #     # print(f"MPC average computational time: {sum(mpc_computational_time) / len(mpc_computational_time)}\n")
+        #     # mpc_data = data_process.post_process_simultation(mpc_trajectory, mpc_computational_time, method="MPC")
+        #     # data.append(mpc_data)
+        #     # plt.close()
         
-            c3bf_trajectory, c3bf_computational_time, c3bf_solver_failure = c3bf_sim(seed, robot_num)
-            print(f"C3BF average computational time: {sum(c3bf_computational_time) / len(c3bf_computational_time)}\n")
-            c3bf_data = data_process.post_process_simultation(c3bf_trajectory, c3bf_computational_time, method='C3BF', 
-                                                            solver_failure=c3bf_solver_failure)
-            data.append(c3bf_data)
-            plt.close()
+        #     c3bf_trajectory, c3bf_computational_time, c3bf_solver_failure = c3bf_sim(seed, robot_num)
+        #     print(f"C3BF average computational time: {sum(c3bf_computational_time) / len(c3bf_computational_time)}\n")
+        #     c3bf_data = data_process.post_process_simultation(c3bf_trajectory, c3bf_computational_time, method='C3BF', 
+        #                                                     solver_failure=c3bf_solver_failure)
+        #     data.append(c3bf_data)
+        #     plt.close()
 
-            cbf_trajectory, cbf_computational_time, cbf_solver_failure = cbf_sim(seed, robot_num)
-            print(f"CBF average computational time: {sum(cbf_computational_time) / len(cbf_computational_time)}\n")
-            cbf_data = data_process.post_process_simultation(cbf_trajectory, cbf_computational_time, method="CBF", 
-                                                            solver_failure=cbf_solver_failure)
-            data.append(cbf_data)
-            plt.close()
+        #     cbf_trajectory, cbf_computational_time, cbf_solver_failure = cbf_sim(seed, robot_num)
+        #     print(f"CBF average computational time: {sum(cbf_computational_time) / len(cbf_computational_time)}\n")
+        #     cbf_data = data_process.post_process_simultation(cbf_trajectory, cbf_computational_time, method="CBF", 
+        #                                                     solver_failure=cbf_solver_failure)
+        #     data.append(cbf_data)
+        #     plt.close()
 
-            lbp_trajectory, lbp_computational_time = lbp_sim(seed, robot_num)
-            print(f"LBP average computational time: {sum(lbp_computational_time) / len(lbp_computational_time)}\n")
-            lbp_data = data_process.post_process_simultation(lbp_trajectory, lbp_computational_time, method="LBP")
-            data.append(lbp_data)
-            plt.close()
+        #     lbp_trajectory, lbp_computational_time = lbp_sim(seed, robot_num)
+        #     print(f"LBP average computational time: {sum(lbp_computational_time) / len(lbp_computational_time)}\n")
+        #     lbp_data = data_process.post_process_simultation(lbp_trajectory, lbp_computational_time, method="LBP")
+        #     data.append(lbp_data)
+        #     plt.close()
 
-            cbf_mpc_trajectory, cbf_mpc_computational_time, cbf_mpc_solver_failure = cbf_mpc_sim(seed, robot_num)
-            print(f"C3BF_MPC average computational time: {sum(cbf_mpc_computational_time) / len(cbf_mpc_computational_time)}\n")
-            cbf_mpc_data = data_process.post_process_simultation(cbf_mpc_trajectory, cbf_mpc_computational_time, method="C3BF_MPC", 
-                                                                 solver_failure=cbf_mpc_solver_failure)
-            data.append(cbf_mpc_data)
-            plt.close()
+        #     cbf_mpc_trajectory, cbf_mpc_computational_time, cbf_mpc_solver_failure = cbf_mpc_sim(seed, robot_num)
+        #     print(f"C3BF_MPC average computational time: {sum(cbf_mpc_computational_time) / len(cbf_mpc_computational_time)}\n")
+        #     cbf_mpc_data = data_process.post_process_simultation(cbf_mpc_trajectory, cbf_mpc_computational_time, method="C3BF_MPC", 
+        #                                                          solver_failure=cbf_mpc_solver_failure)
+        #     data.append(cbf_mpc_data)
+        #     plt.close()
         
 
         # dwa_trajectory, dwa_computational_time = dwa_sim(seed, robot_num)   
@@ -870,31 +870,32 @@ def main():
         # data.append(mpc_data)
         # plt.close()
     
-        # c3bf_trajectory, c3bf_computational_time, c3bf_solver_failure = c3bf_sim(seed, robot_num)
-        # print(f"C3BF average computational time: {sum(c3bf_computational_time) / len(c3bf_computational_time)}\n")
-        # c3bf_data = data_process.post_process_simultation(c3bf_trajectory, c3bf_computational_time, method='C3BF', 
-        #                                                 solver_failure=c3bf_solver_failure)
-        # data.append(c3bf_data)
-        # plt.close()
+        c3bf_trajectory, c3bf_computational_time, c3bf_solver_failure = c3bf_sim(seed, robot_num)
+        print(f"C3BF average computational time: {sum(c3bf_computational_time) / len(c3bf_computational_time)}\n")
+        c3bf_data = data_process.post_process_simultation(c3bf_trajectory, c3bf_computational_time, method='C3BF', 
+                                                        solver_failure=c3bf_solver_failure)
+        data.append(c3bf_data)
+        plt.close()
 
-        # cbf_trajectory, cbf_computational_time, cbf_solver_failure = cbf_sim(seed, robot_num)
-        # print(f"CBF average computational time: {sum(cbf_computational_time) / len(cbf_computational_time)}\n")
-        # cbf_data = data_process.post_process_simultation(cbf_trajectory, cbf_computational_time, method="CBF", 
-        #                                                 solver_failure=cbf_solver_failure)
-        # data.append(cbf_data)
-        # plt.close()
+        cbf_trajectory, cbf_computational_time, cbf_solver_failure = cbf_sim(seed, robot_num)
+        print(f"CBF average computational time: {sum(cbf_computational_time) / len(cbf_computational_time)}\n")
+        cbf_data = data_process.post_process_simultation(cbf_trajectory, cbf_computational_time, method="CBF", 
+                                                        solver_failure=cbf_solver_failure)
+        data.append(cbf_data)
+        plt.close()
 
-        # lbp_trajectory, lbp_computational_time = lbp_sim(seed, robot_num)
-        # print(f"LBP average computational time: {sum(lbp_computational_time) / len(lbp_computational_time)}\n")
-        # lbp_data = data_process.post_process_simultation(lbp_trajectory, lbp_computational_time, method="LBP")
-        # data.append(lbp_data)
-        # plt.close()
+        lbp_trajectory, lbp_computational_time = lbp_sim(seed, robot_num)
+        print(f"LBP average computational time: {sum(lbp_computational_time) / len(lbp_computational_time)}\n")
+        lbp_data = data_process.post_process_simultation(lbp_trajectory, lbp_computational_time, method="LBP")
+        data.append(lbp_data)
+        plt.close()
 
-        # cbf_mpc_trajectory, cbf_mpc_computational_time = cbf_mpc_sim(seed, robot_num)
-        # print(f"CBF_MPC average computational time: {sum(cbf_mpc_computational_time) / len(cbf_mpc_computational_time)}\n")
-        # cbf_mpc_data = data_process.post_process_simultation(cbf_mpc_trajectory, cbf_mpc_computational_time, method="CBF_MPC")
-        # data.append(cbf_mpc_data)
-        # plt.close()
+        cbf_mpc_trajectory, cbf_mpc_computational_time, cbf_mpc_solver_failure = cbf_mpc_sim(seed, robot_num)
+        print(f"C3BF_MPC average computational time: {sum(cbf_mpc_computational_time) / len(cbf_mpc_computational_time)}\n")
+        cbf_mpc_data = data_process.post_process_simultation(cbf_mpc_trajectory, cbf_mpc_computational_time, method="C3BF_MPC", 
+                                                             solver_failure=cbf_mpc_solver_failure)
+        data.append(cbf_mpc_data)
+        plt.close()
 
         df1 = pd.DataFrame(data)
         frames = [df, df1]

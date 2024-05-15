@@ -36,7 +36,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
 
-robot_num = 5 #json_object["robot_num"]
+robot_num = 11 #json_object["robot_num"]
 safety_init = json_object["safety"]
 min_dist = json_object["min_dist"]
 width_init = json_object["width"]
@@ -51,7 +51,7 @@ show_animation = json_object["show_animation"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_2.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_33.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -172,27 +172,28 @@ class CBF_algorithm():
            
             # Step 9: Check if the distance between the current position and the target is less than 5
             if not self.reached_goal[i]:                
-                # If goal is reached, stop the robot
-                if add_noise: 
-                    noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
-                    noisy_pos = x + noise
-                    t_prev = time.time()
-                    self.control_robot(i, noisy_pos)
-                    self.computational_time.append((time.time() - t_prev))
-                    plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
-                else:
-                    t_prev = time.time()
-                    self.control_robot(i, x)
-                    self.computational_time.append((time.time() - t_prev)) 
-                
-                # If goal is reached, stop the robot
-                if check_goal_reached(x, self.targets, i, distance=to_goal_stop_distance):
-                    self.reached_goal[i] = True
+                if check_goal_reached(x, self.targets, i):
+                    # print(f"Vehicle {i} reached goal!!")
                     self.dxu[:, i] = 0
                     x[3,i] = 0
+                    self.reached_goal[i] = True
                 else:
-                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i], dt)
-                    
+                    t_prev = time.time()
+                    if add_noise:
+                        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.02*noise_scale_param, 1).reshape(1,1)], axis=0)
+                        noisy_pos = x + noise
+                        self.control_robot(i, noisy_pos)
+                        plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
+                    else:
+                        self.control_robot(i, x)
+
+                    self.computational_time.append((time.time() - t_prev))
+            
+                    # x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
+                    # if x[3,i] < 0.0:
+                    #     print(f"Negative speed for robot {i}!")
+                x = self.check_collision(x, i)
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if all(self.reached_goal):
                 break_flag = True

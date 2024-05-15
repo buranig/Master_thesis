@@ -315,7 +315,7 @@ class LBP_algorithm():
         x1 = x[:, i]
         ob = [self.dilated_traj[idx] for idx in range(len(self.dilated_traj)) if idx != i]
         if add_noise:
-            noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(1, 2), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=1)
+            noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(1, 2), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=1)
             noisy_pos = x1 + noise[0]
             u1, predicted_trajectory1, u_history = self.lbp_control(noisy_pos, ob, i)
             plt.plot(noisy_pos[0], noisy_pos[1], "x", color=color_dict[i], markersize=10)

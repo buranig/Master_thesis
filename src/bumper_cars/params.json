@@ -110,7 +110,7 @@
     "plot_traj": false,
     "to_goal_stop_distance": 2.5,
     "show_animation": false,
-    "add_noise": false,
-    "noise_scale_param": 0.5
+    "add_noise": true,
+    "noise_scale_param": 0.4
     
 }

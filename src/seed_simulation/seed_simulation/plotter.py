@@ -29,7 +29,7 @@ class Plotter:
         sns.boxplot(x=x, y=y, hue=hue,
                     data=self.data, ax=ax, palette=colors)
         
-        # plt.title(title, fontdict={'size': fontsize, 'family': 'serif'})
+        plt.title(title, fontdict={'size': fontsize, 'family': 'serif'})
         plt.grid(True)
         plt.xlabel("Number of AVs",fontdict={'size': fontsize, 'family': 'serif'})
         if y=="Collision Number":
@@ -60,10 +60,10 @@ class Plotter:
 
 quantities = ['Path Length', 'Acceleration Usage', 'Steering Usage', 'Average Speed', 'Avg Computational Time',	'Solver Failure', 'Collision Number']
 methods = ['MPC', 'LBP', 'CBF', 'C3BF', 'DWA']
-methods = ['LBP', 'CBF', 'C3BF', 'CBF_MPC', 'C3BF_MPC']
+methods = ['LBP', 'CBF', 'C3BF', 'C3BF_MPC']
 # noises = [0.0, 0.1, 0.2, 0.4]
 noises = [0.0]
-
+savepath = "/home/giacomo/Documenti/Thesis report/results/"
 # data_plotter = Plotter(data)
 # data_plotter.plot_bars("File Name", "Collision Number", None, "Collision number as a function of the seed file")
 # for idx in range(0,58):
@@ -95,10 +95,10 @@ noises = [0.0]
 #         elif quantity == 'Path Length':
 #             pre = "path_"
 #         # plt.savefig(savepath + pre + "vs_robot_" + method + "_hue_noise"+ ".pdf")
-#         plt.show()
-#         # plt.show(block=False)
-#         # plt.pause(1)
-#         # plt.close()
+#         # plt.show()
+#         plt.show(block=False)
+#         plt.pause(2)
+#         plt.close()
 #         # plt.savefig('Figure1.svg')
 
 data1 = pd.DataFrame()
@@ -138,6 +138,6 @@ for noise in noises:
             noise_str = "Noise3"
         
         plt.show()
-        # plt.savefig(savepath + pre + "vs_robot_" + noise_str + "_hue_method"+ ".pdf")
+        plt.savefig(savepath + pre + "vs_robot_" + noise_str + "_hue_method"+ "_15_05.pdf")
 
 print("Done")

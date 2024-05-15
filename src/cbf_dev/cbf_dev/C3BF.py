@@ -376,10 +376,7 @@ class C3BF_algorithm():
             self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
         except:
             print(f"QP solver failed for robot {i}! Emergency stop.") 
-            if x[3,i] > 0:
-                self.dxu[0,i] = (0 - x[3,i])/dt 
-            else:
-                self.dxu[0,i] = (x[3,i] - 0)/dt
+            self.dxu[0,i] = (0 - x[3,i])/dt 
             self.solver_failure += 1         
         if show_animation:
             circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius, color='b', fill=False)

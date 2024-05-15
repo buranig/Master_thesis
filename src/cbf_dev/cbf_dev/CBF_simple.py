@@ -351,10 +351,7 @@ class CBF_algorithm():
                 self.ax.add_patch(circle2)
         except:
             print(f"QP solver failed for robot {i}! Emergency stop.") 
-            if x[3,i] > 0:
-                self.dxu[0,i] = (0 - x[3,i])/dt 
-            else:
-                self.dxu[0,i] = (x[3,i] - 0)/dt
+            self.dxu[0,i] = (0 - x[3,i])/dt 
             self.solver_failure += 1
 
         if self.dxu[0,i] > max_acc or self.dxu[0,i] < min_acc:

@@ -37,7 +37,7 @@ Kv = json_object["C3BF"]["Kv"] # interval [0.5-1]
 Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
-robot_num = 14 #json_object["robot_num"]
+robot_num = 6 #json_object["robot_num"]
 safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
@@ -48,10 +48,11 @@ check_collision_bool = False
 add_noise = json_object["add_noise"]
 noise_scale_param = json_object["noise_scale_param"]
 show_animation = json_object["show_animation"]
+linear_model = json_object["linear_model"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_60.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_11.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -169,9 +170,11 @@ class C3BF_algorithm():
                         self.control_robot(i, x)
 
                     self.computational_time.append((time.time() - t_prev))
-            
-                    # x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
-                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
+
+                    if linear_model:
+                        x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    else:
+                        x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
                     # if x[3,i] < 0.0:
                     #     print(f"Negative speed for robot {i}!")
                 x = self.check_collision(x, i)
@@ -203,8 +206,10 @@ class C3BF_algorithm():
 
                     self.computational_time.append((time.time() - t_prev))
             
-                    # x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
-                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
+                    if linear_model:
+                        x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    else:
+                        x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
                     # if x[3,i] < 0.0:
                     #     print(f"Negative speed for robot {i}!")
                 x = self.check_collision(x, i) 

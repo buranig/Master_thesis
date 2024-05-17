@@ -54,6 +54,7 @@ boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_
 check_collision_bool = False
 add_noise = json_object["add_noise"]
 noise_scale_param = json_object["noise_scale_param"]
+linear_model = json_object["linear_model"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
@@ -343,8 +344,10 @@ class MPC_DISCRETE_algorithm():
             if any([utils.dist([x1[0], x1[1]], [x[0, idx], x[1, idx]]) < WB for idx in range(robot_num) if idx != i]): raise Exception('Collision')
 
         # x1 = utils.motion(x1, u1, dt)
-        # x1 = utils.motion_MPC_casadi(x1, u1, dt)
-        x1 = utils.nonlinear_model_numpy_stable(x1, u1, dt)
+        if linear_model:
+            x1 = utils.motion_MPC_casadi(x1, u1, dt)
+        else:
+            x1 = utils.nonlinear_model_numpy_stable(x1, u1, dt)
         x[:, i] = x1
         u[:, i] = u1
 

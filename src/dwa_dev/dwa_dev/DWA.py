@@ -61,6 +61,7 @@ boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_
 check_collision_bool = False
 add_noise = json_object["add_noise"]
 noise_scale_param = json_object["noise_scale_param"]
+linear_model = json_object["linear_model"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
@@ -406,7 +407,11 @@ class DWA_algorithm():
         self.dilated_traj[i] = LineString(zip(predicted_trajectory1[:, 0], predicted_trajectory1[:, 1])).buffer(dilation_factor, cap_style=3)
 
         # Collision check
-        x1 = utils.nonlinear_model_numpy_stable(x1, u1, dt)
+        if linear_model:
+            x1 = utils.motion(x1, u1, dt)
+        else:
+            x1 = utils.nonlinear_model_numpy_stable(x1, u1, dt)
+        # x1 = utils.nonlinear_model_numpy_stable(x1, u1, dt)
         x[:, i] = x1
         u[:, i] = u1
         

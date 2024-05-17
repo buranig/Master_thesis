@@ -23,6 +23,7 @@ min_dist = json_object["min_dist"]
 to_goal_stop_distance = json_object["to_goal_stop_distance"]
 add_noise = json_object["add_noise"]
 noise_scale_param = json_object["noise_scale_param"]
+linear_model = json_object["linear_model"]
 
 class DataProcessor:
     def __init__(self, robot_num, file_name, seed):
@@ -246,6 +247,11 @@ class DataProcessor:
             noise_scaling = noise_scale_param
         else:
             noise_scaling = 0.0
+        
+        if linear_model:
+            model_type = 'Kinematic'
+        else:
+            model_type = 'Dynamic'
 
         data = {
             "Path Length": avg_path_length,
@@ -259,7 +265,8 @@ class DataProcessor:
             "File Name": self.file_name,
             "Method": method,
             "Collision Number": collision_number,
-            "Noise Scaling": noise_scaling
+            "Noise Scaling": noise_scaling,
+            "Model Type": model_type
         }
 
         print("Data Processed Successfully!\n")

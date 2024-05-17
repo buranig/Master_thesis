@@ -47,6 +47,7 @@ check_collision_bool = False
 add_noise = json_object["add_noise"]
 noise_scale_param = json_object["noise_scale_param"]
 show_animation = json_object["show_animation"]
+linear_model = json_object["linear_model"]
 
 np.random.seed(1)
 
@@ -159,7 +160,10 @@ class CBF_algorithm():
 
                     self.computational_time.append((time.time() - t_prev))
             
-                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i], dt)
+                    if linear_model:
+                        x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    else:
+                        x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
 
             utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
 
@@ -190,7 +194,10 @@ class CBF_algorithm():
                     self.computational_time.append((time.time() - t_prev))
             
                     # x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
-                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
+                    if linear_model:
+                        x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    else:
+                        x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
                     # if x[3,i] < 0.0:
                     #     print(f"Negative speed for robot {i}!")
                 x = self.check_collision(x, i)

@@ -5,7 +5,7 @@ import seaborn as sns
 import numpy as np
 
 # Read the CSV file
-data = pd.read_csv('src/seed_simulation/seed_simulation/seed_sim1.csv')
+data = pd.read_csv('src/seed_simulation/seed_simulation/seed_sim2.csv')
 filename = 'src/seed_simulation/seed_simulation/seed_sim.csv'
 # data = data.to_numpy()
 fontsize = 25
@@ -61,7 +61,7 @@ class Plotter:
 quantities = ['Path Length', 'Acceleration Usage', 'Steering Usage', 'Average Speed', 'Avg Computational Time',	'Solver Failure', 'Collision Number']
 methods = ['MPC', 'LBP', 'CBF', 'C3BF', 'DWA']
 quantities = ['Collision Number', 'Average Speed', 'Steering Usage', 'Acceleration Usage', 'Solver Failure']
-methods = ['LBP', 'CBF', 'C3BF', 'C3BF_MPC']
+methods = ['LBP', 'CBF', 'C3BF', 'C3BF_MPC', "DWA"]
 # noises = [0.0, 0.1, 0.2, 0.4]
 noises = [0.0]
 savepath = "/home/giacomo/Documenti/Thesis report/results/"

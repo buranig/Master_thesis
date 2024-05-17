@@ -427,9 +427,12 @@ def normalize_angle_array(angle):
     :param angle: (float)
     :return: (float) Angle in radian in [-pi, pi]
     """
-    angle[angle[:] > np.pi] -= 2.0 * np.pi
+    for i, _angle in enumerate(angle):
+        _angle = normalize_angle(_angle)
+        angle[i] = _angle
+    # angle[angle[:] > np.pi] -= 2.0 * np.pi
 
-    angle[angle[:] < -np.pi] += 2.0 * np.pi
+    # angle[angle[:] < -np.pi] += 2.0 * np.pi
 
     return angle
 

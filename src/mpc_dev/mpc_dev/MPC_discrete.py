@@ -247,6 +247,7 @@ class MPC_DISCRETE_algorithm():
         self.robot_num = robot_num
         self.reached_goal = [False]*robot_num
         self.computational_time = []
+        self.solver_failure = 0
 
     def run_mpc(self, x, u, break_flag):
         for i in range(self.robot_num):
@@ -450,8 +451,10 @@ class MPC_DISCRETE_algorithm():
             
             trajectory_buf = trajectory_buf[1:]
             # Even when following the old trajectory, we need to update it to the position of the robot
-            trajectory_buf[:,0:2] += [x[0]-trajectory_buf[0,0],x[1]-trajectory_buf[0,1]]
-            trajectory_buf[:,2] += x[2]- trajectory_buf[0,2]
+            trajectory_buf[:,0:2] -= trajectory_buf[1,0:2]
+            trajectory_buf[:,0:2] = (trajectory_buf[:,0:2]) @ utils.rotateMatrix(utils.normalize_angle(-x[2]+trajectory_buf[0,2]))
+            trajectory_buf[:,0:2] += x[0:2]
+            trajectory_buf[:,2] += utils.normalize_angle(x[2]-trajectory_buf[0,2])
 
             to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
             # speed_cost = speed_cost_gain * np.sign(trajectory[-1, 3]) * trajectory[-1, 3]
@@ -469,6 +472,7 @@ class MPC_DISCRETE_algorithm():
         elif min_cost == np.inf:
             # emergency stop
             print(f"Emergency stop for vehicle {i}")
+            self.solver_failure +=1
             if x[3]>0:
                 best_u = [min_acc, 0]
             else:

@@ -8,7 +8,6 @@ import json
 from custom_message.msg import Coordinate
 from shapely.geometry import Point, LineString
 from shapely import distance
-from shapely.plotting import plot_polygon
 import time
 
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
@@ -293,6 +292,7 @@ class DWA_algorithm():
         self.u_hist = u_hist
         self.reached_goal = [False]*robot_num
         self.computational_time = []
+        self.solver_failure = 0
 
     def run_dwa(self, x, u, break_flag):
         """
@@ -314,11 +314,10 @@ class DWA_algorithm():
                     # Perform some action when the condition is met
                     self.paths[i].pop(0)
                     if not self.paths[i]:
-                        print("Path complete for vehicle {i}!")
+                        print(f"Path complete for vehicle {i}!")
                         u[:, i] = np.zeros(2)
                         x[3, i] = 0
                         self.reached_goal[i] = True
-                    
                     else: 
                         self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
 
@@ -505,10 +504,12 @@ class DWA_algorithm():
             if len(u_buf) > emergency_brake_distance:              
                 u_buf.pop(0)
 
-                trajectory_buf = trajectory_buf[0:]
+                trajectory_buf = trajectory_buf[1:]
                 # Even when following the old trajectory, we need to update it to the position of the robot
-                trajectory_buf[:,0:2] += [x[0]-trajectory_buf[0,0],x[1]-trajectory_buf[0,1]]
-                trajectory_buf[:,2] += x[2]- trajectory_buf[0,2]
+                trajectory_buf[:,0:2] -= trajectory_buf[1,0:2]
+                trajectory_buf[:,0:2] = (trajectory_buf[:,0:2]) @ utils.rotateMatrix(utils.normalize_angle(-x[2]+trajectory_buf[0,2]))
+                trajectory_buf[:,0:2] += x[0:2]
+                trajectory_buf[:,2] += utils.normalize_angle(x[2]-trajectory_buf[0,2])
 
                 to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
                 # speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
@@ -524,13 +525,14 @@ class DWA_algorithm():
 
             elif min_cost == np.inf:
                 # emergency stop
-                print("Emergency stop")
+                print(f"Emergency stop for vehicle {i}")
+                solver_failure += 1
                 if x[3]>0:
                     best_u = [min_acc, 0]
                 else:
                     best_u = [max_acc, 0]
                 best_trajectory = np.array([x[0:3], x[0:3]])
-                u_history = [min_acc, 0]
+                u_history = best_u*int(predict_time/dt)
 
             return best_u, best_trajectory, u_history
     
@@ -585,7 +587,7 @@ class DWA_algorithm():
         if dist_to_goal <= distance:
             print(f"Vehicle {i} reached goal!")
             self.dilated_traj[i] = Point(x[0, i], x[1, i]).buffer(L/2, cap_style=3)
-            self.predicted_trajectory[i] = np.array([x[0:-1, i]]*int(predict_time/dt))
+            self.predicted_trajectory[i] = np.array([x[0:5, i]]*int(predict_time/dt))
             return True
         return False
 
@@ -627,9 +629,9 @@ def main_seed():
     trajectory = np.zeros((x.shape[0], robot_num, 1))
     trajectory[:, :, 0] = x
 
-    predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 3]))
+    predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 4]))
     for i in range(robot_num):
-        predicted_trajectory[i] = np.full((int(predict_time/dt), 3), x[0:3,i])
+        predicted_trajectory[i] = np.full((int(predict_time/dt), 4), x[0:4,i])
 
     # Step 4: Create paths for each robot
     traj = seed['trajectories']

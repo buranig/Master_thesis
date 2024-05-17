@@ -39,7 +39,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 
 WB = json_object["Controller"]["WB"] # Wheel base
-robot_num = 5 #json_object["robot_num"]
+robot_num = 11 #json_object["robot_num"]
 safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
@@ -61,7 +61,7 @@ color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:or
 with open('/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP.json', 'r') as file:
     data = json.load(file)
 
-with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_1.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_30.json', 'r') as file:
     seed = json.load(file)
 
 def calc_dynamic_window(x):
@@ -232,8 +232,22 @@ class LBP_algorithm():
         self.robot_num = robot_num
         self.reached_goal = [False]*robot_num
         self.computational_time = []
+        self.solver_failure = 0
 
     def run_lbp(self, x, u, break_flag):
+        """
+        Runs the LBP (Loop-based Path Planning) algorithm for the given robot configuration.
+
+        Args:
+            x (numpy.ndarray): The current state of the robots.
+            u (numpy.ndarray): The control inputs for the robots.
+            break_flag (bool): A flag indicating whether the algorithm should break or continue.
+
+        Returns:
+            numpy.ndarray: The updated state of the robots.
+            numpy.ndarray: The updated control inputs for the robots.
+            bool: The updated break flag.
+        """
         for i in range(self.robot_num):
             if not self.reached_goal[i]:
                 # Step 9: Check if the distance between the current position and the target is less than 5
@@ -241,7 +255,7 @@ class LBP_algorithm():
                     # Perform some action when the condition is met
                     self.paths[i].pop(0)
                     if not self.paths[i]:
-                        print("Path complete for vehicle {i}!")
+                        print(f"Path complete for vehicle {i}!")
                         u[:, i] = np.zeros(2)
                         x[3, i] = 0
                         self.reached_goal[i] = True
@@ -262,9 +276,9 @@ class LBP_algorithm():
 
             if show_animation:
                 utils.plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
- 
+
         if all(self.reached_goal):
-                break_flag = True
+            break_flag = True
 
         return x, u, break_flag
     
@@ -435,8 +449,10 @@ class LBP_algorithm():
             
             trajectory_buf = trajectory_buf[1:]
             # Even when following the old trajectory, we need to update it to the position of the robot
-            trajectory_buf[:,0:2] += [x[0]-trajectory_buf[0,0],x[1]-trajectory_buf[0,1]]
-            trajectory_buf[:,2] += x[2]- trajectory_buf[0,2]
+            trajectory_buf[:,0:2] -= trajectory_buf[1,0:2]
+            trajectory_buf[:,0:2] = (trajectory_buf[:,0:2]) @ utils.rotateMatrix(utils.normalize_angle(-x[2]+trajectory_buf[0,2]))
+            trajectory_buf[:,0:2] += x[0:2]
+            trajectory_buf[:,2] += utils.normalize_angle(x[2]-trajectory_buf[0,2])
 
             # trajectory_buf[:,2] = trajectory_buf[:,2] + x[2]
 
@@ -456,6 +472,7 @@ class LBP_algorithm():
         elif min_cost == np.inf:
             # emergency stop
             print(f"Emergency stop for vehicle {i}")
+            self.solver_failure += 1
             if x[3]>0:
                 best_u = [min_acc, 0]
             else:
@@ -580,8 +597,8 @@ def main_seed():
         plt.cla()
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
         
-        # x, u, break_flag = lbp.run_lbp(x, u, break_flag)
-        x, u, break_flag = lbp.go_to_goal(x, u, break_flag)
+        x, u, break_flag = lbp.run_lbp(x, u, break_flag)
+        # x, u, break_flag = lbp.go_to_goal(x, u, break_flag)
 
         trajectory = np.dstack([trajectory, x])
 

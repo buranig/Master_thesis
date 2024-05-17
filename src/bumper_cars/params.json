@@ -38,7 +38,7 @@
             "a_resolution": 0.5,
             "v_resolution": 0.5,
             "delta_resolution": 15,
-            "predict_time": 2,
+            "predict_time": 3,
             "to_goal_cost_gain": 1,
             "speed_cost_gain": 1,
             "obstacle_cost_gain": 30,

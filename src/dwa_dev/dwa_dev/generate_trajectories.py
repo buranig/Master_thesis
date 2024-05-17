@@ -74,22 +74,10 @@ def motion(x, u, dt):
     x[1] = x[1] + x[3] * math.sin(x[2]) * dt
     x[2] = x[2] + x[3] / L * math.tan(delta) * dt
     x[3] = x[3] + throttle * dt
-    x[2] = normalize_angle(x[2])
+    x[2] = utils.normalize_angle(x[2])
     x[3] = np.clip(x[3], min_speed, max_speed)
 
     return x
-
-def normalize_angle(angle):
-    """
-    Normalize an angle to [-pi, pi].
-    :param angle: (float)
-    :return: (float) Angle in radian in [-pi, pi]
-    """
-    while angle > np.pi:
-        angle -= 2.0 * np.pi
-    while angle < -np.pi:
-        angle += 2.0 * np.pi
-    return angle
 
 
 def calc_trajectory(x_init, u, dt):
@@ -145,9 +133,6 @@ def generate_trajectories(x_init):
             u_total.append(u)
 
     return traj, u_total
-
-def rotateMatrix(a):
-    return np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
 
 def find_nearest(array, value):
     array = np.asarray(array)
@@ -239,7 +224,7 @@ def main():
                 # print(v, a, delta)
                 geom = data[str(v)][str(a)][str(delta)]
                 geom = np.array(geom)
-                newgeom = (geom[:, 0:2]) @ rotateMatrix(np.radians(-45)) + [10,10]
+                newgeom = (geom[:, 0:2]) @ utils.rotateMatrix(np.radians(-45)) + [10,10]
                 geom = LineString(zip(geom[:, 0], geom[:, 1]))
                 newgeom = LineString(zip(newgeom[:, 0], newgeom[:, 1]))
                 plot_line(geom, ax=ax, add_points=False, linewidth=3)
@@ -261,7 +246,7 @@ def main():
 
     # x = np.array([[0, 20, 15], [0, 0, 20], [0, np.pi, -np.pi/2], [0, 0, 0]])
     # goal = np.array([[30, 0, 15], [10, 10, 0]])
-    x = np.array([[0, 10], [0, 0], [0, np.pi], [0, 0]])
+    x = np.array([[0, 10], [0, 0], [0, np.pi], [0, 0], [0, 0]])
     goal = np.array([[10, 0], [10, 10]])
     u = np.zeros((2, N))
     
@@ -270,7 +255,9 @@ def main():
     # append the firt state to the trajectory
     trajectory[:, :, 0] = x
 
-    predicted_trajectory = np.zeros((N, round(predict_time/dt)+1, x.shape[0]))
+    predicted_trajectory = dict.fromkeys(range(2),np.zeros([int(predict_time/dt), 4]))
+    for i in range(2):
+        predicted_trajectory[i] = np.full((int(predict_time/dt), 4), x[0:4,i])
 
     paths = [[goal[0,idx], goal[1,idx]] for idx in range(N)]
 
@@ -307,9 +294,9 @@ def main():
     print("Done")
     if show_animation:
         for i in range(N):
-            DWA.plot_robot(x[0, i], x[1, i], x[2, i], i)
-            DWA.plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
-            DWA.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
+            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
+            utils.plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
+            utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
             plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-"+color_dict[i])
         plt.pause(0.0001)
         plt.show()

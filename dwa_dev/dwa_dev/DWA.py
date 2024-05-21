@@ -99,15 +99,16 @@ class DWA_algorithm(Controller):
         u, trajectory, u_history = self.__calc_control_and_trajectory(self.curr_state[self.robot_num])
         self.dilated_traj[self.robot_num] = LineString(zip(trajectory[:, 0], trajectory[:, 1])).buffer(self.dilation_factor, cap_style=3)
 
-        car_cmd.throttle = u[0]
-        car_cmd.steering = u[1]
+                            
+        car_cmd.throttle = np.interp(u[0], [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
+        car_cmd.steering = np.interp(u[1], [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
 
         # Debug visualization
         if self.show_animation and self.robot_num == 0:
             plt.cla()
             plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
             for i in range(self.curr_state.shape[0]):
-                self.plot_robot_trajectory(self.curr_state[i], u, trajectory, self.dilated_traj[i], [self.goal.x, self.goal.y], ax)
+                self.plot_robot_trajectory(self.curr_state[i], u, trajectory, self.dilated_traj[i], [0,0], ax)
             plt.axis("equal")
             plt.grid(True)
             plt.pause(0.00001)
@@ -115,8 +116,13 @@ class DWA_algorithm(Controller):
         return car_cmd
 
     def set_goal(self, goal: CarControlStamped) -> None:
-        next_state = self.__simulate_input(goal)
-        self.goal = next_state
+        # next_state = self.__simulate_input(goal)
+        self.goal = CarControlStamped()
+        self.goal.throttle = np.interp(goal.throttle, [-1, 1], [self.car_model.min_acc, self.car_model.max_acc]) * self.car_model.acc_gain
+        self.goal.steering = np.interp(goal.steering, [-1, 1], [-self.car_model.max_steer, self.car_model.max_steer])
+
+        print("Desired goal: ", goal.throttle, goal.steering)
+        print("Goal set to: ", self.goal.throttle, self.goal.steering)
 
     def compute_traj(self):
         """
@@ -130,15 +136,18 @@ class DWA_algorithm(Controller):
         initial_state.y = 0.0
         initial_state.yaw = np.radians(90.0)
 
+        other_delta = np.random.normal(0.0, 0.1, int((dw[3] - dw[2])/self.delta_resolution)) #TODO: modify hardcoded std and number generation
         for v in np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution):
             initial_state.v = v
             traj = []
             u_total = []
             cmd = CarControlStamped()
             for a in np.arange(dw[0], dw[1]+self.a_resolution, self.a_resolution):
-                cmd.throttle = a
-                for delta in np.arange(dw[2], dw[3]+self.delta_resolution, self.delta_resolution):
-                    cmd.steering = delta
+                cmd.throttle = np.interp(a, [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
+                init_delta = np.array([0.0, dw[2], dw[3]])
+                delta_list = np.hstack((init_delta, other_delta))
+                for delta in delta_list:
+                    cmd.steering = np.interp(delta, [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
 
                     traj.append(self.__calc_trajectory(initial_state, cmd))
                     u_total.append([a, delta])
@@ -155,7 +164,7 @@ class DWA_algorithm(Controller):
         with open(self.dir_path + '/../config/trajectories.json', 'w') as file:
             json.dump(complete_trajectories, file, indent=4)
 
-        print("\nThe JSON data has been written to 'data.json'")
+        print("\nThe JSON data has been written to 'config/trajectories.json'")
 
 
     ################## PRIVATE METHODS
@@ -270,7 +279,7 @@ class DWA_algorithm(Controller):
         # print("Robot: "+str(self.robot_num) + " distance: " + str(min_distance))
         return distance_cost
 
-    def __calc_to_goal_cost(self, trajectory):
+    def __calc_to_goal_cost(self, a = 0.0, delta = 0.0):
         """
         Calculate the cost to the goal.
 
@@ -286,10 +295,10 @@ class DWA_algorithm(Controller):
 
         # cost = math.hypot(dx, dy)
 
-        dx = self.goal.x - trajectory[:, 0]
-        dy = self.goal.y - trajectory[:, 1]
+        dx = self.goal.throttle - a
+        dy = self.goal.steering - delta
 
-        cost = sum(np.sqrt(dx**2+dy**2))
+        cost = np.sqrt(dx**2+dy**2)
         return cost
 
     def __calc_to_goal_heading_cost(self, trajectory):
@@ -339,8 +348,9 @@ class DWA_algorithm(Controller):
             nearest = utils.find_nearest(np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution), x[3])
 
             for a in np.arange(dw[0], dw[1]+self.v_resolution, self.v_resolution):
-                for delta in np.arange(dw[2], dw[3]+self.delta_resolution, self.delta_resolution):
-
+                # delta_list = self.trajs[str(nearest)][str(a)].keys()
+                for delta in self.trajs[str(nearest)][str(a)]:
+                    
                     # old_time = time.time()
                     geom = self.trajs[str(nearest)][str(a)][str(delta)]
                     geom = np.array(geom)
@@ -352,22 +362,22 @@ class DWA_algorithm(Controller):
                     trajectory = geom
                     # calc cost
 
-                    to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(trajectory)
+                    to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(a, float(delta))
                     speed_cost = self.speed_cost_gain * (self.car_model.max_speed - trajectory[-1, 3])
                     # if trajectory[-1, 3] <= 0.0:
                     #     speed_cost = 5
                     # else:
                     #     speed_cost = 0.0
                     ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(trajectory, ob)
-                    heading_cost = self.heading_cost_gain * self.__calc_to_goal_heading_cost(trajectory)
-                    final_cost = to_goal_cost + ob_cost #+  speed_cost  #+ heading_cost #+ speed_cost 
+                    # heading_cost = self.heading_cost_gain * self.__calc_to_goal_heading_cost(trajectory)
+                    final_cost = to_goal_cost #######+ ob_cost #+  speed_cost  #+ heading_cost #+ speed_cost 
                     # print("COSTS: ", to_goal_cost, speed_cost, ob_cost)
                     # search minimum trajectory
                     if min_cost >= final_cost:
                         min_cost = final_cost
-                        best_u = [a, delta]
+                        best_u = [a, float(delta)]
                         best_trajectory = trajectory
-                        u_history = [[a, delta] for _ in range(len(trajectory-1))]
+                        u_history = [[a, float(delta)] for _ in range(len(trajectory-1))]
 
             return best_u, best_trajectory, u_history
     

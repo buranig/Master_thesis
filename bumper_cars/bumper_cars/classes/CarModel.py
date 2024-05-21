@@ -35,6 +35,7 @@ class CarModel:
         self.min_speed = yaml_object["min_speed"] # [m/s]
         self.max_acc = yaml_object["max_acc"] # [m/ss]
         self.min_acc = yaml_object["min_acc"] # [m/ss]
+        self.acc_gain = yaml_object["acc_gain"] # [0.0 - 1.0]
 
         self.width = yaml_object["width"] # [m] Width of the vehicle's track
         self.L = yaml_object["L"]       # [m] Wheel base of vehicle
@@ -93,17 +94,18 @@ class CarModel:
         old_omega = self.state.omega if curr_state is None else curr_state.omega
 
         # Ensure feasible inputs
-        cmd.steering = np.clip(cmd.steering, -self.max_steer, self.max_steer)
+        mapped_steering = np.interp(cmd.steering, [-1, 1], [-self.max_steer, self.max_steer])
+        mapped_throttle = np.interp(cmd.throttle, [-1, 1], [self.min_acc, self.max_acc]) * self.acc_gain
 
         # State update
         state = State()
         state.x = old_x + old_v * np.cos(old_yaw) * dt
         state.y = old_y + old_v * np.sin(old_yaw) * dt
 
-        state.yaw = old_yaw + old_v / self.L * np.tan(cmd.steering) * dt # TODO: Tan is approximation
+        state.yaw = old_yaw + old_v / self.L * np.tan(mapped_steering) * dt # TODO: Tan is approximation
         state.yaw = normalize_angle(state.yaw)
 
-        state.v = old_v + cmd.throttle * dt
+        state.v = old_v + mapped_throttle * dt
         state.v = np.clip(state.v, self.min_speed, self.max_speed)
 
         return state
@@ -132,23 +134,24 @@ class CarModel:
         old_omega = self.state.omega if curr_state is None else curr_state.omega
 
         # Ensure feasible inputs
-        cmd.steering = np.clip(cmd.steering, -self.max_steer, self.max_steer)
+        mapped_steering = np.interp(cmd.steering, [-1, 1], [-self.max_steer, self.max_steer])
+        mapped_throttle = np.interp(cmd.throttle, [-1, 1], [self.min_acc, self.max_acc]) * self.acc_gain
 
-        beta = math.atan2((self.Lr * math.tan(cmd.steering) / self.L), 1.0)
+        beta = math.atan2((self.Lr * math.tan(mapped_steering) / self.L), 1.0)
         vx = old_v * math.cos(beta)
         vy = old_v * math.sin(beta)
 
-        Ffy = -self.Cf * ((vy + self.Lf * old_omega) / (vx + 0.0001) - cmd.steering)
+        Ffy = -self.Cf * ((vy + self.Lf * old_omega) / (vx + 0.0001) - mapped_steering)
         Fry = -self.Cr * (vy - self.Lr * old_omega) / (vx + 0.0001)
         R_x = self.c_r1 * abs(vx)
         F_aero = self.c_a * vx ** 2 # 
         F_load = F_aero + R_x #
-        vx = vx + (cmd.throttle - Ffy * math.sin(cmd.steering) / self.m - F_load / self.m + vy * state.omega) * dt
-        vy = vy + (Fry / self.m + Ffy * math.cos(cmd.steering) / self.m - vx * state.omega) * dt
+        vx = vx + (mapped_throttle - Ffy * math.sin(mapped_steering) / self.m - F_load / self.m + vy * old_omega) * dt
+        vy = vy + (Fry / self.m + Ffy * math.cos(mapped_steering) / self.m - vx * old_omega) * dt
 
         # State update
         state = State()
-        state.omega = old_omega + (Ffy * self.Lf * math.cos(cmd.steering) - Fry * self.Lr) / self.Iz * dt
+        state.omega = old_omega + (Ffy * self.Lf * math.cos(mapped_steering) - Fry * self.Lr) / self.Iz * dt
         
         state.yaw = old_yaw + old_omega * dt
         state.yaw = normalize_angle(state.yaw)

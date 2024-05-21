@@ -130,8 +130,8 @@ class CollisionAvoidance(Node):
             self.publisher_.publish(safe_cmd)
 
             # Draw in Rviz desired goal
-            if type(self.algorithm.goal) is State:
-                self.goal_marker(self.algorithm.goal)
+            # if type(self.algorithm.goal) is State:
+            #     self.goal_marker(self.algorithm.goal)
 
             # Wait for next period
             self.update_time = False

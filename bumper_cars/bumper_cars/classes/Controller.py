@@ -89,10 +89,10 @@ class Controller:
         plt.plot(predicted_trajectory[:, 0], predicted_trajectory[:, 1], "-", color=color_dict[0])
         plot_polygon(dilated_traj, ax=ax, add_points=False, alpha=0.5, color=color_dict[0])
         # plt.plot(x[0], x[1], "xr")
-        plt.plot(targets[0], targets[1], "x", color=color_dict[0], markersize=15)
+        # plt.plot(targets[0], targets[1], "x", color=color_dict[0], markersize=15)
         self.plot_robot(x[0], x[1], x[2])
         self.plot_arrow(x[0], x[1], x[2], length=0.5, width=0.05)
-        self.plot_arrow(x[0], x[1], x[2] + u[1], length=0.5, width=0.1)
+        # self.plot_arrow(x[0], x[1], x[2] + u[1], length=0.5, width=0.1)
         self.plot_map()
 
 

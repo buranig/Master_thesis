@@ -23,6 +23,7 @@ min_dist = json_object["min_dist"]
 to_goal_stop_distance = json_object["to_goal_stop_distance"]
 add_noise = json_object["add_noise"]
 noise_scale_param = json_object["noise_scale_param"]
+linear_model = json_object["linear_model"]
 
 class DataProcessor:
     def __init__(self, robot_num, file_name, seed):
@@ -34,8 +35,8 @@ class DataProcessor:
         last_idx = 0
         for idx in range(1, len(trajectory[4,i,:])):
             idx_prev = idx-1
-            if trajectory[4, i, idx] == 0.0 and trajectory[5, i, idx] == 0.0 and idx > last_idx:
-                if trajectory[4, i, idx_prev] != 0.0 or trajectory[5, i, idx_prev] != 0.0:
+            if trajectory[5, i, idx] == 0.0 and trajectory[6, i, idx] == 0.0 and idx > last_idx:
+                if trajectory[5, i, idx_prev] != 0.0 or trajectory[6, i, idx_prev] != 0.0:
                     last_idx = idx
         
         return last_idx
@@ -114,7 +115,7 @@ class DataProcessor:
         :return: the acceleration usage
         """
         idx = self.calculate_goal_reached_index(trajectory, i)
-        a = trajectory[4, i, :idx+1]
+        a = trajectory[5, i, :idx+1]
         return np.mean(np.abs(a))
     
     def calculate_avg_acceleration_usage(self, trajectory):
@@ -136,7 +137,7 @@ class DataProcessor:
         :return: the steering usage
         """
         idx = self.calculate_goal_reached_index(trajectory, i)
-        steering = trajectory[5, i, :idx+1]
+        steering = trajectory[6, i, :idx+1]
         return np.mean(np.abs(steering))
     
     def calculate_avg_steering_usage(self, trajectory):
@@ -246,6 +247,11 @@ class DataProcessor:
             noise_scaling = noise_scale_param
         else:
             noise_scaling = 0.0
+        
+        if linear_model:
+            model_type = 'Kinematic'
+        else:
+            model_type = 'Dynamic'
 
         data = {
             "Path Length": avg_path_length,
@@ -259,7 +265,8 @@ class DataProcessor:
             "File Name": self.file_name,
             "Method": method,
             "Collision Number": collision_number,
-            "Noise Scaling": noise_scaling
+            "Noise Scaling": noise_scaling,
+            "Model Type": model_type
         }
 
         print("Data Processed Successfully!\n")

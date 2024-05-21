@@ -75,15 +75,16 @@ def generate_trajectory(s, km, kf, k0, v):
     #  plt.show()
 
     state = State()
-    x, y, yaw = [state.x], [state.y], [state.yaw]
+    x, y, yaw, vi = [state.x], [state.y], [state.yaw], [state.v]
 
     for ikp in kp:
         state = update(state, v, ikp, dt)
         x.append(state.x)
         y.append(state.y)
         yaw.append(state.yaw)
+        vi.append(state.v)
 
-    return x, y, yaw, kp
+    return x, y, yaw, vi, kp
 
 
 def generate_last_state(s, km, kf, k0, v):

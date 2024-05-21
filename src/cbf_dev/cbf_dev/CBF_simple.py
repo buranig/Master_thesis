@@ -36,7 +36,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
 
-robot_num = 15 #json_object["robot_num"]
+robot_num = 11 #json_object["robot_num"]
 safety_init = json_object["safety"]
 min_dist = json_object["min_dist"]
 width_init = json_object["width"]
@@ -47,11 +47,12 @@ check_collision_bool = False
 add_noise = json_object["add_noise"]
 noise_scale_param = json_object["noise_scale_param"]
 show_animation = json_object["show_animation"]
+linear_model = json_object["linear_model"]
 
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_7.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_33.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -111,12 +112,12 @@ def check_goal_reached(x, targets, i, distance=0.5):
     """
     dist_to_goal = math.hypot(x[0, i] - targets[i][0], x[1, i] - targets[i][1])
     if dist_to_goal <= distance:
-        print("Goal!!")
+        print(f"Vehicle {i} reached goal!")
         return True
     return False
 
 class CBF_algorithm():
-    def __init__(self, targets, paths, robot_num=robot_num):
+    def __init__(self, targets, paths, ax, robot_num=robot_num):
         self.targets = targets
         self.paths = paths
         self.robot_num = robot_num
@@ -124,6 +125,7 @@ class CBF_algorithm():
         self.reached_goal = [False]*robot_num
         self.computational_time = []
         self.solver_failure = 0
+        self.ax = ax
         
     def run_cbf(self, x, break_flag):
         for i in range(self.robot_num):
@@ -133,7 +135,7 @@ class CBF_algorithm():
                     # Perform some action when the condition is met
                     self.paths[i].pop(0)
                     if not self.paths[i]:
-                        print("Path complete")
+                        print(f"Path complete for vehicle {i}!")
                         self.dxu[:, i] = 0
                         x[3,i] = 0
                         self.reached_goal[i] = True
@@ -158,12 +160,12 @@ class CBF_algorithm():
 
                     self.computational_time.append((time.time() - t_prev))
             
-                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    if linear_model:
+                        x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    else:
+                        x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
 
-            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.plot(self.targets[i][0], self.targets[i][1], "x", color=color_dict[i])
+            utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
 
         if all(self.reached_goal):
             break_flag = True
@@ -174,36 +176,36 @@ class CBF_algorithm():
            
             # Step 9: Check if the distance between the current position and the target is less than 5
             if not self.reached_goal[i]:                
-                # If goal is reached, stop the robot
-                if add_noise: 
-                    noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
-                    noisy_pos = x + noise
-                    t_prev = time.time()
-                    self.control_robot(i, noisy_pos)
-                    self.computational_time.append((time.time() - t_prev))
-                    plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
-                else:
-                    t_prev = time.time()
-                    self.control_robot(i, x)
-                    self.computational_time.append((time.time() - t_prev)) 
-                
-                # If goal is reached, stop the robot
-                if check_goal_reached(x, self.targets, i, distance=to_goal_stop_distance):
-                    self.reached_goal[i] = True
+                if check_goal_reached(x, self.targets, i):
+                    # print(f"Vehicle {i} reached goal!!")
                     self.dxu[:, i] = 0
                     x[3,i] = 0
+                    self.reached_goal[i] = True
                 else:
-                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
-                    
+                    t_prev = time.time()
+                    if add_noise:
+                        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.02*noise_scale_param, 1).reshape(1,1)], axis=0)
+                        noisy_pos = x + noise
+                        self.control_robot(i, noisy_pos)
+                        plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
+                    else:
+                        self.control_robot(i, x)
+
+                    self.computational_time.append((time.time() - t_prev))
+            
+                    # x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    if linear_model:
+                        x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    else:
+                        x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
+                    # if x[3,i] < 0.0:
+                    #     print(f"Negative speed for robot {i}!")
+                x = self.check_collision(x, i)
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if all(self.reached_goal):
                 break_flag = True
 
-            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.scatter(self.targets[i][0], self.targets[i][1], marker="x", color=color_dict[i], s=200)
-            # print(f"Speed of robot {i}: {x[3, i]}")
+            utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
 
         return x, break_flag
 
@@ -264,6 +266,9 @@ class CBF_algorithm():
                       [0, x[3, i] * np.cos(x[2, i])],
                       [0, x[3, i] / Lr],
                       [1, 0]]).reshape(4, 2)
+        
+        P = np.identity(2) * 2
+        q = np.array([-2 * self.dxu[0, i], - 2 * self.dxu[1, i]])
 
         for j in range(N):
             arr = np.array([x[0, j] - x[0, i], x[1, j] - x[1,i]])
@@ -271,11 +276,9 @@ class CBF_algorithm():
             v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
             scalar_prod = v @ arr
 
-            if j == i or dist > 3 * safety_radius or scalar_prod < 0: 
+            if j == i or dist > 3 * safety_radius: 
+                plt.plot
                 continue
-
-            P = np.identity(2) * 2
-            q = np.array([-2 * self.dxu[0, i], - 2 * self.dxu[1, i]])
 
             Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
             Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - x[1, j]) - np.sin(x[2, i]) * (x[0, i] - x[0, j]))
@@ -350,8 +353,12 @@ class CBF_algorithm():
         try:
             sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
             self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
+            if show_animation:
+                circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius+ Kv * abs(x[3, i]), color='b', fill=False)
+                self.ax.add_patch(circle2)
         except:
-            print("QP solver failed")
+            print(f"QP solver failed for robot {i}! Emergency stop.") 
+            self.dxu[0,i] = (0 - x[3,i])/dt 
             self.solver_failure += 1
 
         if self.dxu[0,i] > max_acc or self.dxu[0,i] < min_acc:
@@ -498,7 +505,7 @@ def main1(args=None):
     v = initial_state['v']
 
     # Step 3: Create an array x with the initial values
-    x = np.array([[-5.0, 5.0], [0.0, 0.0], [0.0, -np.pi], [0.0, 0.0]])
+    x = np.array([[-5.0, 5.0], [0.0, 0.1], [-np.pi, 0.0], [0.0, 0.0], [0.0, 0.0]])
     u = np.array([[0, 0], [0, 0]])
     targets = [[5.0, 0.0], [-5.0, 0.0]]
 
@@ -509,7 +516,7 @@ def main1(args=None):
     # Step 5: Extract the target coordinates from the paths
     # targets = [[path[0].x, path[0].y] for path in paths]
 
-    cbf = CBF_algorithm(targets, paths, robot_num=x.shape[1])
+    cbf = CBF_algorithm(targets, paths, robot_num=x.shape[1], ax=ax)
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
         plt.cla()
@@ -596,7 +603,7 @@ def main2(args=None):
                 # Perform some action when the condition is met
                 paths[i].pop(0)
                 if not paths[i]:
-                    print("Path complete")
+                    print(f"Path complete for vehicle {i}!")
                     return
                 cbf.targets[i] = (paths[i][0].x, paths[i][0].y)
 
@@ -640,9 +647,10 @@ def main_seed(args=None):
     y = initial_state['y']
     yaw = initial_state['yaw']
     v = initial_state['v']
+    omega = [0.0]*len(initial_state['x'])
 
     # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
+    x = np.array([x0, y, yaw, v, omega])
     u = np.zeros((2, robot_num))
     
     trajectory = np.zeros((x.shape[0]+u.shape[0], robot_num, 1))
@@ -655,7 +663,7 @@ def main_seed(args=None):
     # Step 5: Extract the target coordinates from the paths
     targets = [[path[0].x, path[0].y] for path in paths]
 
-    cbf = CBF_algorithm(targets, paths)
+    cbf = CBF_algorithm(targets, paths, ax=ax)
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
         plt.cla()

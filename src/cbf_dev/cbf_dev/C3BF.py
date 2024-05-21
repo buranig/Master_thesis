@@ -37,7 +37,7 @@ Kv = json_object["C3BF"]["Kv"] # interval [0.5-1]
 Lr = L / 2.0  # [m]
 Lf = L - Lr
 WB = json_object["Controller"]["WB"]
-robot_num = 15 #json_object["robot_num"]
+robot_num = 5 #json_object["robot_num"]
 safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
@@ -47,10 +47,12 @@ boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_
 check_collision_bool = False
 add_noise = json_object["add_noise"]
 noise_scale_param = json_object["noise_scale_param"]
+show_animation = json_object["show_animation"]
+linear_model = json_object["linear_model"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_7.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_2.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -110,13 +112,13 @@ def check_goal_reached(x, targets, i, distance=0.5):
     """
     dist_to_goal = math.hypot(x[0, i] - targets[i][0], x[1, i] - targets[i][1])
     if dist_to_goal <= distance:
-        print("Goal!!")
+        print(f"Vehicle {i} reached goal!")
         return True
     return False
 
 class C3BF_algorithm():
     
-    def __init__(self, targets, paths, robot_num=robot_num):
+    def __init__(self, targets, paths, ax, robot_num=robot_num):
         self.targets = targets
         self.paths = paths
         self.robot_num = robot_num
@@ -124,6 +126,17 @@ class C3BF_algorithm():
         self.reached_goal = [False]*robot_num
         self.computational_time = []
         self.solver_failure = 0
+        self.ax = ax
+
+    def debug_info(self):
+        print(f"Solver failure: {self.solver_failure}\n")
+        print(f'Paths: {self.paths}\n')
+        print(f'Targets: {self.targets}\n')
+        print(f'Robot num: {self.robot_num}\n')
+        print(f'Computational time: {self.computational_time}\n')
+        print(f'Reached goal: {self.reached_goal}\n')
+        print(f'dxu: {self.dxu}\n')
+        print(f'Solver failure: {self.solver_failure}\n')
 
     def run_3cbf(self, x, break_flag):
         for i in range(self.robot_num):
@@ -133,7 +146,7 @@ class C3BF_algorithm():
                     # Perform some action when the condition is met
                     self.paths[i].pop(0)
                     if not self.paths[i]:
-                        print("Path complete")
+                        print(f"Path complete for vehicle {i}!")
                         self.dxu[:, i] = 0
                         x[3,i] = 0
                         self.reached_goal[i] = True
@@ -142,14 +155,14 @@ class C3BF_algorithm():
                         self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
                 
                 if check_goal_reached(x, self.targets, i):
-                    print(f"Vehicle {i} reached goal!!")
+                    # print(f"Vehicle {i} reached goal!!")
                     self.dxu[:, i] = 0
                     x[3,i] = 0
                     self.reached_goal[i] = True
                 else:
                     t_prev = time.time()
                     if add_noise:
-                        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
+                        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.02*noise_scale_param, 1).reshape(1,1)], axis=0)
                         noisy_pos = x + noise
                         self.control_robot(i, noisy_pos)
                         plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
@@ -157,13 +170,16 @@ class C3BF_algorithm():
                         self.control_robot(i, x)
 
                     self.computational_time.append((time.time() - t_prev))
-            
-                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
 
-            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.plot(self.targets[i][0], self.targets[i][1], "x", color=color_dict[i])
+                    if linear_model:
+                        x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    else:
+                        x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
+                    # if x[3,i] < 0.0:
+                    #     print(f"Negative speed for robot {i}!")
+                x = self.check_collision(x, i)
+
+            utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
 
         if all(self.reached_goal):
             break_flag = True
@@ -173,34 +189,35 @@ class C3BF_algorithm():
         for i in range(self.robot_num):
             # Step 9: Check if the distance between the current position and the target is less than 5
             if not self.reached_goal[i]:
-                if add_noise: 
-                    noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
-                    noisy_pos = x + noise
-                    t_prev = time.time()
-                    self.control_robot(i, noisy_pos)
-                    self.computational_time.append((time.time() - t_prev))
-                    plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
-                else:
-                    t_prev = time.time()
-                    self.control_robot(i, x)
-                    self.computational_time.append((time.time() - t_prev)) 
-                                              
-                # If goal is reached, stop the robot
-                if check_goal_reached(x, self.targets, i, distance=to_goal_stop_distance):
-                    self.reached_goal[i] = True
-                    self.dxu[:,i]= 0
+                if check_goal_reached(x, self.targets, i):
+                    # print(f"Vehicle {i} reached goal!!")
+                    self.dxu[:, i] = 0
                     x[3,i] = 0
+                    self.reached_goal[i] = True
                 else:
-                    x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
-                  
+                    t_prev = time.time()
+                    if add_noise:
+                        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.02*noise_scale_param, 1).reshape(1,1)], axis=0)
+                        noisy_pos = x + noise
+                        self.control_robot(i, noisy_pos)
+                        plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
+                    else:
+                        self.control_robot(i, x)
+
+                    self.computational_time.append((time.time() - t_prev))
+            
+                    if linear_model:
+                        x[:, i] = utils.motion(x[:, i], self.dxu[:, i], dt)
+                    else:
+                        x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
+                    # if x[3,i] < 0.0:
+                    #     print(f"Negative speed for robot {i}!")
+                x = self.check_collision(x, i) 
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if all(self.reached_goal):
                 break_flag = True
 
-            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i] + self.dxu[1, i], length=3, width=0.5)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            plt.scatter(self.targets[i][0], self.targets[i][1], marker="x", color=color_dict[i], s=200)
+            utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
             # print(f"Speed of robot {i}: {x[3, i]}")
 
         return x, break_flag
@@ -224,7 +241,7 @@ class C3BF_algorithm():
 
         cmd = ControlInputs()
         
-        x = self.check_collision(x, i)
+        # x = self.check_collision(x, i)
         x1 = utils.array_to_state(x[:, i])
         cmd.throttle, cmd.delta = utils.pure_pursuit_steer_control(self.targets[i], x1)
         self.dxu[0, i], self.dxu[1, i] = cmd.throttle, cmd.delta
@@ -243,6 +260,7 @@ class C3BF_algorithm():
             numpy.ndarray: Filtered Control input dxu of shape (2, N).
 
         """
+        flag = True
         N = x.shape[1]
         M = self.dxu.shape[0]
         self.dxu[1,:] = utils.delta_to_beta_array(self.dxu[1,:])
@@ -250,9 +268,6 @@ class C3BF_algorithm():
         count = 0
         G = np.zeros([N-1,M])
         H = np.zeros([N-1,1])
-
-        # when the car goes backwards the yaw angle should be flipped --> Why??
-        # x[2,i] = (1-np.sign(x[3,i]))*(np.pi/2) + x[2,i]
 
         f = np.array([x[3,i]*np.cos(x[2,i]),
                             x[3,i]*np.sin(x[2,i]), 
@@ -272,7 +287,7 @@ class C3BF_algorithm():
             v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
             scalar_prod = v @ arr
 
-            if j == i or dist > 3 * safety_radius or scalar_prod < 0: 
+            if j == i or dist > 2 * safety_radius: 
                 continue
 
             v_rel = np.array([x[3,j]*np.cos(x[2,j]) - x[3,i]*np.cos(x[2,i]), 
@@ -302,48 +317,6 @@ class C3BF_algorithm():
             H[count] = np.array([barrier_gain*np.power(h, 3) + Lf_h])
             G[count,:] = -Lg_h
             count+=1
-
-        # Adding arena boundary constraints
-        # # Pos Y
-        # h = (x[1,i] - boundary_points[3])**2 - safety_radius**2 - Kv * abs(x[3,i]*np.sin(x[2,i]))
-        # gradH = np.array([2*(x[1,i] - boundary_points[3]), 0, 
-        #                 -Kv*np.abs(x[3,i])*np.sign(np.sin(x[2,i]))*np.cos(x[2,i]), 
-        #                 -Kv*np.abs(np.sin(x[2,i]))*np.sign(x[3,i])])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
-        
-        # # Neg Y
-        # h = (x[1,i] - boundary_points[2])**2 - safety_radius**2 - Kv * abs(x[3,i]*np.sin(x[2,i]))
-        
-        # gradH = np.array([2*(x[1,i] - boundary_points[2]), 0, 
-        #                 -Kv*np.abs(x[3,i])*np.sign(np.sin(x[2,i]))*np.cos(x[2,i]), 
-        #                 -Kv*np.abs(np.sin(x[2,i]))*np.sign(x[3,i])])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
-        
-        # # Pos X
-        # h = (x[0,i] - boundary_points[1])**2 - safety_radius**2 - Kv * abs(x[3,i]*np.cos(x[2,i]))
-        # gradH = np.array([2*(x[0,i] - boundary_points[1]), 0, 
-        #                 Kv*np.abs(x[3,i])*np.sign(np.cos(x[2,i]))*np.sin(x[2,i]), 
-        #                 -Kv*np.abs(np.cos(x[2,i]))*np.sign(x[3,i])])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
-
-        # # Neg X
-        # h = (x[0,i] - boundary_points[0])**2 - safety_radius**2 - Kv * abs(x[3,i]*np.cos(x[2,i]))
-        # gradH = np.array([2*(x[0,i] - boundary_points[0]), 0, 
-        #                 Kv*np.abs(x[3,i])*np.sign(np.cos(x[2,i]))*np.sin(x[2,i]), 
-        #                 -Kv*np.abs(np.cos(x[2,i]))*np.sign(x[3,i])])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
 
         # Adding arena boundary constraints
         # Pos Y
@@ -391,20 +364,12 @@ class C3BF_algorithm():
         G = np.vstack([G, -Lg_h])
         H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
         
-        # safety = 1
-        # G = np.vstack([G, [[0, -x[3,i]*np.sin(x[2,i])], [0, x[3,i]*np.cos(x[2,i])]]])
-        # h1 = ((np.array([boundary_points[1]-safety, boundary_points[3]-safety])-x[0:2,i])/dt - np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])).reshape(2,1)
-        # H = np.vstack([H, h1])
-        # G = np.vstack([G, [[0, x[3,i]*np.sin(x[2,i])], [0, -x[3,i]*np.cos(x[2,i])]]])
-        # h1 = ((x[0:2,i] - np.array([boundary_points[0]+safety, boundary_points[2]+safety]))/dt + np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])).reshape(2,1)
-        # H = np.vstack([H, h1])
-        
         # Input constraints
         G = np.vstack([G, [[0, 1], [0, -1]]])
         H = np.vstack([H, utils.delta_to_beta(max_steer), -utils.delta_to_beta(-max_steer)])
         # TODO: Keeping the following constraints for solves some problem with the circular_seed_10.json --> why??
-        # G = np.vstack([G, [[0, x[3,i]/Lr], [0, x[3,i]/Lr]]])
-        # H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
+        G = np.vstack([G, [[0, x[3,i]/Lr], [0, x[3,i]/Lr]]])
+        H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
         # G = np.vstack([G, [[0, 1], [0, -1]]])
         # H = np.vstack([H, self.dxu[1,i]+delta_to_beta(5), -self.dxu[1,i]+delta_to_beta(5)])
         G = np.vstack([G, [[1, 0], [-1, 0]]])
@@ -415,15 +380,17 @@ class C3BF_algorithm():
             sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
             self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
         except:
-            print("QP solver failed")   
+            print(f"QP solver failed for robot {i}! Emergency stop.") 
+            self.dxu[0,i] = (0 - x[3,i])/dt 
             self.solver_failure += 1         
-        
+        if show_animation:
+            circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius, color='b', fill=False)
+            self.ax.add_patch(circle2)
         if self.dxu[0,i] > max_acc or self.dxu[0,i] < min_acc:
             print("Throttle out of bounds: ")
             print(self.dxu[0,i])
-            # self.dxu[0,i] = np.clip(self.dxu[0,i], -min_acc, max_acc)
+            self.dxu[0,i] = np.clip(self.dxu[0,i], -min_acc, max_acc)
         self.dxu[1,i] = utils.beta_to_delta(self.dxu[1,i])    
-
 
     def check_collision(self, x, i):
         """
@@ -459,72 +426,6 @@ class C3BF_algorithm():
                     x[3,i] = 0.0
         return x
 
-def main(args=None):
-    """
-    Main function for controlling multiple robots using Model Predictive Control (MPC).
-
-    Steps:
-    1. Initialize the necessary variables and parameters.
-    2. Create an instance of the ModelPredictiveControl class.
-    3. Set the initial state and control inputs.
-    4. Generate the reference trajectory for each robot.
-    5. Plot the initial positions and reference trajectory.
-    6. Set the bounds and constraints for the MPC.
-    7. Initialize the predicted trajectory for each robot.
-    8. Enter the main control loop:
-        - Check if the distance between the current position and the target is less than 5.
-            - If yes, update the path and target.
-        - Perform 3CBF control for each robot.
-        - Plot the robot trajectory.
-        - Update the predicted trajectory.
-        - Plot the map and pause for visualization.
-    """
-    # Step 1: Set the number of iterations
-    iterations = 3000
-    fig = plt.figure(1, dpi=90, figsize=(10,10))
-    ax = fig.add_subplot(111)
-    
-    # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
-    x0, y, yaw, v, omega, model_type = utils.samplegrid(width_init, height_init, min_dist, robot_num, safety_init)
-
-    # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
-    
-    # Step 4: Create paths for each robot
-    paths = [utils.create_path() for _ in range(robot_num)]
-
-    # Step 5: Extract the target coordinates from the paths
-    targets = [[path[0].x, path[0].y] for path in paths]
-
-    c3bf = C3BF_algorithm(targets, paths, robot_num) 
-    
-    # Step 6: Create a MultiControl object
-    multi_control = MultiControl()
-    
-    # Step 7: Initialize the multi_control list with ControlInputs objects
-    multi_control.multi_control = [ControlInputs(delta=0.0, throttle=0.0) for _ in range(robot_num)]
-    
-    # Step 8: Perform the simulation for the specified number of iterations
-    for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect(
-            'key_release_event',
-            lambda event: [exit(0) if event.key == 'escape' else None])
-        for i in range(robot_num):
-            # Step 9: Check if the distance between the current position and the target is less than 5
-            if utils.dist(point1=(x[0,i], x[1,i]), point2=targets[i]) < 2:
-                # Perform some action when the condition is met
-                c3bf.paths[i] = utils.update_path(paths[i])
-                c3bf.targets[i] = (paths[i][0].x, paths[i][0].y)
-
-            c3bf.control_robot(i, x)
-            x, multi_control = update_robot_state(i, x, c3bf.dxu, multi_control, targets)
-        
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
-
 def main1(args=None):
     """
     Main function for controlling multiple robots using Model Predictive Control (MPC).
@@ -554,18 +455,14 @@ def main1(args=None):
     plt.rcParams['font.serif'] = ['Times New Roman']
     plt.rcParams['font.size'] = fontsize
     break_flag = False
-    
-    # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
-    initial_state = data['initial_position']
-    x0 = initial_state['x']
-    y = initial_state['y']
-    yaw = initial_state['yaw']
-    v = initial_state['v']
 
     # Step 3: Create an array x with the initial values
-    x = np.array([[5.0, 5.0], [-2.0, 2.0], [0.0, 0.0], [0.0, 0.0]])
+    # x = np.array([[5.0, 5.0], [-2.0, 2.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
+    # u = np.array([[0, 0], [0, 0]])
+    # targets = [[10, 2], [10, -2]]
+    x = np.array([[-5.0, 5.0], [0.0, 0.1], [-np.pi, 0.0], [0.0, 0.0], [0.0, 0.0]])
     u = np.array([[0, 0], [0, 0]])
-    targets = [[10, 2], [10, -2]]
+    targets = [[5.0, 0.0], [-5.0, 0.0]]
     
     # Step 4: Create paths for each robot
     traj = data['trajectories']
@@ -574,7 +471,7 @@ def main1(args=None):
     # Step 5: Extract the target coordinates from the paths
     # targets = [[path[0].x, path[0].y] for path in paths]
 
-    c3bf = C3BF_algorithm(targets, paths, robot_num=x.shape[1])
+    c3bf = C3BF_algorithm(targets, paths, robot_num=x.shape[1], ax=ax)
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
         plt.cla()
@@ -590,88 +487,15 @@ def main1(args=None):
         plt.ylabel("y [m]", fontdict={'size': fontsize, 'family': 'serif'})
         plt.title('C3BF Corner Case', fontdict={'size': fontsize, 'family': 'serif'})
         
-        plt.xlim(0, 20)
-        plt.ylim(-5, 5)
+        # plt.xlim(0, 20)
+        # plt.ylim(-5, 5)
+        plt.axis("equal")
         plt.legend()
         plt.grid(True)
         plt.pause(0.0001)
 
         if break_flag:
             break
-
-def main2(args=None):
-    """
-    Main function for controlling multiple robots using Model Predictive Control (MPC).
-
-    Steps:
-    1. Initialize the necessary variables and parameters.
-    2. Create an instance of the ModelPredictiveControl class.
-    3. Set the initial state and control inputs.
-    4. Generate the reference trajectory for each robot.
-    5. Plot the initial positions and reference trajectory.
-    6. Set the bounds and constraints for the MPC.
-    7. Initialize the predicted trajectory for each robot.
-    8. Enter the main control loop:
-        - Check if the distance between the current position and the target is less than 5.
-            - If yes, update the path and target.
-        - Perform 3CBF control for each robot.
-        - Plot the robot trajectory.
-        - Update the predicted trajectory.
-        - Plot the map and pause for visualization.
-    """
-    # Step 1: Set the number of iterations
-    iterations = 3000
-    fig = plt.figure(1, dpi=90, figsize=(10,10))
-    ax = fig.add_subplot(111)
-    
-    # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
-    initial_state = data['initial_position']
-    x0 = initial_state['x']
-    y = initial_state['y']
-    yaw = initial_state['yaw']
-    v = initial_state['v']
-
-    # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
-    
-    # Step 4: Create paths for each robot
-    traj = data['trajectories']
-    paths = [[Coordinate(x=traj[str(idx)][i][0], y=traj[str(idx)][i][1]) for i in range(len(traj[str(idx)]))] for idx in range(robot_num)]
-
-    # Step 5: Extract the target coordinates from the paths
-    targets = [[path[0].x, path[0].y] for path in paths]
-
-    c3bf = C3BF_algorithm(targets, paths, robot_num)
-    
-    # Step 6: Create a MultiControl object
-    multi_control = MultiControl()
-    
-    # Step 7: Initialize the multi_control list with ControlInputs objects
-    multi_control.multi_control = [ControlInputs(delta=0.0, throttle=0.0) for _ in range(robot_num)]
-    
-    # Step 8: Perform the simulation for the specified number of iterations
-    for z in range(iterations):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect(
-            'key_release_event',
-            lambda event: [exit(0) if event.key == 'escape' else None])
-        for i in range(robot_num):
-            # Step 9: Check if the distance between the current position and the target is less than 5
-            if utils.dist(point1=(x[0,i], x[1,i]), point2=targets[i]) < 5:
-                # Perform some action when the condition is met
-                paths[i].pop(0)
-                if not paths[i]:
-                    print("Path complete")
-                    return
-                c3bf.targets[i] = (paths[i][0].x, paths[i][0].y)
-
-            c3bf.control_robot(i, x)
-            x, multi_control = update_robot_state(i, x, c3bf.dxu, multi_control, targets)
-        
-        utils.plot_map(width=width_init, height=height_init)
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.0001)
 
 def main_seed(args=None):
     """
@@ -705,9 +529,14 @@ def main_seed(args=None):
     y = initial_state['y']
     yaw = initial_state['yaw']
     v = initial_state['v']
+    omega = [0.0]*len(initial_state['x'])
 
     # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
+    x = np.array([x0, y, yaw, v, omega])
+    u = np.zeros((2, robot_num))
+
+    trajectory = np.zeros((x.shape[0]+u.shape[0], robot_num, 1))
+    trajectory[:, :, 0] = np.concatenate((x,u))
     
     # Step 4: Create paths for each robot
     traj = data['trajectories']
@@ -716,7 +545,7 @@ def main_seed(args=None):
     # Step 5: Extract the target coordinates from the paths
     targets = [[path[0].x, path[0].y] for path in paths]
 
-    c3bf = C3BF_algorithm(targets, paths)
+    c3bf = C3BF_algorithm(targets, paths, ax=ax)
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
         plt.cla()
@@ -724,8 +553,10 @@ def main_seed(args=None):
             'key_release_event',
             lambda event: [exit(0) if event.key == 'escape' else None])
         
-        x, break_flag = c3bf.run_3cbf(x, break_flag) 
-        # x, break_flag = c3bf.go_to_goal(x, break_flag) 
+        # x, break_flag = c3bf.run_3cbf(x, break_flag) 
+        x, break_flag = c3bf.go_to_goal(x, break_flag) 
+
+        trajectory = np.dstack([trajectory, np.concatenate((x, c3bf.dxu))])
         
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")
@@ -734,6 +565,13 @@ def main_seed(args=None):
 
         if break_flag:
             break
+    
+    print("Done")
+    if show_animation:
+        for i in range(robot_num):
+            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
+        plt.pause(0.0001)
+        plt.show()
         
 if __name__=='__main__':
     main_seed()

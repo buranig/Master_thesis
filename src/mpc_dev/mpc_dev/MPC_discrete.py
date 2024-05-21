@@ -39,12 +39,13 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 
 WB = json_object["Controller"]["WB"] # Wheel base
-robot_num = json_object["robot_num"]
+robot_num = 15 # json_object["robot_num"]
 safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
 min_dist = json_object["min_dist"]
 to_goal_stop_distance = json_object["to_goal_stop_distance"]
+emergency_brake_distance = json_object["LBP"]["emergency_brake_distance"]
 update_dist = 2
 N=3
 
@@ -53,6 +54,7 @@ boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_
 check_collision_bool = False
 add_noise = json_object["add_noise"]
 noise_scale_param = json_object["noise_scale_param"]
+linear_model = json_object["linear_model"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
@@ -60,7 +62,7 @@ color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:or
 with open('/home/giacomo/thesis_ws/src/mpc_dev/mpc_dev/MPC_casadi.json', 'r') as file:
     data = json.load(file)
 
-with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_2.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_10.json', 'r') as file:
     seed = json.load(file)
 
 def find_nearest(array, value):
@@ -77,24 +79,6 @@ def find_nearest(array, value):
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return array[idx]
-
-def mpc_discrete_control(x, goal, ob, u_buf, trajectory_buf):
-    """
-    Calculates the control input, trajectory, and control history for the LBP algorithm.
-
-    Args:
-        x (tuple): Current state of the system.
-        goal (tuple): Goal state.
-        ob (list): List of obstacles.
-        u_buf (list): Buffer for storing control inputs.
-        trajectory_buf (list): Buffer for storing trajectories.
-
-    Returns:
-        tuple: Control input, trajectory, and control history.
-    """
-    v_search = calc_dynamic_window(x)
-    u, trajectory, u_history = calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf)
-    return u, trajectory, u_history
 
 def calc_dynamic_window(x):
     """
@@ -116,109 +100,6 @@ def calc_dynamic_window(x):
             v_search.append(v)
     
     return v_search
-
-def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
-    """
-    Calculates the final input with LBP method.
-
-    Args:
-        x (list): The current state of the system.
-        dw (float): The dynamic window.
-        goal (list): The goal position.
-        ob (list): The obstacle positions.
-        u_buf (list): The buffer of control inputs.
-        trajectory_buf (list): The buffer of trajectories.
-
-    Returns:
-        tuple: A tuple containing the best control input, the best trajectory, and the control input history.
-    """
-
-    min_cost = float("inf")
-    best_u = [0.0, 0.0]
-    best_trajectory = np.array([x])
-    u_history = {}
-
-    nearest = find_nearest(np.arange(min_speed, max_speed+v_resolution, v_resolution), x[3])
-
-    # Calculate the cost of each possible trajectory and return the minimum
-    for v in v_search:
-        dict = data[str(nearest)][str(v)]
-        for id, info in dict.items():
-
-            # old_time = time.time()
-            geom = np.zeros((len(info['x']),3))
-            geom[:,0] = info['x']
-            geom[:,1] = info['y']
-            geom[:,2] = info['yaw']
-            geom[:,0:2] = (geom[:,0:2]) @ utils.rotateMatrix(-x[2]) + [x[0],x[1]]
-            
-            geom[:,2] = geom[:,2] + x[2] #bringing also the yaw angle in the new frame
-            
-            trajectory = geom
-            # calc cost
-
-            # TODO: small bug when increasing the factor too much for the to_goal_cost_gain
-            to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory, goal)
-            
-            if v <= 0.0:
-                speed_cost = 30
-            else:
-                speed_cost = 0.0
-                
-            ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory, ob)
-            heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory, goal)
-            final_cost = to_goal_cost + ob_cost + heading_cost + speed_cost 
-            
-            # search minimum trajectory
-            if min_cost >= final_cost:
-                min_cost = final_cost
-
-                # print(f'v: {v}, id: {id}')
-                # print(f"Control seq. {len(info['ctrl'])}")
-                best_u = [info['throttle'][0], info['steering'][0]]
-                best_trajectory = trajectory
-                u_history['throttle'] = info['throttle'].copy()
-                u_history['steering'] = info['steering'].copy()
-                u_history['v_goal'] = v
-
-    # Calculate cost of the previous best trajectory and compare it with that of the new trajectories
-    # If the cost of the previous best trajectory is lower, use the previous best trajectory
-    
-    #TODO: this section has a small bug due to popping elements from the buffer, it gets to a point where there 
-    # are no more elements in the buffer to use
-    if len(u_buf['throttle']) > 4 and len(u_buf['steering']) > 4:
-        u_buf['throttle'].pop(0)
-        u_buf['steering'].pop(0)
-        
-        trajectory_buf = trajectory_buf[1:]
-
-        to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
-        # speed_cost = speed_cost_gain * np.sign(trajectory[-1, 3]) * trajectory[-1, 3]
-        ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory_buf, ob)
-        heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory_buf, goal)
-        final_cost = to_goal_cost + ob_cost + heading_cost #+ speed_cost 
-
-        if min_cost >= final_cost:
-            min_cost = final_cost
-            best_u = [u_buf['throttle'][0], u_buf['steering'][0]]
-            best_trajectory = trajectory_buf
-            u_history['throttle'] = u_buf['throttle'].copy()
-            u_history['steering'] = u_buf['steering'].copy()
-
-    elif min_cost == np.inf:
-        # emergency stop
-        print("Emergency stop")
-        if x[3]>0:
-            best_u = [min_acc, 0]
-        else:
-            best_u = [max_acc, 0]
-
-        # TODO: add prediction trajectory for emergency stop
-        best_trajectory = np.array([x[0:3], x[0:3]]*int(predict_time/dt))
-        u_history['throttle'] = [min_acc]*int(predict_time/dt)
-        u_history['steering'] = [0]*int(predict_time/dt)
-
-    return best_u, best_trajectory, u_history
 
 def calc_obstacle_cost(trajectory, ob):
     """
@@ -355,68 +236,6 @@ def initialize_paths_targets_dilated_traj(x):
 
     return paths, targets, dilated_traj
 
-def update_robot_state(x, u, dt, targets, dilated_traj, u_hist, predicted_trajectory, i):
-    """
-    Update the state of a robot in a multi-robot system.
-
-    Args:
-        x (numpy.ndarray): Current state of all robots.
-        u (numpy.ndarray): Current control inputs of all robots.
-        dt (float): Time step.
-        targets (list): List of target positions for each robot.
-        dilated_traj (list): List of dilated trajectories for each robot.
-        u_hist (list): List of control input histories for each robot.
-        predicted_trajectory (list): List of predicted trajectories for each robot.
-        i (int): Index of the robot to update.
-
-    Returns:
-        tuple: Updated state, control inputs, predicted trajectories, and control input histories of all robots.
-    """
-    x1 = x[:, i]
-    ob = [dilated_traj[idx] for idx in range(len(dilated_traj)) if idx != i]
-    if add_noise:
-        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(1, 2), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=1)
-        noisy_pos = x1 + noise[0]
-        u1, predicted_trajectory1, u_history = mpc_discrete_control(noisy_pos, targets[i], ob, u_hist[i], predicted_trajectory[i])
-        plt.plot(noisy_pos[0], noisy_pos[1], "x", color=color_dict[i], markersize=10)
-    else:
-        u1, predicted_trajectory1, u_history = mpc_discrete_control(x1, targets[i], ob, u_hist[i], predicted_trajectory[i])
-    dilated_traj[i] = LineString(zip(predicted_trajectory1[:, 0], predicted_trajectory1[:, 1])).buffer(dilation_factor, cap_style=3)
-   
-    # Collision check
-    if check_collision_bool:
-        if any([utils.dist([x1[0], x1[1]], [x[0, idx], x[1, idx]]) < WB for idx in range(robot_num) if idx != i]): raise Exception('Collision')
-
-    # x1 = utils.motion(x1, u1, dt)
-    x1 = utils.motion_MPC_casadi(x1, u1, dt)
-    x[:, i] = x1
-    u[:, i] = u1
-
-    # u, x = self.check_collision(x, u, i)
-
-    predicted_trajectory[i] = predicted_trajectory1
-    u_hist[i] = u_history
-
-    return x, u, predicted_trajectory, u_hist
-
-def check_goal_reached(x, targets, i, distance=0.5):
-    """
-    Check if the given point has reached the goal.
-
-    Args:
-        x (numpy.ndarray): Array of x-coordinates.
-        targets (list): List of target points.
-        i (int): Index of the current point.
-
-    Returns:
-        bool: True if the point has reached the goal, False otherwise.
-    """
-    dist_to_goal = math.hypot(x[0, i] - targets[i][0], x[1, i] - targets[i][1])
-    if dist_to_goal <= distance:
-        print("Goal!!")
-        return True
-    return False
-
 class MPC_DISCRETE_algorithm():
     def __init__(self, trajectories, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist, robot_num=robot_num):
         self.trajectories = trajectories
@@ -429,8 +248,9 @@ class MPC_DISCRETE_algorithm():
         self.robot_num = robot_num
         self.reached_goal = [False]*robot_num
         self.computational_time = []
+        self.solver_failure = 0
 
-    def run_lbp(self, x, u, break_flag):
+    def run_mpc(self, x, u, break_flag):
         for i in range(self.robot_num):
             if not self.reached_goal[i]:
                 # Step 9: Check if the distance between the current position and the target is less than 5
@@ -438,22 +258,24 @@ class MPC_DISCRETE_algorithm():
                     # Perform some action when the condition is met
                     self.paths[i].pop(0)
                     if not self.paths[i]:
-                        print("Path complete")
+                        print("Path complete for vehicle {i}!")
                         u[:, i] = np.zeros(2)
                         x[3, i] = 0
                         self.reached_goal[i] = True
                     else: 
                         self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
 
-                if check_goal_reached(x, self.targets, i):
+                if self.check_goal_reached(x, i):
                     print(f"Vehicle {i} reached goal!!")
                     u[:, i] = np.zeros(2)
                     x[3, i] = 0
                     self.reached_goal[i] = True
                 else:
                     t_prev = time.time()
-                    x, u, self.predicted_trajectory, self.u_hist = update_robot_state(x, u, dt, self.targets, self.dilated_traj, self.u_hist, self.predicted_trajectory, i)
+                    x, u = self.update_robot_state(x, u, dt, i)
                     self.computational_time.append(time.time()-t_prev)
+                
+                u, x = self.check_collision(x, u, i) 
 
             if show_animation:
                 utils.plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
@@ -468,13 +290,13 @@ class MPC_DISCRETE_algorithm():
             # Step 9: Check if the distance between the current position and the target is less than 5
             if not self.reached_goal[i]:        
                 # If goal is reached, stop the robot
-                if check_goal_reached(x, self.targets, i, distance=to_goal_stop_distance):
+                if self.check_goal_reached(x, i, distance=to_goal_stop_distance):
                     u[:, i] = np.zeros(2)
                     x[3, i] = 0
                     self.reached_goal[i] = True
                 else:
                     t_prev = time.time()
-                    x, u, self.predicted_trajectory, self.u_hist = update_robot_state(x, u, dt, self.targets, self.dilated_traj, self.u_hist, self.predicted_trajectory, i)
+                    x, u = self.update_robot_state(x, u, dt, i)
                     self.computational_time.append(time.time()-t_prev)
 
                 u, x = self.check_collision(x, u, i) 
@@ -488,6 +310,183 @@ class MPC_DISCRETE_algorithm():
             if show_animation:
                 utils.plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
         return x, u, break_flag
+    
+    def update_robot_state(self, x, u, dt, i):
+        """
+        Update the state of a robot in a multi-robot system.
+
+        Args:
+            x (numpy.ndarray): Current state of all robots.
+            u (numpy.ndarray): Current control inputs of all robots.
+            dt (float): Time step.
+            targets (list): List of target positions for each robot.
+            dilated_traj (list): List of dilated trajectories for each robot.
+            u_hist (list): List of control input histories for each robot.
+            predicted_trajectory (list): List of predicted trajectories for each robot.
+            i (int): Index of the robot to update.
+
+        Returns:
+            tuple: Updated state, control inputs, predicted trajectories, and control input histories of all robots.
+        """
+        x1 = x[:, i]
+        ob = [self.dilated_traj[idx] for idx in range(len(self.dilated_traj)) if idx != i]
+        if add_noise:
+            noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(1, 2), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=1)
+            noisy_pos = x1 + noise[0]
+            u1, predicted_trajectory1, u_history = self.mpc_discrete_control(noisy_pos, ob, i)
+            plt.plot(noisy_pos[0], noisy_pos[1], "x", color=color_dict[i], markersize=10)
+        else:
+            u1, predicted_trajectory1, u_history = self.mpc_discrete_control(x1, ob, i)
+        self.dilated_traj[i] = LineString(zip(predicted_trajectory1[:, 0], predicted_trajectory1[:, 1])).buffer(dilation_factor, cap_style=3)
+    
+        # Collision check
+        if check_collision_bool:
+            if any([utils.dist([x1[0], x1[1]], [x[0, idx], x[1, idx]]) < WB for idx in range(robot_num) if idx != i]): raise Exception('Collision')
+
+        # x1 = utils.motion(x1, u1, dt)
+        if linear_model:
+            x1 = utils.motion_MPC_casadi(x1, u1, dt)
+        else:
+            x1 = utils.nonlinear_model_numpy_stable(x1, u1, dt)
+        x[:, i] = x1
+        u[:, i] = u1
+
+        # u, x = self.check_collision(x, u, i)
+
+        self.predicted_trajectory[i] = predicted_trajectory1
+        self.u_hist[i] = u_history
+
+        return x, u
+    
+    def mpc_discrete_control(self, x, ob, i):
+        """
+        Calculates the control input, trajectory, and control history for the LBP algorithm.
+
+        Args:
+            x (tuple): Current state of the system.
+            goal (tuple): Goal state.
+            ob (list): List of obstacles.
+            u_buf (list): Buffer for storing control inputs.
+            trajectory_buf (list): Buffer for storing trajectories.
+
+        Returns:
+            tuple: Control input, trajectory, and control history.
+        """
+        v_search = calc_dynamic_window(x)
+        u, trajectory, u_history = self.calc_control_and_trajectory(x, v_search, ob, i)
+        return u, trajectory, u_history
+    
+    def calc_control_and_trajectory(self, x, v_search, ob, i):
+        """
+        Calculates the final input with LBP method.
+
+        Args:
+            x (list): The current state of the system.
+            dw (float): The dynamic window.
+            goal (list): The goal position.
+            ob (list): The obstacle positions.
+            u_buf (list): The buffer of control inputs.
+            trajectory_buf (list): The buffer of trajectories.
+
+        Returns:
+            tuple: A tuple containing the best control input, the best trajectory, and the control input history.
+        """
+
+        min_cost = float("inf")
+        best_u = [0.0, 0.0]
+        best_trajectory = np.array([x])
+        u_history = {}
+        u_buf = self.u_hist[i]
+        goal = self.targets[i] 
+        trajectory_buf = self.predicted_trajectory[i]
+
+        nearest = find_nearest(np.arange(min_speed, max_speed+v_resolution, v_resolution), x[3])
+
+        # Calculate the cost of each possible trajectory and return the minimum
+        for v in v_search:
+            dict = data[str(nearest)][str(v)]
+            for id, info in dict.items():
+
+                # old_time = time.time()
+                geom = np.zeros((len(info['x']),3))
+                geom[:,0] = info['x']
+                geom[:,1] = info['y']
+                geom[:,2] = info['yaw']
+                geom[:,0:2] = (geom[:,0:2]) @ utils.rotateMatrix(-x[2]) + [x[0],x[1]]
+                
+                geom[:,2] = geom[:,2] + x[2] #bringing also the yaw angle in the new frame
+                
+                trajectory = geom
+                # calc cost
+
+                # TODO: small bug when increasing the factor too much for the to_goal_cost_gain
+                to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory, goal)
+                
+                if v <= 0.0:
+                    speed_cost = 30
+                else:
+                    speed_cost = 0.0
+                    
+                ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory, ob)
+                heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory, goal)
+                final_cost = to_goal_cost + ob_cost + heading_cost + speed_cost 
+                
+                # search minimum trajectory
+                if min_cost >= final_cost:
+                    min_cost = final_cost
+
+                    # print(f'v: {v}, id: {id}')
+                    # print(f"Control seq. {len(info['ctrl'])}")
+                    best_u = [info['throttle'][0], info['steering'][0]]
+                    best_trajectory = trajectory
+                    u_history['throttle'] = info['throttle'].copy()
+                    u_history['steering'] = info['steering'].copy()
+                    u_history['v_goal'] = v
+
+        # Calculate cost of the previous best trajectory and compare it with that of the new trajectories
+        # If the cost of the previous best trajectory is lower, use the previous best trajectory
+        
+        #TODO: this section has a small bug due to popping elements from the buffer, it gets to a point where there 
+        # are no more elements in the buffer to use
+        if len(u_buf['throttle']) > emergency_brake_distance and len(u_buf['steering']) > emergency_brake_distance:
+            u_buf['throttle'].pop(0)
+            u_buf['steering'].pop(0)
+            
+            trajectory_buf = trajectory_buf[1:]
+            # Even when following the old trajectory, we need to update it to the position of the robot
+            trajectory_buf[:,0:2] -= trajectory_buf[1,0:2]
+            trajectory_buf[:,0:2] = (trajectory_buf[:,0:2]) @ utils.rotateMatrix(utils.normalize_angle(-x[2]+trajectory_buf[0,2]))
+            trajectory_buf[:,0:2] += x[0:2]
+            trajectory_buf[:,2] += utils.normalize_angle(x[2]-trajectory_buf[0,2])
+
+            to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
+            # speed_cost = speed_cost_gain * np.sign(trajectory[-1, 3]) * trajectory[-1, 3]
+            ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory_buf, ob)
+            heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory_buf, goal)
+            final_cost = to_goal_cost + ob_cost + heading_cost #+ speed_cost 
+
+            if min_cost >= final_cost:
+                min_cost = final_cost
+                best_u = [u_buf['throttle'][0], u_buf['steering'][0]]
+                best_trajectory = trajectory_buf
+                u_history['throttle'] = u_buf['throttle'].copy()
+                u_history['steering'] = u_buf['steering'].copy()
+
+        elif min_cost == np.inf:
+            # emergency stop
+            print(f"Emergency stop for vehicle {i}")
+            self.solver_failure +=1
+            if x[3]>0:
+                best_u = [min_acc, 0]
+            else:
+                best_u = [max_acc, 0]
+            
+            best_trajectory = utils.predict_trajectory(x, best_u[0], best_u[1], predict_time)
+            
+            u_history['throttle'] = [min_acc]*int(predict_time/dt)
+            u_history['steering'] = [0]*int(predict_time/dt)
+
+        return best_u, best_trajectory, u_history
     
     def check_collision(self, x, u, i):
         """
@@ -523,6 +522,26 @@ class MPC_DISCRETE_algorithm():
                     x[3, i] = 0
         
         return u, x
+    
+    def check_goal_reached(self, x, i, distance=0.5):
+        """
+        Check if the given point has reached the goal.
+
+        Args:
+            x (numpy.ndarray): Array of x-coordinates.
+            targets (list): List of target points.
+            i (int): Index of the current point.
+
+        Returns:
+            bool: True if the point has reached the goal, False otherwise.
+        """
+        dist_to_goal = math.hypot(x[0, i] - self.targets[i][0], x[1, i] - self.targets[i][1])
+        if dist_to_goal <= distance:
+            print(f"Vehicle {i} reached goal!")
+            self.dilated_traj[i] = Point(x[0, i], x[1, i]).buffer(L/2, cap_style=3)
+            self.predicted_trajectory[i] = np.array([x[0:-1, i]]*int(predict_time/dt))
+            return True
+        return False
 
 def main_seed():
     """
@@ -543,10 +562,11 @@ def main_seed():
     y = initial_state['y']
     yaw = initial_state['yaw']
     v = initial_state['v']
+    omega = [0.0]*len(initial_state['x'])
 
     assert robot_num == len(seed['initial_position']['x']), "The number of robots in the seed file does not match the number of robots in the seed file"
     # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
+    x = np.array([x0, y, yaw, v, omega])
     u = np.zeros((2, robot_num))
 
     trajectory = np.zeros((x.shape[0], robot_num, 1))
@@ -572,14 +592,14 @@ def main_seed():
     fig = plt.figure(1, dpi=90, figsize=(10,10))
     ax = fig.add_subplot(111)
     
-    lbp = MPC_DISCRETE_algorithm(predicted_trajectory, paths, targets, dilated_traj,
+    mpc = MPC_DISCRETE_algorithm(predicted_trajectory, paths, targets, dilated_traj,
                         predicted_trajectory, ax, u_hist)
     
     for z in range(iterations):
         plt.cla()
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
         
-        x, u, break_flag = lbp.run_lbp(x, u, break_flag)
+        x, u, break_flag = mpc.run_mpc(x, u, break_flag)
         # x, u, break_flag = lbp.go_to_goal(x, u, break_flag)
 
         trajectory = np.dstack([trajectory, x])

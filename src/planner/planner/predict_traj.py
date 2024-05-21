@@ -51,12 +51,12 @@ m = 1395.0  # kg
 # # Aerodynamic and friction coefficients
 c_a = 1.36
 c_r1 = 0.02
-dt = 0.01
+dt = 0.1
 
 WB = json_object["Controller"]["WB"] 
 L_d = json_object["Controller"]["L_d"] 
 
-debug = False
+debug = True
 
 color_dict = {
     0: "r",
@@ -88,7 +88,7 @@ class Dynamic_params:
 
         
 
-def predict_trajectory(initial_state: State, target, dynamic_params: Dynamic_params, model='linear'):
+def predict_trajectory(initial_state: State, target, dynamic_params: Dynamic_params, model='linear', ax=None):
     """
     Predicts the trajectory of a vehicle from an initial state to a target point.
 
@@ -116,7 +116,7 @@ def predict_trajectory(initial_state: State, target, dynamic_params: Dynamic_par
     elif model == 'linear_improved':
             new_state, old_time = linear_model_improved_callback(initial_state, cmd)
     else:
-        new_state, old_time = nonlinear_model_callback(initial_state, cmd, dyn_param=dynamic_params)
+        new_state, old_time = nonlinear_model_callback_stable(initial_state, cmd, dyn_param=dynamic_params)
     traj.append((new_state.x, new_state.y))
 
     # Continue predicting the trajectory until the utils.distance between the last point and the target is less than 10
@@ -131,7 +131,7 @@ def predict_trajectory(initial_state: State, target, dynamic_params: Dynamic_par
         elif model == 'linear_improved':
             new_state, old_time = linear_model_improved_callback(new_state, cmd)
         else:
-            new_state, old_time = nonlinear_model_callback(new_state, cmd, dyn_param=dynamic_params)
+            new_state, old_time = nonlinear_model_callback_stable(new_state, cmd, dyn_param=dynamic_params)
         traj.append((new_state.x, new_state.y))
 
         if debug:
@@ -141,8 +141,10 @@ def predict_trajectory(initial_state: State, target, dynamic_params: Dynamic_par
                 'key_release_event',
                 lambda event: [exit(0) if event.key == 'escape' else None])
             
-            plot_path(traj)
             plt.plot(initial_state.x, initial_state.y, 'k.')
+            utils.plot_robot(new_state.x, new_state.y, new_state.yaw, 0)
+            utils.plot_arrow(new_state.x, new_state.y, new_state.yaw, length=1, width=0.5, color='k')
+            utils.plot_arrow(new_state.x, new_state.y, new_state.yaw + cmd.delta, length=1, width=0.5, color='k')
             plt.plot(target[0], target[1], 'b.')
             plt.axis("equal")
             plt.grid(True)
@@ -225,8 +227,8 @@ def plot_path(path: Path):
         x = []
         y = []
         for coord in path:
-            x.append(coord.x)
-            y.append(coord.y)
+            x.append(coord[0])
+            y.append(coord[1])
         plt.scatter(x, y, marker='.', s=10)
         plt.scatter(x[0], y[0], marker='x', s=20)
 
@@ -301,8 +303,14 @@ def nonlinear_model_callback(initial_state: State, cmd: ControlInputs, dyn_param
     vx = initial_state.v * math.cos(beta)
     vy = initial_state.v * math.sin(beta)
 
-    Ffy = -dyn_param.Cf * ((vy + Lf * initial_state.omega) / (vx + 0.0001) - cmd.delta)
-    Fry = -dyn_param.Cr * (vy - Lr * initial_state.omega) / (vx + 0.0001)
+    # alpha_f = cmd.delta - math.atan2((vy + Lf * initial_state.omega), vx)
+    # alpha_r = -math.atan2((vy - Lr * initial_state.omega), vx)
+
+    # Ffy = utils.pacejka_magic_formula(alpha_f)
+    # Fry = utils.pacejka_magic_formula(alpha_r)
+
+    Ffy = -dyn_param.Cf * (np.arctan2((vy + Lf * initial_state.omega), vx) - cmd.delta)
+    Fry = -dyn_param.Cr * np.arctan2((vy - Lr * initial_state.omega),vx)
     R_x = dyn_param.c_r1 * abs(vx)
     F_aero = dyn_param.c_a * vx ** 2
     F_load = F_aero + R_x
@@ -314,11 +322,47 @@ def nonlinear_model_callback(initial_state: State, cmd: ControlInputs, dyn_param
     state.yaw = initial_state.yaw + state.omega * dt
     state.yaw = utils.normalize_angle(state.yaw)
 
+    state.v = math.sqrt(vx ** 2 + vy ** 2)
+    state.v = np.clip(state.v, min_speed, max_speed)
+
     state.x = initial_state.x + vx * math.cos(state.yaw) * dt - vy * math.sin(state.yaw) * dt
     state.y = initial_state.y + vx * math.sin(state.yaw) * dt + vy * math.cos(state.yaw) * dt
 
-    state.v = math.sqrt(vx ** 2 + vy ** 2)
+
+    return state, time.time()
+
+def nonlinear_model_callback_stable(initial_state: State, cmd: ControlInputs, dyn_param: Dynamic_params):
+    """
+    Nonlinear model callback function.
+
+    Args:
+        initial_state (State): The initial state of the system.
+        cmd (ControlInputs): The control inputs.
+        old_time (float): The previous time.
+
+    Returns:
+        Tuple[State, float]: The updated state and the current time.
+    """
+
+    state = State()
+
+    cmd.delta = np.clip(cmd.delta, -max_steer, max_steer)
+
+    beta = math.atan2((Lr * math.tan(cmd.delta) / L), 1.0)
+    u = initial_state.v * math.cos(beta)
+    v = initial_state.v * math.sin(beta)
+
+    kf = -dyn_param.Cf
+    kr = -dyn_param.Cr
+
+    state.x = initial_state.x + u * math.cos(initial_state.yaw) * dt - v * math.sin(initial_state.yaw) * dt
+    state.y = initial_state.y + u * math.sin(initial_state.yaw) * dt + v * math.cos(initial_state.yaw) * dt
+    state.yaw = initial_state.yaw + initial_state.omega * dt
+    u = u + cmd.throttle * dt
+    v = (m*u*v+dt*(Lf*kf-Lr*kr)*initial_state.omega - dt*kf*cmd.delta*u - dt*m*u**2*initial_state.omega)/(m*u - dt*(kf+kr))
+    state.v = math.sqrt(u**2 + v**2)
     state.v = np.clip(state.v, min_speed, max_speed)
+    state.omega = (Iz*u*initial_state.omega+ dt*(Lf*kf-Lr*kr)*v - dt*Lf*kf*cmd.delta*u)/(Iz*u - dt*(Lf**2*kf+Lr**2*kr))
 
     return state, time.time()
 
@@ -338,18 +382,24 @@ def pure_pursuit_steer_control(target, pose):
 
     # this if/else condition should fix the buf of the waypoint behind the car
     if alpha > np.pi/2.0:
-        delta = max_steer
+        alpha = np.pi - alpha
+        desired_speed = -2
+        # delta = max_steer
     elif alpha < -np.pi/2.0:
-        delta = -max_steer
+        alpha = -np.pi - alpha
+        desired_speed = -2
+        # delta = -max_steer
     else:
+        desired_speed = 2
         # ref: https://www.shuffleai.blog/blog/Three_Methods_of_Vehicle_Lateral_Control.html
-        delta = utils.normalize_angle(math.atan2(2.0 * WB *  math.sin(alpha), L_d))
+    
+    delta = utils.normalize_angle(math.atan2(2.0 * WB *  math.sin(alpha), L_d))
 
     # decreasing the desired speed when turning
-    if delta > math.radians(10) or delta < -math.radians(10):
-        desired_speed = 2
-    else:
-        desired_speed = max_speed
+    # if delta > math.radians(10) or delta < -math.radians(10):
+    #     desired_speed = 2
+    # else:
+    #     desired_speed = max_speed
 
     # print(f'Steering angle: {delta} and desired speed: {desired_speed}')
     throttle = 3 * (desired_speed-pose.v)
@@ -357,7 +407,7 @@ def pure_pursuit_steer_control(target, pose):
 
 def main():
     initial_state = State(x=0.0, y=0.0, yaw=0.0, v=0.0, omega=0.0)
-    target = [-10, 0]
+    target = [5, 0]
     # trajectory, tx, ty = predict_trajectory(initial_state, target)
     trajectory = predict_trajectory(initial_state, target, 'linear')
 
@@ -401,10 +451,11 @@ def main():
     dyn_param = Dynamic_params()
 
     fig = plt.figure(0, figsize=(10, 10))
+    ax = fig.add_subplot(111)
     for i, Cf_i in enumerate(Cf_range):
         dyn_param.Cf = Cf_i
         dyn_param.Cr = Cf_i
-        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, model='non_linear', dynamic_params=dyn_param)
+        trajectory1 = predict_trajectory(initial_state=initial_state, target=target, model='non_linear', dynamic_params=dyn_param, ax=ax)
 
         # print(f'Cf: {dyn_param.Cf}')
         x = []

@@ -250,7 +250,7 @@ def uniform_terminal_state_sampling_test1():
     result = generate_path(states, k0, v)
 
     for table in result:
-        xc, yc, yawc, kp = motion_model.generate_trajectory(
+        xc, yc, yawc, vc, kp = motion_model.generate_trajectory(
             table[3], table[4], table[5], k0, v)
 
         if show_animation:
@@ -278,7 +278,7 @@ def uniform_terminal_state_sampling_test2():
     result = generate_path(states, k0,v)
 
     for table in result:
-        xc, yc, yawc, kp = motion_model.generate_trajectory(
+        xc, yc, yawc, vc, kp = motion_model.generate_trajectory(
             table[3], table[4], table[5], k0,v)
 
         if show_animation:
@@ -308,7 +308,7 @@ def biased_terminal_state_sampling_test1():
     result = generate_path(states, k0)
 
     for table in result:
-        xc, yc, yawc, kp = motion_model.generate_trajectory(
+        xc, yc, yawc, vc, kp = motion_model.generate_trajectory(
             table[3], table[4], table[5], k0)
         if show_animation:
             plt.plot(xc, yc, "-r")
@@ -336,7 +336,7 @@ def biased_terminal_state_sampling_test2():
     
     yaw_samples = []
     for table in result:
-        xc, yc, yawc, kp = motion_model.generate_trajectory(
+        xc, yc, yawc, vc, kp = motion_model.generate_trajectory(
             table[3], table[4], table[5], k0)
         yaw_samples.append(yawc[-1])
 
@@ -374,7 +374,7 @@ def lane_state_sampling_test1():
         plt.close("all")
 
     for table in result:
-        x_c, y_c, yaw_c, kp = motion_model.generate_trajectory(
+        x_c, y_c, yaw_c, v_c, kp = motion_model.generate_trajectory(
             table[3], table[4], table[5], k0)
 
         if show_animation:

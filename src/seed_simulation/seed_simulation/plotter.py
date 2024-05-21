@@ -5,7 +5,7 @@ import seaborn as sns
 import numpy as np
 
 # Read the CSV file
-data = pd.read_csv('src/seed_simulation/seed_simulation/seed_sim.csv')
+data = pd.read_csv('src/seed_simulation/seed_simulation/seed_sim2.csv')
 filename = 'src/seed_simulation/seed_simulation/seed_sim.csv'
 # data = data.to_numpy()
 fontsize = 25
@@ -29,7 +29,7 @@ class Plotter:
         sns.boxplot(x=x, y=y, hue=hue,
                     data=self.data, ax=ax, palette=colors)
         
-        # plt.title(title, fontdict={'size': fontsize, 'family': 'serif'})
+        plt.title(title, fontdict={'size': fontsize, 'family': 'serif'})
         plt.grid(True)
         plt.xlabel("Number of AVs",fontdict={'size': fontsize, 'family': 'serif'})
         if y=="Collision Number":
@@ -60,10 +60,11 @@ class Plotter:
 
 quantities = ['Path Length', 'Acceleration Usage', 'Steering Usage', 'Average Speed', 'Avg Computational Time',	'Solver Failure', 'Collision Number']
 methods = ['MPC', 'LBP', 'CBF', 'C3BF', 'DWA']
-methods = ['LBP', 'CBF', 'C3BF', 'CBF_MPC', 'C3BF_MPC']
+quantities = ['Collision Number', 'Average Speed', 'Steering Usage', 'Acceleration Usage', 'Solver Failure']
+methods = ['LBP', 'CBF', 'C3BF', 'C3BF_MPC', "DWA"]
 # noises = [0.0, 0.1, 0.2, 0.4]
 noises = [0.0]
-
+savepath = "/home/giacomo/Documenti/Thesis report/results/"
 # data_plotter = Plotter(data)
 # data_plotter.plot_bars("File Name", "Collision Number", None, "Collision number as a function of the seed file")
 # for idx in range(0,58):
@@ -97,7 +98,7 @@ noises = [0.0]
 #         # plt.savefig(savepath + pre + "vs_robot_" + method + "_hue_noise"+ ".pdf")
 #         plt.show()
 #         # plt.show(block=False)
-#         # plt.pause(1)
+#         # plt.pause(2)
 #         # plt.close()
 #         # plt.savefig('Figure1.svg')
 
@@ -137,7 +138,8 @@ for noise in noises:
         elif noise == 0.4:
             noise_str = "Noise3"
         
+        plt.savefig(savepath + pre + "vs_robot_" + noise_str + "_hue_method"+ "_15_05.pdf")
         plt.show()
-        # plt.savefig(savepath + pre + "vs_robot_" + noise_str + "_hue_method"+ ".pdf")
+        
 
 print("Done")

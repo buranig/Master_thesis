@@ -128,10 +128,10 @@ def generate_lookup_table():
     save_lookup_table("src/lattice_planning/LBP.csv", lookup_table)
 
     for table in lookup_table:
-        x_c, y_c, yaw_c, kp = motion_model.generate_trajectory(
+        x_c, y_c, yaw_c, v_c, kp = motion_model.generate_trajectory(
             table[3], table[4], table[5], k0)
         plt.plot(x_c, y_c, "-r")
-        x_c, y_c, yaw_c, kp = motion_model.generate_trajectory(
+        x_c, y_c, yaw_c, v_c, kp = motion_model.generate_trajectory(
             table[3], -table[4], -table[5], k0)
         plt.plot(x_c, y_c, "-r")
 

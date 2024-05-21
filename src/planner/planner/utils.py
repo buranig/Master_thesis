@@ -46,6 +46,7 @@ c_a = json_object["Car_model"]["c_a"]
 c_r1 = json_object["Car_model"]["c_r1"]
 WB = json_object["Controller"]["WB"]
 predict_time = json_object["LBP"]["predict_time"] # [s]
+show_animation = json_object["show_animation"]
 
 def motion(x, u, dt):
     """
@@ -127,7 +128,7 @@ def nonlinear_model_callback(initial_state: State, cmd: ControlInputs, old_time:
     dt = 0.1
     state = State()
     #dt = time.time() - old_time
-    cmd.delta = np.clip(cmd.delta, -max_steer, max_steer)
+    cmd.throttle = np.clip(cmd.throttle, car_min_acc, car_max_acc)
     cmd.delta = np.clip(cmd.delta, -max_steer, max_steer)
 
     beta = math.atan2((Lr * math.tan(cmd.delta) / L), 1.0)
@@ -154,6 +155,105 @@ def nonlinear_model_callback(initial_state: State, cmd: ControlInputs, old_time:
 
     return state, time.time()
 
+def nonlinear_model_numpy(x, u, dt=dt):
+    """
+    Calculates the state of the system using a nonlinear dynamic model.
+
+    Args:
+        x (numpy.ndarray): The state of the system.
+        u (numpy.ndarray): The control inputs for the system.
+        dt (float): The time step.
+
+    Returns:
+        numpy.ndarray: The updated state of the system.
+    """
+
+    
+    initial_state = State(x=x[0], y=x[1], yaw=x[2], v=x[3], omega=x[4])
+    cmd = ControlInputs(throttle=u[0], delta=u[1])
+    state = State()
+
+    #dt = time.time() - old_time
+    cmd.throttle = np.clip(cmd.throttle, car_min_acc, car_max_acc)
+    cmd.delta = np.clip(cmd.delta, -max_steer, max_steer)
+
+    beta = math.atan2((Lr * math.tan(cmd.delta) / L), 1.0)
+    vx = initial_state.v * math.cos(beta)
+    vy = initial_state.v * math.sin(beta)
+
+    Ffy = -Cf * ((vy + Lf * initial_state.omega) / (vx + 0.1) - cmd.delta)
+    Fry = -Cr * (vy - Lr * initial_state.omega) / (vx + 0.1)
+    R_x = c_r1 * abs(vx)
+    F_aero = c_a * vx ** 2 # 
+    F_load = F_aero + R_x #
+    state.omega = initial_state.omega + (Ffy * Lf * math.cos(cmd.delta) - Fry * Lr) / Iz * dt
+    vx = vx + (cmd.throttle - Ffy * math.sin(cmd.delta) / m - F_load / m + vy * state.omega) * dt
+    vy = vy + (Fry / m + Ffy * math.cos(cmd.delta) / m - vx * state.omega) * dt
+
+    state.yaw = initial_state.yaw + state.omega * dt
+    state.yaw = normalize_angle(state.yaw)
+
+    state.x = initial_state.x + vx * math.cos(state.yaw) * dt - vy * math.sin(state.yaw) * dt
+    state.y = initial_state.y + vx * math.sin(state.yaw) * dt + vy * math.cos(state.yaw) * dt
+
+    state.v = math.sqrt(vx ** 2 + vy ** 2)
+    state.v = np.clip(state.v, min_speed, max_speed)
+
+    x[0] = state.x
+    x[1] = state.y
+    x[2] = state.yaw
+    x[3] = state.v
+    x[4] = state.omega
+
+    return x
+
+def nonlinear_model_numpy_stable(x, u, dt=dt):
+    """
+    Calculates the state of the system using a nonlinear dynamic model.
+
+    Args:
+        x (numpy.ndarray): The state of the system.
+        u (numpy.ndarray): The control inputs for the system.
+        dt (float): The time step.
+
+    Returns:
+        numpy.ndarray: The updated state of the system.
+    """
+
+    
+    initial_state = State(x=x[0], y=x[1], yaw=x[2], v=x[3], omega=x[4])
+    cmd = ControlInputs(throttle=float(u[0]), delta=float(u[1]))
+    state = State()
+
+    #dt = time.time() - old_time
+    cmd.throttle = np.clip(cmd.throttle, car_min_acc, car_max_acc)
+    cmd.delta = np.clip(cmd.delta, -max_steer, max_steer)
+
+    beta = math.atan2((Lr * math.tan(cmd.delta) / L), 1.0)
+    ux = initial_state.v * math.cos(beta)
+    v = initial_state.v * math.sin(beta)
+
+    kf = -Cf
+    kr = -Cr
+
+    state.x = initial_state.x + ux * math.cos(initial_state.yaw) * dt - v * math.sin(initial_state.yaw) * dt
+    state.y = initial_state.y + ux * math.sin(initial_state.yaw) * dt + v * math.cos(initial_state.yaw) * dt
+    state.yaw = initial_state.yaw + initial_state.omega * dt
+    ux = ux + cmd.throttle * dt
+    v = (m*ux*v+dt*(Lf*kf-Lr*kr)*initial_state.omega - dt*kf*cmd.delta*ux - dt*m*ux**2*initial_state.omega)/(m*ux - dt*(kf+kr))
+    # Added sign(ux) to allow for reverse motion
+    state.v = math.sqrt(ux**2 + v**2)*np.sign(ux)
+    state.v = np.clip(state.v, min_speed, max_speed)
+    state.omega = (Iz*ux*initial_state.omega+ dt*(Lf*kf-Lr*kr)*v - dt*Lf*kf*cmd.delta*ux)/(Iz*ux - dt*(Lf**2*kf+Lr**2*kr))
+
+    x[0] = state.x
+    x[1] = state.y
+    x[2] = state.yaw
+    x[3] = state.v
+    x[4] = state.omega
+
+    return x
+
 def pure_pursuit_steer_control(target, pose):
     """
     Calculates the throttle and steering angle for a pure pursuit steering control algorithm.
@@ -169,48 +269,39 @@ def pure_pursuit_steer_control(target, pose):
         
     alpha = normalize_angle(math.atan2(target[1] - pose.y, target[0] - pose.x) - pose.yaw)
 
-    # this if/else condition should fix the buf of the waypoint behind the car
-    if alpha > np.pi/2.0:
-        delta = max_steer
-    elif alpha < -np.pi/2.0:
-        delta = -max_steer
-    else:
-        # ref: https://www.shuffleai.blog/blog/Three_Methods_of_Vehicle_Lateral_Control.html
-        delta = normalize_angle(math.atan2(2.0 * WB *  math.sin(alpha), Lf))
+    # # this if/else condition should fix the bug of the waypoint behind the car
+    # if alpha > np.pi/2.0:
+    #     delta = max_steer
+    # elif alpha < -np.pi/2.0:
+    #     delta = -max_steer
+    # else:
+    #     # ref: https://www.shuffleai.blog/blog/Three_Methods_of_Vehicle_Lateral_Control.html
+    #     delta = normalize_angle(math.atan2(2.0 * WB *  math.sin(alpha), Lf))
 
-    # decreasing the desired speed when turning
-    if delta > math.radians(10) or delta < -math.radians(10):
-        desired_speed = 2
+    # # decreasing the desired speed when turning
+    # if delta > math.radians(10) or delta < -math.radians(10):
+    #     desired_speed = 2
+    # else:
+    #     desired_speed = max_speed
+
+    if alpha > np.pi/2.0:
+        alpha = np.pi - alpha
+        desired_speed = -2
+        # delta = max_steer
+    elif alpha < -np.pi/2.0:
+        alpha = -np.pi - alpha
+        desired_speed = -2
+        # delta = -max_steer
     else:
-        desired_speed = max_speed
+        desired_speed = 2
+        # ref: https://www.shuffleai.blog/blog/Three_Methods_of_Vehicle_Lateral_Control.html
+    
+    delta = normalize_angle(math.atan2(2.0 * WB *  math.sin(alpha), Lf))
 
     delta = np.clip(delta, -max_steer, max_steer)
     # delta = delta
     throttle = 3 * (desired_speed-pose.v)
     return throttle, delta
-
-@staticmethod
-def dist(point1, point2):
-    """
-    Calculate the Euclidean distance between two points.
-
-    Args:
-        point1 (tuple): The coordinates of the first point in the form (x1, y1).
-        point2 (tuple): The coordinates of the second point in the form (x2, y2).
-
-    Returns:
-        float: The Euclidean distance between the two points.
-    """
-    x1, y1 = point1
-    x2, y2 = point2
-
-    x1 = float(x1)
-    x2 = float(x2)
-    y1 = float(y1)
-    y2 = float(y2)
-
-    distance = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-    return float(distance)
 
 def normalize_angle(angle):
     """
@@ -289,6 +380,8 @@ def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax,
     plot_robot(x[0, i], x[1, i], x[2, i], i)
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
     plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
+    if show_animation:
+        ax.annotate(str(i), (float(predicted_trajectory[i][0, 0]), float(predicted_trajectory[i][0, 1])))
 
 def plot_arrow(x, y, yaw, label=None, length=0.5, width=0.1, color='k'):  # pragma: no cover
     plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
@@ -310,7 +403,7 @@ def plot_path(path: Path):
         plt.scatter(x, y, marker='.', s=10)
         plt.scatter(x[0], y[0], marker='x', s=20)
 
-def plot_robot_and_arrows(i, x, multi_control, targets):
+def plot_robot_and_arrows(i, x, u, targets, ax):
     """
     Plots the robot and arrows for visualization.
 
@@ -322,9 +415,11 @@ def plot_robot_and_arrows(i, x, multi_control, targets):
 
     """
     plot_robot(x[0, i], x[1, i], x[2, i], i)
-    plot_arrow(x[0, i], x[1, i], x[2, i] + multi_control.multi_control[i].delta, length=3, width=0.5)
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
+    plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
     plt.plot(targets[i][0], targets[i][1], "x", color = color_dict[i])
+    if show_animation:
+        ax.annotate(str(i), (float(x[0, i]), float(x[1, i])))
 
 def normalize_angle_array(angle):
     """
@@ -332,9 +427,12 @@ def normalize_angle_array(angle):
     :param angle: (float)
     :return: (float) Angle in radian in [-pi, pi]
     """
-    angle[angle[:] > np.pi] -= 2.0 * np.pi
+    for i, _angle in enumerate(angle):
+        _angle = normalize_angle(_angle)
+        angle[i] = _angle
+    # angle[angle[:] > np.pi] -= 2.0 * np.pi
 
-    angle[angle[:] < -np.pi] += 2.0 * np.pi
+    # angle[angle[:] < -np.pi] += 2.0 * np.pi
 
     return angle
 
@@ -655,7 +753,49 @@ def predict_trajectory(x_init, a, delta, predict_time=predict_time, dt=dt):
     trajectory = np.array(x)
     time = 0
     while time < predict_time:
-        x = motion(x, [a, delta], dt)
+        # x = motion(x, [a, delta], dt)
+        x = nonlinear_model_numpy_stable(x, [a, delta], dt)
         trajectory = np.vstack((trajectory, x))
         time += dt
     return trajectory
+
+def pacejka_magic_formula(alpha):
+    """
+    Calculates lateral force using Pacejka Magic Formula.
+    
+    Parameters:
+        alpha (float): Slip angle (radians).
+        Fz (float): Vertical load on the tire (N).
+        C, D, B, E (float): Pacejka Magic Formula parameters.
+    
+    Returns:
+        float: Lateral force (N).
+    """
+    C = 1.3
+    D = 2500
+    B = 10
+    E = 0.97
+    Fz = m * 9.81
+    mu = D * math.sin(C * math.atan(B * alpha - E * (B * alpha - math.atan(B * alpha))))
+    return mu * Fz
+
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
+    # Print New Line on Complete
+    if iteration == total: 
+        print()

@@ -11,7 +11,7 @@ import pathlib
 import json
 
 import matplotlib
-matplotlib.use("Agg") # Uncomment to save but not visualize
+# matplotlib.use("Agg") # Uncomment to save but not visualize
 
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
 # Opening JSON file
@@ -30,7 +30,7 @@ iterations = 700
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
 
-method = "CBF-MPC"
+method = "CBF-LBP"
 
 if method == "LBP":
     fpath = '/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_trajectories.pkl'

@@ -153,7 +153,7 @@ def optimize_trajectory(target, k0, p, v):
     """
     
     for i in range(max_iter):
-        xc, yc, yawc, kp = motion_model.generate_trajectory(p[0, 0], p[1, 0], p[2, 0], k0, v)
+        xc, yc, yawc, vi, kp = motion_model.generate_trajectory(p[0, 0], p[1, 0], p[2, 0], k0, v)
         dc = np.array(calc_diff(target, xc, yc, yawc)).reshape(3, 1)
 
         cost = np.linalg.norm(dc)

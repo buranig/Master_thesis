@@ -13,7 +13,7 @@
             "max_steer": 0.785398,
             "max_acc": 100,
             "min_acc": -100,
-            "safety_radius": 2,
+            "safety_radius": 1,
             "barrier_gain": 0.01, 
             "arena_gain": 0.01,
             "Kv": 0.1
@@ -21,11 +21,11 @@
     "C3BF":
         {
             "max_steer": 0.785398,
-            "max_acc": 5,
-            "min_acc": -5,
-            "safety_radius": 1.5,
-            "barrier_gain": 1, 
-            "arena_gain": 50,
+            "max_acc": 100,
+            "min_acc": -100,
+            "safety_radius": 2,
+            "barrier_gain": 0.01, 
+            "arena_gain": 0.01,
             "Kv": 0.1
         },
     "DWA":
@@ -38,13 +38,14 @@
             "a_resolution": 0.5,
             "v_resolution": 0.5,
             "delta_resolution": 15,
-            "predict_time": 2,
+            "predict_time": 3,
             "to_goal_cost_gain": 1,
             "speed_cost_gain": 1,
             "obstacle_cost_gain": 30,
             "heading_cost_gain": 1,
             "robot_stuck_flag_cons": 0.001,
-            "dilation_factor": 0.35
+            "dilation_factor": 0.35,
+            "emergency_brake_distance": 5
         },
     "LBP":
         {
@@ -59,10 +60,11 @@
             "predict_time": 1.5,
             "to_goal_cost_gain": 20,
             "speed_cost_gain": 1,
-            "obstacle_cost_gain": 30,
+            "obstacle_cost_gain": 50,
             "heading_cost_gain": 1,
             "robot_stuck_flag_cons": 0.001,
-            "dilation_factor": 0.35
+            "dilation_factor": 0.35,
+            "emergency_brake_distance": 8
         },
     "MPC":
         {
@@ -81,9 +83,9 @@
             "max_speed": 2,
             "min_speed": -1.0,
             "L": 1.0, 
-            "Cf": 320.0,
-            "Cr": 340.0, 
-            "Iz": 225.0,
+            "Cf": 50000.0,
+            "Cr": 50000.0, 
+            "Iz": 25.0,
             "m": 150.0,
             "c_a": 1.36,
             "c_r1": 0.01
@@ -108,7 +110,8 @@
     "plot_traj": false,
     "to_goal_stop_distance": 2.5,
     "show_animation": false,
-    "add_noise": true,
-    "noise_scale_param": 0.0
+    "add_noise": false,
+    "noise_scale_param": 0.0,
+    "linear_model": false
     
 }

@@ -3,6 +3,7 @@ import numpy as np
 import pathlib
 import math
 from shapely.geometry import Point, Polygon, LineString
+from shapely.plotting import plot_polygon
 import matplotlib.pyplot as plt
 from planner import utils as utils
 
@@ -50,7 +51,7 @@ show_animation = True
 v_ref = 2.0 # [m/s] reference speed
 
 # Load trajectory and control inputs from LBP.json file
-with open('src/lbp_dev/lbp_dev/LBP.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/dwa_dev/trajectories.json', 'r') as file:
     data = json.load(file)
 
 def interp0(x, xp, yp):
@@ -100,15 +101,23 @@ def plot_robot(x, y, yaw):  # pragma: no cover
 
 # Implement kinematic bicycle model to follow the trajectory
 def main():
-    v = -1.0 # [m/s] reference speed
-    x = [0.0, 0.0, 0.0, 0.0, 0.0] #[x, y, yaw, v, omega]   
-    ref = data[str(v)]['1']
-    trajectory = np.zeros((len(ref['x']),3))
-    trajectory[:,0] = ref['x']
-    trajectory[:,1] = ref['y']
-    trajectory[:,2] = ref['yaw']
-    control_inputs = ref['ctrl']
-
+    v = 0.0 # [m/s] reference speed
+    a = 2.0
+    delta = -0.785398
+    # delta = 0.7853983267948961
+    x = [0.0, 0.0, 0.0, v, 0.0] #[x, y, yaw, v, omega]   
+    ref = data[str(v)][str(a)][str(delta)]
+    ref = np.array(ref)
+    trajectory = np.zeros((len(ref),4))
+    trajectory[:,0] = ref[:,0]
+    trajectory[:,1] = ref[:,1]
+    trajectory[:,2] = ref[:,2]
+    trajectory[:,3] = ref[:,3]
+    trajectory[:,0:2] = (trajectory[:,0:2]) @ utils.rotateMatrix(np.radians(90)-x[2]) + [x[0],x[1]]
+    
+    # print(time.time()-old_time)
+    trajectory[:,2] = trajectory[:,2]-np.pi/2+x[2]
+    trajectory[:,2] = utils.normalize_angle_array(trajectory[:,2])
     
     fig = plt.figure(1, dpi=90)
     ax = fig.add_subplot(111)
@@ -116,25 +125,37 @@ def main():
     plt.rcParams['font.family'] = ['serif']
     plt.rcParams['font.serif'] = ['Times New Roman']
     plt.rcParams['font.size'] = fontsize
-    a_buf = []
 
-    for i in range(len(control_inputs)):
+    trajectory1 = trajectory.copy()
+    dilated_traj = LineString(zip(trajectory1[:, 0], trajectory1[:, 1])).buffer(dilation_factor)
+    i = 1
+    while (len(trajectory1)>2):
         # Get current state and control input
-        delta = control_inputs[i]
-        a = (v-x[3])/dt
-        a = np.clip(a, -5, 5)
-        a_buf.append(a)
         u = [a, delta]
 
-        # Apply control input to the kinematic bicycle model
-        # TODO: Implement the kinematic bicycle model logic here
-        # x = utils.motion(x, u, dt)
         x = utils.nonlinear_model_numpy_stable(x, u, dt)
+        # trajectory1 = trajectory1[i:,:]
+        # trajectory1[:,0:2] += [x[0]-trajectory1[0,0],x[1]-trajectory1[0,1]]
+        # Rotate the whole trajectory arount the first trajectory point
+        trajectory1 = trajectory1[1:,:] 
+        trajectory1[:,0:2] -= trajectory1[1,0:2]
+        # print(f'yaw angle: {np.rad2deg(utils.normalize_angle(x[2]))}, traejctory angle: {np.rad2deg(trajectory1[0,2])}, difference: {np.rad2deg(utils.normalize_angle(x[2]-trajectory1[0,2]))}\n')
+        # print(np.rad2deg(utils.normalize_angle(x[2]-trajectory[0,2])))
+        trajectory1[:,0:2] = (trajectory1[:,0:2]) @ utils.rotateMatrix(utils.normalize_angle(-x[2]+trajectory1[0,2]))
+        trajectory1[:,0:2] += x[0:2]
+        trajectory1[:,2] += utils.normalize_angle(x[2]-trajectory1[0,2])
+        # print(f'After: yaw angle: {np.rad2deg(utils.normalize_angle(x[2]))}, traejctory angle: {np.rad2deg(trajectory1[0,2])}, difference: {np.rad2deg(utils.normalize_angle(x[2]-trajectory1[0,2]))}\n')
 
+        i += 1
+
+        # trajectory1[:,0:2] = (trajectory1[:,0:2]) @ utils.rotateMatrix(x[2]-trajectory1[0,2])
+
+
+        dilated_traj = LineString(zip(trajectory1[:, 0], trajectory1[:, 1])).buffer(dilation_factor)
         # Print the current state and control input
-        print(f"Control Input: {u}")
-        print(f'Current State: {x[0:3]}, reference: {trajectory[i,:]}')
-        print(f'Current Speed: {x[3]}\n')
+        # print(f"Control Input: {u}")
+        # print(f'Current State: {x[0:3]}, reference: {trajectory[i,:]}')
+        # print(f'Current Speed: {x[3]}\n')
         
         # plot the trajectory, the robot and the yaw
         plt.cla()
@@ -144,7 +165,7 @@ def main():
             lambda event: [exit(0) if event.key == 'escape' else None])
         
         plt.plot(trajectory[:, 0], trajectory[:, 1], "-g")
-        # plot_polygon(dilated_traj[i], ax=ax, add_points=False, alpha=0.5)
+        plot_polygon(dilated_traj, ax=ax, add_points=False, alpha=0.5)
         plt.plot(x[0], x[1], "xr")
         plt.plot(trajectory[-1, 0], trajectory[-1, 1], "xb")
         plot_robot(x[0], x[1], x[2])
@@ -157,43 +178,43 @@ def main():
 
     plt.show()
 
-    # Create two subplots and unpack the output array immediately
-    t = np.arange(0, 3.1, 0.1)
-    t2 = np.linspace(0, 3.1, 1000)
-    fig = plt.figure(2, dpi=90, figsize=(14, 5))
-    # fig, (ax1, ax2, ax3) = plt.subplots(2, 2, sharex=True)
-    fig.suptitle('LBP Trajectory Following')
-    ax1 = fig.add_subplot(221)
-    # ax1.plot(t, a_buf, label='Acceleration')
-    ax1.scatter(t, a_buf, color='b', s=20)
-    ax1.plot(t2,interp0(t2,t,a_buf),'r',label='Discrete Acceleration')
-    ax1.set_title('Acceleration')
-    ax1.set_ylim(min_acc-1, max_acc+1)
-    ax1.set_ylabel("Acceleration", fontdict={'size': fontsize, 'family': 'serif'})
-    ax1.grid(True)
-    ax1.legend()
-    plt.scatter
-    ax2 = fig.add_subplot(223)
-    ax2.set_title('Steering Inputs')
-    # ax2.plot(t, control_inputs, label='Control Inputs')
-    ax2.scatter(t, control_inputs, color='b', s=20)
-    ax2.plot(t2,interp0(t2,t,control_inputs),'r', label='Discrete Control Inputs')
-    ax2.scatter([0, (len(control_inputs)-1)/20, (len(control_inputs)-1)/10], [control_inputs[0], control_inputs[int(len(control_inputs)/2)], control_inputs[-1]], color='r', marker='x', s=90,label='Checkpoints for interpolation')
-    ax2.set_xlabel('time (s)')
-    ax2.set_ylim(-max_steer-0.1, max_steer+0.1)
-    ax2.set_xlabel("Time (s)", fontdict={'size': fontsize, 'family': 'serif'})
-    ax2.set_ylabel("Steering", fontdict={'size': fontsize, 'family': 'serif'})
-    ax2.grid(True)
-    ax2.legend()
+    # # Create two subplots and unpack the output array immediately
+    # t = np.arange(0, 3.1, 0.1)
+    # t2 = np.linspace(0, 3.1, 1000)
+    # fig = plt.figure(2, dpi=90, figsize=(14, 5))
+    # # fig, (ax1, ax2, ax3) = plt.subplots(2, 2, sharex=True)
+    # fig.suptitle('LBP Trajectory Following')
+    # ax1 = fig.add_subplot(221)
+    # # ax1.plot(t, a_buf, label='Acceleration')
+    # ax1.scatter(t, a_buf, color='b', s=20)
+    # ax1.plot(t2,interp0(t2,t,a_buf),'r',label='Discrete Acceleration')
+    # ax1.set_title('Acceleration')
+    # ax1.set_ylim(min_acc-1, max_acc+1)
+    # ax1.set_ylabel("Acceleration", fontdict={'size': fontsize, 'family': 'serif'})
+    # ax1.grid(True)
+    # ax1.legend()
+    # plt.scatter
+    # ax2 = fig.add_subplot(223)
+    # ax2.set_title('Steering Inputs')
+    # # ax2.plot(t, control_inputs, label='Control Inputs')
+    # ax2.scatter(t, control_inputs, color='b', s=20)
+    # ax2.plot(t2,interp0(t2,t,control_inputs),'r', label='Discrete Control Inputs')
+    # ax2.scatter([0, (len(control_inputs)-1)/20, (len(control_inputs)-1)/10], [control_inputs[0], control_inputs[int(len(control_inputs)/2)], control_inputs[-1]], color='r', marker='x', s=90,label='Checkpoints for interpolation')
+    # ax2.set_xlabel('time (s)')
+    # ax2.set_ylim(-max_steer-0.1, max_steer+0.1)
+    # ax2.set_xlabel("Time (s)", fontdict={'size': fontsize, 'family': 'serif'})
+    # ax2.set_ylabel("Steering", fontdict={'size': fontsize, 'family': 'serif'})
+    # ax2.grid(True)
+    # ax2.legend()
 
-    ax3 = fig.add_subplot(122)
-    ax3.plot(trajectory[:, 0], trajectory[:, 1], "-g", label='Reference Trajectory')
-    ax3.set_xlabel("x (m)", fontdict={'size': fontsize, 'family': 'serif'})
-    ax3.set_ylabel("y (m)", fontdict={'size': fontsize, 'family': 'serif'})
-    ax3.set_title('Reference Trajectory')
-    ax3.grid(True)
-    ax3.legend()
-    plt.show()
+    # ax3 = fig.add_subplot(122)
+    # ax3.plot(trajectory[:, 0], trajectory[:, 1], "-g", label='Reference Trajectory')
+    # ax3.set_xlabel("x (m)", fontdict={'size': fontsize, 'family': 'serif'})
+    # ax3.set_ylabel("y (m)", fontdict={'size': fontsize, 'family': 'serif'})
+    # ax3.set_title('Reference Trajectory')
+    # ax3.grid(True)
+    # ax3.legend()
+    # plt.show()
 
 
 if __name__ == "__main__":

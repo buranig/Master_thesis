@@ -11,7 +11,7 @@ import pathlib
 import json
 
 import matplotlib
-# matplotlib.use("Agg") # Uncomment to visualize but not save
+matplotlib.use("Agg") # Uncomment to save but not visualize
 
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
 # Opening JSON file
@@ -30,23 +30,44 @@ iterations = 700
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
 
-fpath = '/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_trajectories.pkl'
-fpath = '/home/giacomo/thesis_ws/src/seed_simulation/seed_simulation/objs.pkl'
-fpath = '/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_trajectories.pkl'
-fpath = '/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_trajectories.pkl'
-fpath = '/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_LBP_trajectories.pkl'
+method = "CBF-MPC"
+
+if method == "LBP":
+    fpath = '/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_trajectories.pkl'
+
+elif method == "DWA":
+    fpath = '/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_trajectories.pkl'
+# fpath = '/home/giacomo/thesis_ws/src/seed_simulation/seed_simulation/objs.pkl'
+
+elif method == 'CBF':
+    fpath = '/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_trajectories.pkl'
+
+elif method == 'CBF-LBP':
+    fpath = '/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_LBP_trajectories.pkl'
+
+elif method == 'CBF-MPC':
+    fpath = '/home/giacomo/thesis_ws/src/mpc_dev/mpc_dev/CBF_MPC_trajectories.pkl'
+
 f = open(fpath, 'rb')
-method = "LBP"
 obj = pickle.load(f)
 f.close()
 
 trajectory = obj[0]
 targets = obj[1]
 
-if method == "LBP" or method == "DWA":
-    fpath = '/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_dilated_traj.pkl'
-    fpath = '/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_dilated_traj.pkl'
-    fpath = '/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_LBP_dilated_traj.pkl'
+if method == "LBP" or method == "DWA" or method == "CBF-MPC" or method == "CBF-LBP":
+    
+    if method == "LBP": 
+        fpath = '/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_dilated_traj.pkl'
+    
+    if method == "DWA":
+        fpath = '/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_dilated_traj.pkl'
+
+    if method == "CBF-LBP":
+        fpath = '/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_LBP_dilated_traj.pkl'
+
+    if method == "CBF-MPC":
+        fpath = '/home/giacomo/thesis_ws/src/mpc_dev/mpc_dev/CBF_MPC_dilated_traj.pkl'
     f = open(fpath, 'rb')
     obj = pickle.load(f)
     f.close()
@@ -68,10 +89,13 @@ def update(frame):
         utils.plot_arrow(trajectory[0, i, z], trajectory[1, i, z], trajectory[2, i, z] + trajectory[5, i, z], length=3, width=0.5)
         utils.plot_arrow(trajectory[0, i, z], trajectory[1, i, z], trajectory[2, i, z], length=1, width=0.5)
         plt.scatter(targets[i][0], targets[i][1], marker="x", color=color_dict[i], s=200)
-        if method == "LBP" or method == "DWA":
-            predicted_trajectory1 = dilated_traj[z][i]
-            predicted_trajectory1 = LineString(zip(predicted_trajectory1[:, 0], predicted_trajectory1[:, 1])).buffer(0.35, cap_style=3)
-            plot_polygon(Polygon(predicted_trajectory1), ax=ax, add_points=False, alpha=0.5, color=color_dict[i])
+        if method == "LBP" or method == "DWA" or method == 'CBF-MPC' or method == "CBF-LBP":
+            try:
+                predicted_trajectory1 = dilated_traj[z][i]
+                predicted_trajectory1 = LineString(zip(predicted_trajectory1[:, 0], predicted_trajectory1[:, 1])).buffer(0.35, cap_style=3)
+                plot_polygon(Polygon(predicted_trajectory1), ax=ax, add_points=False, alpha=0.5, color=color_dict[i])
+            except: 
+                print(f'Robot {i}, finished')
     utils.plot_map(width=width_init, height=height_init)
     plt.xlabel("x [m]", fontdict={'size': 17, 'family': 'serif'})
     plt.ylabel("y [m]", fontdict={'size': 17, 'family': 'serif'})
@@ -92,4 +116,4 @@ plt.show()
 writergif = animation.PillowWriter(fps=10) 
 # writergif.setup(fig, "2D_Schrodinger_Equation.gif", dpi = 300) 
 # anim.save('/home/giacomo/Video/Video/' + method + '.gif', writer=writergif, dpi="figure")
-anim.save('/home/giacomo/Video/Video/' + 'CBF-LBP' + '.gif', writer=writergif, dpi="figure")
+anim.save('/home/giacomo/Video/Video/' + method + '.gif', writer=writergif, dpi="figure")

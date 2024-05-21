@@ -60,7 +60,9 @@ class Plotter:
 
 quantities = ['Path Length', 'Acceleration Usage', 'Steering Usage', 'Average Speed', 'Avg Computational Time',	'Solver Failure', 'Collision Number']
 methods = ['MPC', 'LBP', 'CBF', 'C3BF', 'DWA']
-noises = [0.0, 0.1, 0.2, 0.4]
+methods = ['LBP', 'CBF', 'C3BF', 'CBF_MPC', 'C3BF_MPC']
+# noises = [0.0, 0.1, 0.2, 0.4]
+noises = [0.0]
 
 # data_plotter = Plotter(data)
 # data_plotter.plot_bars("File Name", "Collision Number", None, "Collision number as a function of the seed file")
@@ -71,33 +73,39 @@ noises = [0.0, 0.1, 0.2, 0.4]
 # plt.show()
 
 
-for method in methods:
-    for quantity in quantities:
-        plt.close()
-        mpc_data = data.loc[data["Method"] == method]
-        mpc_plotter = Plotter(mpc_data)
-        mpc_plotter.plot_bars("Robot Number", quantity, 'Noise Scaling', quantity+" vs Number of robots " + '(Method: ' + method + ')')
-        savepath = "/home/giacomo/Documenti/Thesis report/results/"
-        if quantity == 'Collision Number':
-            pre = "collision_"
-        elif quantity == 'Solver Failure':
-            pre = "failure_"
-        elif quantity == 'Avg Computational Time':
-            pre = "comp_"
-        elif quantity == 'Average Speed':
-            pre = "speed_"
-        elif quantity == 'Steering Usage':
-            pre = "steer_"
-        elif quantity == 'Acceleration Usage':
-            pre = "acc_"
-        elif quantity == 'Path Length':
-            pre = "path_"
-        plt.savefig(savepath + pre + "vs_robot_" + method + "_hue_noise"+ ".pdf")
-        plt.show(block=False)
-        plt.pause(1)
-        plt.close()
-        # plt.savefig('Figure1.svg')
+# for method in methods:
+#     for quantity in quantities:
+#         plt.close()
+#         mpc_data = data.loc[data["Method"] == method]
+#         mpc_plotter = Plotter(mpc_data)
+#         mpc_plotter.plot_bars("Robot Number", quantity, 'Noise Scaling', quantity+" vs Number of robots " + '(Method: ' + method + ')')
+#         savepath = "/home/giacomo/Documenti/Thesis report/results/"
+#         if quantity == 'Collision Number':
+#             pre = "collision_"
+#         elif quantity == 'Solver Failure':
+#             pre = "failure_"
+#         elif quantity == 'Avg Computational Time':
+#             pre = "comp_"
+#         elif quantity == 'Average Speed':
+#             pre = "speed_"
+#         elif quantity == 'Steering Usage':
+#             pre = "steer_"
+#         elif quantity == 'Acceleration Usage':
+#             pre = "acc_"
+#         elif quantity == 'Path Length':
+#             pre = "path_"
+#         # plt.savefig(savepath + pre + "vs_robot_" + method + "_hue_noise"+ ".pdf")
+#         plt.show()
+#         # plt.show(block=False)
+#         # plt.pause(1)
+#         # plt.close()
+#         # plt.savefig('Figure1.svg')
 
+data1 = pd.DataFrame()
+for method in methods:
+    data1 = pd.concat([data1, data.loc[data["Method"] == method]])
+
+data = data1
 for noise in noises:
     for quantity in quantities:
         plt.close()
@@ -128,6 +136,8 @@ for noise in noises:
             noise_str = "Noise2"
         elif noise == 0.4:
             noise_str = "Noise3"
-        plt.savefig(savepath + pre + "vs_robot_" + noise_str + "_hue_method"+ ".pdf")
+        
+        plt.show()
+        # plt.savefig(savepath + pre + "vs_robot_" + noise_str + "_hue_method"+ ".pdf")
 
 print("Done")

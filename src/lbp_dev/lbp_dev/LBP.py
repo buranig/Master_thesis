@@ -6,9 +6,8 @@ from enum import Enum
 import pathlib
 import json
 from custom_message.msg import Coordinate
-from shapely.geometry import Point, Polygon, LineString
-from shapely import intersection, distance
-from shapely.plotting import plot_polygon, plot_line
+from shapely.geometry import Point, LineString
+from shapely import distance
 import planner.utils as utils
 # for debugging
 import time
@@ -40,7 +39,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 
 WB = json_object["Controller"]["WB"] # Wheel base
-robot_num = 6 #json_object["robot_num"]
+robot_num = json_object["robot_num"]
 safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
@@ -61,7 +60,7 @@ color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:or
 with open('/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP.json', 'r') as file:
     data = json.load(file)
 
-with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_11.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_2.json', 'r') as file:
     seed = json.load(file)
 
 def lbp_control(x, goal, ob, u_buf, trajectory_buf):
@@ -197,8 +196,8 @@ def calc_control_and_trajectory(x, v_search, goal, ob, u_buf, trajectory_buf):
             best_u = [min_acc, 0]
         else:
             best_u = [max_acc, 0]
-        best_trajectory = np.array([x[0:3], x[0:3]])
-        u_history['ctrl'] = [min_acc, 0]
+        best_trajectory = np.array([x[0:3], x[0:3]]*int(predict_time/dt))
+        u_history['ctrl'] = [min_acc, 0]*int(predict_time/dt)
 
 
     return best_u, best_trajectory, u_history

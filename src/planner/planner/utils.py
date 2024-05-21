@@ -67,12 +67,22 @@ def motion(x, u, dt):
 
     x[0] = x[0] + x[3] * math.cos(x[2]) * dt
     x[1] = x[1] + x[3] * math.sin(x[2]) * dt
-    x[2] = x[2] + x[3] / Lr * np.sin(np.arctan2(Lr/L * np.tan(delta),1)) * dt
+    x[2] = x[2] + x[3] / Lr * np.sin(np.arctan2(Lr/L * np.tan(delta), 1.0)) * dt
     # x[2] = x[2] + x[3] / L * math.tan(delta) * dt
 
     x[2] = normalize_angle(x[2])
     x[3] = x[3] + throttle * dt
     x[3] = np.clip(x[3], min_speed, max_speed)
+
+    return x
+
+def motion_MPC_casadi(x, u, dt):
+    
+    beta = math.atan2(Lr / (Lf + Lr) * math.tan(u[1]), 1.0)
+    x[0] = x[0] + dt * (x[3] * math.cos(x[2] + beta))
+    x[1] = x[1] + dt * (x[3] * math.sin(x[2] + beta))
+    x[2] = x[2]+ dt * (x[3] / Lr * math.sin(beta))
+    x[3] = x[3] + dt * (u[0])
 
     return x
 
@@ -256,11 +266,21 @@ def plot_robot_trajectory(x, u, predicted_trajectory, dilated_traj, targets, ax,
     Plots the robot and arrows for visualization.
 
     Args:
-        i (int): Index of the robot.
         x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
-        multi_control (numpy.ndarray): Control inputs of shape (2, N).
-        targets (list): List of target points.
+            The state vector contains the robot's position and orientation at each time step.
+        u (numpy.ndarray): Control inputs of shape (2, N).
+            The control inputs represent the robot's control actions at each time step.
+        predicted_trajectory (list): List of predicted trajectories for each robot.
+            Each predicted trajectory is a numpy array of shape (N, 2), where N is the number of time steps.
+        dilated_traj (list): List of dilated trajectories for each robot.
+            Each dilated trajectory is a numpy array of shape (N, 2), where N is the number of time steps.
+        targets (list): List of target points for each robot.
+            Each target point is a tuple (x, y) representing the coordinates of the target.
+        ax (matplotlib.axes.Axes): The axes object to plot on.
+        i (int): Index of the robot.
 
+    Returns:
+        None
     """
     plt.plot(predicted_trajectory[i][:, 0], predicted_trajectory[i][:, 1], "-", color=color_dict[i])
     plot_polygon(dilated_traj[i], ax=ax, add_points=False, alpha=0.5, color=color_dict[i])
@@ -289,6 +309,22 @@ def plot_path(path: Path):
             y.append(coord.y)
         plt.scatter(x, y, marker='.', s=10)
         plt.scatter(x[0], y[0], marker='x', s=20)
+
+def plot_robot_and_arrows(i, x, multi_control, targets):
+    """
+    Plots the robot and arrows for visualization.
+
+    Args:
+        i (int): Index of the robot.
+        x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
+        multi_control (numpy.ndarray): Control inputs of shape (2, N).
+        targets (list): List of target points.
+
+    """
+    plot_robot(x[0, i], x[1, i], x[2, i], i)
+    plot_arrow(x[0, i], x[1, i], x[2, i] + multi_control.multi_control[i].delta, length=3, width=0.5)
+    plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
+    plt.plot(targets[i][0], targets[i][1], "x", color = color_dict[i])
 
 def normalize_angle_array(angle):
     """

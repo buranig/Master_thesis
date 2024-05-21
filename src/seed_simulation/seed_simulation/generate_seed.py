@@ -11,7 +11,7 @@ import json
 
 # TODO: import all this parameters from a config file so that we can easily change them in one place
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
-path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params_small.json')
+# path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params_small.json')
 # Opening JSON file
 with open(path, 'r') as openfile:
     # Reading from json file
@@ -47,6 +47,10 @@ def random_seed(robot_num):
     initial_position['y'] = y
     initial_position['yaw'] = yaw
     initial_position['v'] = v
+
+    plt.scatter(x0, y, color='r')
+    utils.plot_map(width_init, height_init)
+    plt.show()
 
     trajectories = {}
     for i in range(robot_num):
@@ -106,6 +110,6 @@ def circular_seed(robot_num, R=10.0):
 
 if __name__ == "__main__":
 
-    circular_seed(R=1, robot_num=5)
-    # random_seed(robot_num=5)
+    # circular_seed(R=1, robot_num=5)
+    random_seed(robot_num=15)
     # random_seed()

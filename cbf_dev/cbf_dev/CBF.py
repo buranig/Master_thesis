@@ -22,7 +22,7 @@ ax= fig.add_subplot(111)
 np.random.seed(1)
 
 class CBF_algorithm(Controller):
-    def __init__(self, controller_path:str, robot_num = 1):
+    def __init__(self, controller_path:str, robot_num = 0):
 
         ## Init Controller class
         super().__init__(controller_path)
@@ -30,7 +30,7 @@ class CBF_algorithm(Controller):
         ## Init public parameters
 
         self.goal = None
-        self.robot_num = robot_num - 1
+        self.robot_num = robot_num
         self.dxu = np.zeros((2, 1), dtype=float)
         self.solver_failure = 0
 

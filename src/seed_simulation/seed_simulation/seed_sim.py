@@ -529,7 +529,7 @@ def lbp_sim(seed, robot_num):
     for i in range(robot_num):
         dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
 
-    u_hist = dict.fromkeys(range(robot_num),[0]*int(predict_time/dt))
+    u_hist = dict.fromkeys(range(robot_num),{'ctrl': [0]*int(predict_time/dt), 'v_goal': 0})
 
     if show_animation:
         plt.ion()

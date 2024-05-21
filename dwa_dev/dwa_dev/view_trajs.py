@@ -3,7 +3,7 @@ import math
 # For the parameter file
 import json
 import yaml
-
+from tqdm import tqdm
 import os
 import matplotlib.pyplot as plt
 from shapely.geometry import Point, LineString
@@ -71,11 +71,16 @@ def main():
 
     fig = plt.figure(1, dpi=90)
     ax = fig.add_subplot(111)
-    for v in np.arange(min_speed, max_speed, v_resolution):
+    vel_list = list(data.keys())
+    i = [0, -1]
+    for v in tqdm(range(2)):
+        v = float(vel_list[i[v]])
         x_init = np.array([0.0, 0.0, np.radians(90.0), v])
         dw = calc_dynamic_window()
         for a in np.arange(dw[0], dw[1]+a_resolution, a_resolution):
-            for delta in np.arange(dw[2], dw[3]+delta_resolution, delta_resolution):
+            delta_list = data[str(v)][str(a)].keys()
+            for delta in delta_list:
+            # for delta in np.arange(dw[2], dw[3]+delta_resolution, delta_resolution):
                 # print(v, a, delta)
                 geom = data[str(v)][str(a)][str(delta)]
                 geom = np.array(geom)
@@ -84,7 +89,7 @@ def main():
                 newgeom = LineString(zip(newgeom[:, 0], newgeom[:, 1]))
                 plot_line(geom, ax=ax, add_points=False, linewidth=3)
                 # plot_line(newgeom, ax=ax, add_points=False, linewidth=3)
-                
+    plt.axis('equal')
     plt.show()
     #########################################################################################################        
 

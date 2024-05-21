@@ -75,7 +75,7 @@ def add_car(context, ld):
             parameters=[
                     {'track_yaml': track_yaml},
                     # {'static_throttle': 0.5},
-                    {'control_mode': 'pursuit'},
+                    {'control_mode': 'pursuit'},    
                     {'state_source': LaunchConfiguration('source_target')},
                     {'control_target': LaunchConfiguration('source_target')},
                     {'arm_mpc': False},
@@ -122,29 +122,6 @@ def generate_launch_description():
         description='boolean to select whether trajectories must be re-computed',
         default_value='False'
     )
-
-    #######################################################################################
-    ##### Node containing the dynamic model of the vehicle in Johanness' simulation #######
-    #######################################################################################
-
-    # # # amz_mini = os.path.join(
-    # # #     get_package_share_directory('bumper_cars'),
-    # # #     'lib','model-driving','config',
-    # # #     'amz_mini_car5.yaml'
-    # # # )
-    # # # ld.add_action(sim)
-
-    # # # model_stepper = Node(
-    # # #     package='bumper_cars',
-    # # #     executable='bumper_car_model',
-    # # #     name='model_stepper_node',
-    # # #     parameters=[
-    # # #             {'car_path': amz_mini}
-    # # #     ],
-    # # #     emulate_tty=True,
-    # # #     output='both'
-    # # # )
-    # # # ld.add_action(model_stepper)
 
     ld.add_action(carNumber_arg)
     ld.add_action(carNumOffset_arg)

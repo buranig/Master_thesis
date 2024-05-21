@@ -621,7 +621,7 @@ def main_seed():
         plt.show()
 
 if __name__ == '__main__':
-    # main1()
+    # main()
     main_seed()
 
     

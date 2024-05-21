@@ -174,3 +174,7 @@ Specify the license under which your project is distributed. If applicable, incl
 ## Acknowledgements
 
 Acknowledge any individuals, organizations, or resources that contributed to your project.
+
+## Sources
+- Stable Dynamic Model: https://arxiv.org/pdf/2011.09612
+- Pure-pursuit reverse motion: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9174710

@@ -127,7 +127,18 @@ def generate_trajectories(x_init):
     traj = []
     u_total = []
     for a in np.arange(dw[0], dw[1]+a_resolution, a_resolution):
-        for delta in np.arange(dw[2], dw[3]+delta_resolution, delta_resolution):
+    
+        for delta in np.arange(dw[2]/2, dw[3]/2+delta_resolution/2, delta_resolution/6):
+            u = np.array([a, delta])
+            traj.append(calc_trajectory(x_init, u, dt))
+            u_total.append(u)
+
+        for delta in np.arange(dw[2], dw[2]/2, delta_resolution):
+            u = np.array([a, delta])
+            traj.append(calc_trajectory(x_init, u, dt))
+            u_total.append(u)
+
+        for delta in np.arange(dw[3]/2+delta_resolution, dw[3]+delta_resolution, delta_resolution):
             u = np.array([a, delta])
             traj.append(calc_trajectory(x_init, u, dt))
             u_total.append(u)
@@ -168,7 +179,7 @@ def main():
                     plt.grid(True)
                     plt.axis("equal")
 
-                # plt.show()
+                plt.show()
 
                 # fig = plt.figure(1, dpi=90)
                 # ax = fig.add_subplot(111)
@@ -197,15 +208,15 @@ def main():
         if plot_flag:
             plt.xlabel("x [m]", fontdict={'size': 11, 'family': 'serif'})
             plt.ylabel("y [m]", fontdict={'size': 11, 'family': 'serif'})
-            plt.title('LBP Trajectories Set')
+            plt.title('DWA Trajectories Set')
             plt.grid(True)
             plt.axis("equal")
             plt.show()
         # print(complete_trajectories)
         
-        # saving the complete trajectories to a csv file
-        with open('src/dwa_dev/trajectories.json', 'w') as file:
-            json.dump(complete_trajectories, file, indent=4)
+        # # saving the complete trajectories to a csv file
+        # with open('src/dwa_dev/trajectories.json', 'w') as file:
+        #     json.dump(complete_trajectories, file, indent=4)
 
         print("\nThe JSON data has been written to 'data.json'")
 

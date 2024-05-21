@@ -100,9 +100,9 @@ def plot_robot(x, y, yaw):  # pragma: no cover
 
 # Implement kinematic bicycle model to follow the trajectory
 def main():
-    v = -1.0 # [m/s] reference speed
-    x = [0.0, 0.0, 0.0, v] #[x, y, yaw, v]   
-    ref = data[str(v)]['-1.0']['0']
+    v = 0.0 # [m/s] reference speed
+    x = [0.0, 0.0, 0.0, v, 0.0] #[x, y, yaw, v]   
+    ref = data[str(v)]['-1.0']['3']
     trajectory = np.zeros((len(ref['x']),3))
     trajectory[:,0] = ref['x']
     trajectory[:,1] = ref['y']
@@ -129,13 +129,14 @@ def main():
         # Apply control input to the kinematic bicycle model
         # TODO: Implement the kinematic bicycle model logic here
         # x = utils.motion(x, u, dt)
-        x = utils.motion_MPC_casadi(x, u, dt)
+        # x = utils.motion_MPC_casadi(x, u, dt)
+        x = utils.nonlinear_model_numpy_stable(x, u, dt)
 
         # Print the current state and control input
         print(f"Control Input: {u}")
-        print(f'Current State: {x[0:3]}, reference: {trajectory[i,:]}')
-        print(f'Predicted state: {trajectory[i,:]}')
-        print(f'Current Speed: {x[3]}\n')
+        # print(f'Current State: {x[0:3]}, reference: {trajectory[i,:]}')
+        # print(f'Predicted state: {trajectory[i,:]}')
+        # print(f'Current Speed: {x[3]}\n')
         
         # plot the trajectory, the robot and the yaw
         plt.cla()

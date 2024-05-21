@@ -48,7 +48,7 @@ show_animation = json_object["show_animation"]
 predict_time = json_object["LBP"]["predict_time"] # [s]
 dilation_factor = json_object["LBP"]["dilation_factor"]
 
-debug = False
+debug = True
 
 color_dict = {
     0: "r",

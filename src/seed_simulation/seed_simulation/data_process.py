@@ -278,4 +278,4 @@ class DataProcessor:
         :param df: the dataframe
         :return: the dataframe without duplicates
         """
-        return df.drop_duplicates(subset=["Robot Number", "File Name", "Method", "Noise Scaling"], keep="last")
+        return df.drop_duplicates(subset=["Robot Number", "File Name", "Method", "Noise Scaling", "Model Type"], keep="last")

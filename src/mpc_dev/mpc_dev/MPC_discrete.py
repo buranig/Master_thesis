@@ -599,8 +599,8 @@ def main_seed():
         plt.cla()
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
         
-        x, u, break_flag = mpc.run_mpc(x, u, break_flag)
-        # x, u, break_flag = lbp.go_to_goal(x, u, break_flag)
+        # x, u, break_flag = mpc.run_mpc(x, u, break_flag)
+        x, u, break_flag = mpc.go_to_goal(x, u, break_flag)
 
         trajectory = np.dstack([trajectory, x])
 

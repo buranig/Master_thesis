@@ -28,8 +28,6 @@ class CBF_algorithm(Controller):
         super().__init__(controller_path)
 
         ## Init public parameters
-
-        self.goal = None
         self.robot_num = robot_num
         self.dxu = np.zeros((2, 1), dtype=float)
         self.solver_failure = 0
@@ -59,8 +57,8 @@ class CBF_algorithm(Controller):
 
         # If solver did not fail
         if u is not None:
-            car_cmd.throttle = u[0]
-            car_cmd.steering = u[1]
+            car_cmd.throttle = np.interp(u[0], [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
+            car_cmd.steering = np.interp(u[1], [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
             
         # Debug visualization
         if self.show_animation and self.robot_num == 0:
@@ -74,17 +72,14 @@ class CBF_algorithm(Controller):
             plt.axis("equal")
             plt.grid(True)
             plt.pause(0.00001)
-            # plt.plot(self.goal[0], self.goal[1], "x", color = color_dict[0])
 
         return car_cmd
 
     def set_goal(self, goal: CarControlStamped) -> None:
-        self.dxu[0] = goal.throttle
-        self.dxu[1] = goal.steering
+        self.dxu[0] = np.interp(goal.throttle, [-1, 1], [self.car_model.min_acc, self.car_model.max_acc]) * self.car_model.acc_gain
+        self.dxu[1] = np.interp(goal.steering, [-1, 1], [-self.car_model.max_steer, self.car_model.max_steer])
+        print("Desired goal: ",self.dxu[0], self.dxu[1])
         
-        # For homogeneity, keep self.goal updated
-        self.goal = goal
-
     ################# PRIVATE METHODS
     def __delta_to_beta(self, delta):
         """
@@ -149,27 +144,11 @@ class CBF_algorithm(Controller):
         P = np.identity(2) * 2
         q = np.array([- 2 * self.dxu[0], - 2 * self.dxu[1]])
 
-
-        # Solves a quadratic program
-
-        # minimize    (1/2)*x'*P*x + q'*x
-        # subject to  G*x <= h
-        #             A*x = b.
-
         count = 0
         for j in range(N):
 
             if j == i: continue
             
-            # Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
-            # Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - x[1, j]) - np.sin(x[2, i]) * (x[0, i] - x[0, j]))
-            
-            # h = (x[0, i] - x[0, j]) ** 2 + (x[1, i] - x[1, j]) ** 2 - (
-            #             self.safety_radius ** 2 + self.Kv * abs(x[3, i]))
-
-            # H[count] = np.array([self.barrier_gain * np.power(h, 3) + Lf_h])
-            # G[count, :] = - np.array([- np.sign(x[3, i])*self.Kv, Lg_h])
-
             Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
             Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - x[1, j]) - np.sin(x[2, i]) * (x[0, i] - x[0, j]))
             h = (x[0, i] - x[0, j]) * (x[0, i] - x[0, j]) + (x[1, i] - x[1, j]) * (x[1, i] - x[1, j]) - (
@@ -192,7 +171,7 @@ class CBF_algorithm(Controller):
         # G = np.vstack([G, [[0, x[3,i]/self.car_model.Lr], [0, x[3,i]/self.car_model.Lr]]])
         # H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
         G = np.vstack([G, [[1, 0], [-1, 0]]])
-        H = np.vstack([H, self.car_model.max_acc, self.car_model.min_acc])
+        H = np.vstack([H, self.car_model.max_acc, - self.car_model.min_acc])
 
         # Adding arena boundary constraints
         # Pos Y

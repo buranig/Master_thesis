@@ -14,65 +14,63 @@ from matplotlib import pyplot as plt
 import numpy as np
 import math
 from lar_utils import car_utils as utils
+from bumper_cars.classes.CarModel import State
 from lbp_dev.LBP import LBP_algorithm as LBP
+from lar_msgs.msg import CarControlStamped
 import json
 
 from scipy.interpolate import interp1d
 import os
 TABLE_PATH = os.path.dirname(os.path.abspath(__file__)) + "/lookup_table.csv"
 
+from ament_index_python.packages import get_package_share_directory
 
 
-# TODO remove this
-class State:
-    def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0):
-        self.x = x
-        self.y = y
-        self.yaw = yaw
-        self.v = v
-
-
-    def update(self, state, v, delta):
-        state.v = v
-        delta = np.clip(delta, -np.radians(45), np.radians(45)) #TODO remove hardcoded limits
-        state.x = state.x + state.v * math.cos(state.yaw) * self.dt
-        state.y = state.y + state.v * math.sin(state.yaw) * self.dt
-        state.yaw = state.yaw + state.v / self.car_model.L * math.tan(delta) * self.dt
-        state.yaw = utils.normalize_angle(state.yaw)
-        # state.yaw = pi_2_pi(state.yaw)
-
-        return state
-
+car_yaml = os.path.join(
+    get_package_share_directory('bumper_cars'),
+    'config',
+    'controller.yaml'
+)
 
 class TrajectoryGenerator(LBP):
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__(car_yaml)
         pass
 
-    def calc_trajectory(self, x_init, u):
+
+    def calc_trajectory(self, curr_state:State, cmd:CarControlStamped):
         """
-        calc trajectory
+        Computes the trajectory that is used for each vehicle
         """
-        x = np.array(x_init)
-        traj = np.array(x)
-        time = 0.0
-        while time <= self.ph:
-            x = utils.motion(x, u, self.dt)
-            traj = np.vstack((traj, x))
-            time += self.dt
-            if x[3]>self.car_model.max_speed or x[3]<self.car_model.min_speed:
-                print(x[3])
+        iterations = math.ceil(self.ph/self.dt) + 1
+        traj = np.zeros((iterations, 4))
+        traj[0,:] = np.array([curr_state.x, curr_state.y, curr_state.yaw, curr_state.v])
+        i = 1
+        while i < iterations:
+            curr_state = self.car_model.step(cmd,self.dt,curr_state)
+            x = [curr_state.x, curr_state.y, curr_state.yaw, curr_state.v]
+            traj[i,:] = np.array(x)
+            i += 1
         return traj
+
 
     def generate_lookup_table(self):
         temp = {}
-        for v in np.arange(0.5, 2.0+0.5, 0.5): # TODO: Remove this hard-coded velocity range    
+        initial_state = State()
+        initial_state.x = 0.0
+        initial_state.y = 0.0
+        initial_state.yaw = np.radians(90.0)
+
+        for v in np.arange(0.5, 2.0+0.5, 0.5): # TODO: Remove this hard-coded velocity range  
+            print(v)  
             temp[v] = {}
             k0 = 0.0
             nxy = 5
             nh = 3
             d = v*self.ph
-            print(f'distance: {d}')
+            # print(f'distance: {d}')
 
             if v == 0.5:    # TODO: Remove this hard-coded velocity limit
                 angle = 45
@@ -125,7 +123,12 @@ class TrajectoryGenerator(LBP):
             temp[v] = {}
             for delta in np.arange(-self.car_model.max_steer, self.car_model.max_steer+self.delta_resolution, self.delta_resolution):
                 u = [0.0, delta]
-                traj = self.calc_trajectory(x_init, u)
+                initial_state.v = v
+                cmd = CarControlStamped()
+                cmd.throttle = 0.0
+                cmd.steering = np.interp(delta, [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
+                
+                traj = self.calc_trajectory(initial_state, cmd)
                 # plt.plot(traj[:, 0], traj[:, 1])
                 xc = traj[:, 0]
                 yc = traj[:, 1]
@@ -141,8 +144,9 @@ class TrajectoryGenerator(LBP):
                 # print(f'len: {len(xc)}')
 
         # saving the complete trajectories to a csv file
-        with open('src/lbp_dev/lbp_dev/LBP.json', 'w') as file:
+        with open(self.dir_path + '/../config/LBP.json', 'w') as file:
             json.dump(temp, file, indent=4)
+        
 
     def generate_trajectory(self, s, km, kf, k0, v):
         """
@@ -185,7 +189,7 @@ class TrajectoryGenerator(LBP):
         x, y, yaw = [state.x], [state.y], [state.yaw]
 
         for ikp in kp:
-            state = self.update(state, v, ikp, self.dt)
+            self.update(state, v, ikp, self.dt, self.car_model.L)
             x.append(state.x)
             y.append(state.y)
             yaw.append(state.yaw)
@@ -259,10 +263,6 @@ class TrajectoryGenerator(LBP):
 
 
 
-    def get_lookup_table(table_path):
-        return np.loadtxt(table_path, delimiter=',', skiprows=1)
-
-
     def generate_path(self, target_states, k0, v, k=False):
         """
         Generates a path based on the given target states, initial steering angle, velocity, and a flag indicating whether to use a specific value for k.
@@ -277,12 +277,11 @@ class TrajectoryGenerator(LBP):
             list: List of generated paths [x, y, yaw, p, kp].
         """
         
-        lookup_table = self.get_lookup_table(TABLE_PATH)
         result = []
 
         for state in target_states:
             target = State(x=state[0], y=state[1], yaw=state[2])
-            initial_state = State(x=0.0, y=0.0, yaw=0.0, v=0.0, omega=0.0)
+            initial_state = State(x=0.0, y=0.0, yaw=0.0, v=0.0)
             throttle, delta = utils.pure_pursuit_steer_control([target.x,target.y], initial_state)
             k0 = delta
             if k:
@@ -295,14 +294,14 @@ class TrajectoryGenerator(LBP):
             x, y, yaw, p, kp = self.optimize_trajectory(target, k0, init_p, v)
 
             if x is not None:
-                print("find good path")
+                # print("find good path")
                 result.append(
                     [x[-1], y[-1], yaw[-1], float(p[0, 0]), float(p[1, 0]), float(p[2, 0])])
 
-        print("finish path generation")
+        # print("finish path generation")
         return result
     
-    def calc_diff(target, x, y, yaw):
+    def calc_diff(self, target, x, y, yaw):
         pi_2_pi = target.yaw - yaw[-1]
         pi_2_pi = (pi_2_pi + math.pi) % (2 * math.pi) - math.pi
         d = np.array([target.x - x[-1],
@@ -337,14 +336,14 @@ class TrajectoryGenerator(LBP):
 
             cost = np.linalg.norm(dc)
             if cost <= cost_th:
-                print("path is ok cost is:" + str(cost))
+                # print("path is ok cost is:" + str(cost))
                 break
 
             J = self.calc_j(target, p, h, k0, v)
             try:
                 dp = - np.linalg.pinv(J) @ dc
             except np.linalg.linalg.LinAlgError:
-                print("cannot calc path LinAlgError")
+                # print("cannot calc path LinAlgError")
                 xc, yc, yawc, p = None, None, None, None
                 break
             alpha = self.selection_learning_param(dp, p, k0, target, v)
@@ -354,7 +353,7 @@ class TrajectoryGenerator(LBP):
 
         else:
             xc, yc, yawc, p = None, None, None, None
-            print("cannot calc path")
+            # print("cannot calc path")
 
         return xc, yc, yawc, p, kp
 
@@ -443,7 +442,7 @@ class TrajectoryGenerator(LBP):
 
         state = State()
 
-        _ = [self.update(state, v, ikp, dt) for ikp in kp]
+        _ = [self.update(state, v, ikp, dt, self.car_model.L) for ikp in kp]
 
         return state.x, state.y, state.yaw
     
@@ -483,3 +482,23 @@ class TrajectoryGenerator(LBP):
         #  input()
 
         return mina
+    
+    # TODO: Remove this function
+    def update(self, state, v, delta, dt, L):
+        state.v = v
+        delta = np.clip(delta, -np.radians(45), np.radians(45)) #TODO remove hardcoded limits
+        state.x = state.x + state.v * math.cos(state.yaw) * dt
+        state.y = state.y + state.v * math.sin(state.yaw) * dt
+        state.yaw = state.yaw + state.v / L * math.tan(delta) * dt
+        state.yaw = utils.normalize_angle(state.yaw)
+        # state.yaw = pi_2_pi(state.yaw)
+
+        return state
+
+    
+def main():
+    asdf = TrajectoryGenerator()
+    asdf.generate_lookup_table()
+
+if __name__ == '__main__':
+    main()

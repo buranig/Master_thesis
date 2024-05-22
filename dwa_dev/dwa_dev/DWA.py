@@ -99,7 +99,6 @@ class DWA_algorithm(Controller):
         u, trajectory, u_history = self.__calc_control_and_trajectory(self.curr_state[self.robot_num])
         self.dilated_traj[self.robot_num] = LineString(zip(trajectory[:, 0], trajectory[:, 1])).buffer(self.dilation_factor, cap_style=3)
 
-                            
         car_cmd.throttle = np.interp(u[0], [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
         car_cmd.steering = np.interp(u[1], [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
 
@@ -120,9 +119,6 @@ class DWA_algorithm(Controller):
         self.goal = CarControlStamped()
         self.goal.throttle = np.interp(goal.throttle, [-1, 1], [self.car_model.min_acc, self.car_model.max_acc]) * self.car_model.acc_gain
         self.goal.steering = np.interp(goal.steering, [-1, 1], [-self.car_model.max_steer, self.car_model.max_steer])
-
-        print("Desired goal: ", goal.throttle, goal.steering)
-        print("Goal set to: ", self.goal.throttle, self.goal.steering)
 
     def compute_traj(self):
         """
@@ -183,13 +179,13 @@ class DWA_algorithm(Controller):
             traj_i = self.__calc_trajectory(car_state, emptyControl )
             self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1])).buffer(self.dilation_factor, cap_style=3)
 
-    def __simulate_input(self, car_cmd: CarControlStamped) -> State:
-        curr_state = self.car_model.step(car_cmd, self.dt)
-        t = self.dt
-        while t<self.ph:
-            curr_state = self.car_model.step(car_cmd, self.dt, curr_state=curr_state)
-            t += self.dt
-        return curr_state
+    # def __simulate_input(self, car_cmd: CarControlStamped) -> State:
+    #     curr_state = self.car_model.step(car_cmd, self.dt)
+    #     t = self.dt
+    #     while t<self.ph:
+    #         curr_state = self.car_model.step(car_cmd, self.dt, curr_state=curr_state)
+    #         t += self.dt
+    #     return curr_state
 
     def __calc_trajectory(self, curr_state:State, cmd:CarControlStamped):
         """

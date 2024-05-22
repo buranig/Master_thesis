@@ -29,8 +29,6 @@ class C3BF_algorithm(Controller):
         super().__init__(controller_path)
 
         ## Init public parameters
-
-        self.goal = None
         self.robot_num = robot_num
         self.dxu = np.zeros((2, 1), dtype=float)
         self.solver_failure = 0
@@ -56,10 +54,11 @@ class C3BF_algorithm(Controller):
 
         # Compute control   
         u = self.__C3BF(self.robot_num, self.curr_state)
+
         # If solver did not fail
         if u is not None:
-            car_cmd.throttle = u[0]
-            car_cmd.steering = u[1]
+            car_cmd.throttle = np.interp(u[0], [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
+            car_cmd.steering = np.interp(u[1], [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
 
         # Debug visualization
         if self.show_animation and self.robot_num == 0:
@@ -73,17 +72,13 @@ class C3BF_algorithm(Controller):
             plt.axis("equal")
             plt.grid(True)
             plt.pause(0.00001)
-            # plt.plot(self.goal[0], self.goal[1], "x", color = color_dict[0])
 
         return car_cmd
 
     def set_goal(self, goal: CarControlStamped) -> None:
-        self.dxu[0] = goal.throttle
-        self.dxu[1] = goal.steering
+        self.dxu[0] = np.interp(goal.throttle, [-1, 1], [self.car_model.min_acc, self.car_model.max_acc]) * self.car_model.acc_gain
+        self.dxu[1] = np.interp(goal.steering, [-1, 1], [-self.car_model.max_steer, self.car_model.max_steer])
         
-        # For homogeneity, keep self.goal updated
-        self.goal = goal
-
     ################# PRIVATE METHODS
     def __delta_to_beta(self, delta):
         """

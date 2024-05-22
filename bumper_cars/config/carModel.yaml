@@ -1,11 +1,11 @@
 
 ###############  State constraints  #############################################
-max_steer: 0.78         # Maximal and (- minimal) steering angle [rad]
-max_speed: 1.0              # Maximal speed [m/s]       --- Not quite used yet
-min_speed: -1.0             # Minimal speed [m/s]       --- Not quite used yet
-max_acc: 0.15                # Max acceleration [m/ss]
-min_acc: -0.15               # Min acceleration [m/ss]
-
+max_steer: 0.19199         # Maximal and (- minimal) steering angle [rad]
+max_speed: 2.0              # Maximal speed [m/s]       --- Not quite used yet
+min_speed: -2.0             # Minimal speed [m/s]       --- Not quite used yet
+max_acc: 0.45                # Max acceleration [m/ss]
+min_acc: -0.45               # Min acceleration [m/ss]
+acc_gain: 1.0               # Gain for acceleration control
 
 ###############  Mechanical properties  #############################################
 width: 0.05                  # Width of the track of the vehicle [m]

@@ -1,10 +1,10 @@
 CBF:
-  safety_radius: 0.2
+  safety_radius: 0.1
   barrier_gain: 7.0
   arena_gain: 7.0
   Kv: 0.2
 C3BF:
-  safety_radius: 0.2
+  safety_radius: 0.1
   barrier_gain: 7.0
   arena_gain: 7.0
   Kv: 0.2
@@ -46,4 +46,4 @@ Controller:
 Simulation:
   width: 6
   height: 6
-  show_animation: true
+  show_animation: false

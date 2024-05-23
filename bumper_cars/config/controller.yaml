@@ -46,4 +46,4 @@ Controller:
 Simulation:
   width: 6
   height: 6
-  show_animation: true
+  show_animation: false

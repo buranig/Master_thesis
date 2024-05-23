@@ -4,14 +4,21 @@ import rclpy
 from rclpy.node import Node
 from lar_msgs.msg import CarStateStamped as State, CarControlStamped
 from lar_msgs.srv import EnvState, CarCommand
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, qos_profile_sensor_data
 
 class StateBuffer(Node):
     def __init__(self):
         super().__init__('state_buffer')
+        # qos_profile = QoSProfile(reliability=QoSReliabilityPolicy.BEST_EFFORT)
 
         # Initialise car number
         self.declare_parameter('carNumber', 0)
         self.car_amount = self.get_parameter('carNumber').value
+
+        # Initialize if we are on sim or real
+        self.declare_parameter('source', 'sim')
+        self.source = self.get_parameter('source').value
+        topic_str = "/sim/car" if self.source == 'sim' else "/car"
 
         # Establish publishing service
         self.srv = self.create_service(EnvState, 'env_state', self._get_env_state)
@@ -22,13 +29,13 @@ class StateBuffer(Node):
         # Subscribe to each car's state and commands
         self.sub_state = []
         self.sub_cmd = []
-        
+
         for i in range(int(self.car_amount)):
             car_str = '' if i==0 else str(i+1)
-            self.sub_state.append(self.create_subscription(State, "/sim/car" + car_str + "/state",\
-                                             lambda msg, car_i=i: self._received_state(msg, car_i), 10))
-            self.sub_cmd.append(self.create_subscription(CarControlStamped, "/sim/car" + car_str + "/desired_control",\
-                                             lambda msg, car_i=i: self._received_cmd(msg, car_i), 10))
+            self.sub_state.append(self.create_subscription(State, topic_str + car_str + "/state",\
+                                             lambda msg, car_i=i: self._received_state(msg, car_i), qos_profile_sensor_data))
+            self.sub_cmd.append(self.create_subscription(CarControlStamped, topic_str + car_str + "/desired_control",\
+                                             lambda msg, car_i=i: self._received_cmd(msg, car_i), qos_profile_sensor_data))
         
         # Initialize states (at default) and update bit
         self.env_state = [State()] * self.car_amount

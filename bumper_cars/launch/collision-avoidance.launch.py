@@ -41,7 +41,8 @@ def add_car(context, ld):
             executable='state_buffer',
             name='state_buffer_node' + car_str,
             parameters=[
-                    {'carNumber': int(carAmount_value)}
+                    {'carNumber': int(carAmount_value)},
+                    {'source': LaunchConfiguration('source_target')}
             ],
             remappings=[('/env_state', '/env_state' + car_str),
                         ('/car_cmd', '/car_cmd' + car_str)],

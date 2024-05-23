@@ -45,7 +45,7 @@ class Controller:
         # Size of map
         self.width_init = yaml_object["Simulation"]["width"]
         self.height_init = yaml_object["Simulation"]["height"]
-        self.boundary_points = np.array([-self.width_init/2, self.width_init/2, -self.height_init/2, self.height_init/2])
+        self.boundary_points = np.array([-self.width_init/2+0.154, self.width_init/2+0.154, -self.height_init/2+0.081, self.height_init/2+0.081])
 
         # Noise params
         self.add_noise = yaml_object["Controller"]["add_noise"]
@@ -139,7 +139,7 @@ class Controller:
         """
         Plot the map.
         """
-        corner_x = [-self.width_init/2.0, self.width_init/2.0, self.width_init/2.0, -self.width_init/2.0, -self.width_init/2.0]
-        corner_y = [self.height_init/2.0, self.height_init/2.0, -self.height_init/2.0, -self.height_init/2.0, self.height_init/2.0]
+        corner_x = [-self.width_init/2.0 + 0.154, self.width_init/2.0 + 0.154, self.width_init/2.0 + 0.154, -self.width_init/2.0 + 0.154, -self.width_init/2.0 + 0.154]
+        corner_y = [self.height_init/2.0 + 0.081, self.height_init/2.0 + 0.081, -self.height_init/2.0 + 0.081, -self.height_init/2.0 + 0.081, self.height_init/2.0 + 0.081]
 
         plt.plot(corner_x, corner_y)

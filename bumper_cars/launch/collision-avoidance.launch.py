@@ -30,7 +30,8 @@ def add_car(context, ld):
 
     # One *state buffer* / *controller* / *safety controller* per car
     for car_num in range(int(carAmount_value)):
-
+        if car_num == 1:
+            continue
         # Assign names and numbers to each car
         car_i = car_num + int(offset_value)
         car_str = '' if car_i == 0 else str(car_i + 1)
@@ -41,7 +42,8 @@ def add_car(context, ld):
             executable='state_buffer',
             name='state_buffer_node' + car_str,
             parameters=[
-                    {'carNumber': int(carAmount_value)}
+                    {'carNumber': int(carAmount_value)},
+                    {'source': LaunchConfiguration('source_target')}
             ],
             remappings=[('/env_state', '/env_state' + car_str),
                         ('/car_cmd', '/car_cmd' + car_str)],

@@ -359,14 +359,14 @@ class DWA_algorithm(Controller):
                     # calc cost
 
                     to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(a, float(delta))
-                    speed_cost = self.speed_cost_gain * (self.car_model.max_speed - trajectory[-1, 3])
+                    # speed_cost = self.speed_cost_gain * (self.car_model.max_speed - trajectory[-1, 3])
                     # if trajectory[-1, 3] <= 0.0:
                     #     speed_cost = 5
                     # else:
                     #     speed_cost = 0.0
                     ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(trajectory, ob)
                     # heading_cost = self.heading_cost_gain * self.__calc_to_goal_heading_cost(trajectory)
-                    final_cost = to_goal_cost #######+ ob_cost #+  speed_cost  #+ heading_cost #+ speed_cost 
+                    final_cost = to_goal_cost + ob_cost #+  speed_cost  #+ heading_cost #+ speed_cost 
                     # print("COSTS: ", to_goal_cost, speed_cost, ob_cost)
                     # search minimum trajectory
                     if min_cost >= final_cost:

@@ -75,7 +75,7 @@ class CollisionAvoidance(Node):
         self.cmd_req = CarCommand.Request()
         self.cmd_req.car = self.car_i
 
-        if self.source:
+        if self.source == 'sim':
             self.publisher_ = self.create_publisher(CarControlStamped, '/sim/car'+self.car_str+'/set/control', 10)
         else:
             self.publisher_ = self.create_publisher(CarControlStamped, '/car'+self.car_str+'/set/control', 10)

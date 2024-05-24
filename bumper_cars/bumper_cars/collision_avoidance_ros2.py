@@ -4,7 +4,6 @@ import rclpy
 import yaml
 from rclpy.node import Node
 import numpy as np
-from bumper_cars.classes.CarModel import CarModel, State
 from lar_utils import car_utils as utils
 
 # Plot goal in Rviz
@@ -108,7 +107,7 @@ class CollisionAvoidance(Node):
             try:
                 curr_state = self.state_request() # Might return empty list
                 curr_car = curr_state.env_state[self.car_i] # Select desired car
-                updated_state = carStateStamped_to_State(curr_car)
+                updated_state = utils.carStateStamped_to_State(curr_car)
                 self.algorithm.set_state(updated_state)
             except:                
                 continue
@@ -129,48 +128,9 @@ class CollisionAvoidance(Node):
             # Send command to car
             self.publisher_.publish(safe_cmd)
 
-            # Draw in Rviz desired goal
-            # if type(self.algorithm.goal) is State:
-            #     self.goal_marker(self.algorithm.goal)
-
             # Wait for next period
             self.update_time = False
 
-            
-    def goal_marker(self, next_state):
-        marker = Marker()
-        marker.header.frame_id = 'world'  # Set the frame of reference
-        marker.header.stamp = self.get_clock().now().to_msg()
-        marker.ns = "goal" + self.car_str
-        marker.type = Marker.SPHERE
-        marker.action = Marker.ADD
-        marker.pose.position.x = next_state.x  # Set the position
-        marker.pose.position.y = next_state.y
-        marker.pose.position.z = 0.0
-        marker.pose.orientation.x = 0.0
-        marker.pose.orientation.y = 0.0
-        marker.pose.orientation.z = 0.0
-        marker.pose.orientation.w = 1.0
-        marker.scale.x = 0.2  # Set the scale
-        marker.scale.y = 0.2
-        marker.scale.z = 0.2
-        marker.color.a = 1.0  # Set the color and transparency
-        marker.color.r = 1.0
-        marker.color.g = 0.0
-        marker.color.b = 0.0
-
-        # Publish the marker
-        self.goal_publisher_.publish(marker)
-        
-        
-def carStateStamped_to_State(curr_car: CarStateStamped) -> State:
-    car_state = State()
-    car_state.x = curr_car.pos_x
-    car_state.y = curr_car.pos_y
-    car_state.yaw = utils.normalize_angle(curr_car.turn_angle) #turn angle is with respect to the car, not wheel
-    car_state.omega = curr_car.turn_rate
-    car_state.v = utils.longitudinal_velocity(curr_car.vel_x, curr_car.vel_y, car_state.omega)
-    return car_state
 
 
 def main(args=None):

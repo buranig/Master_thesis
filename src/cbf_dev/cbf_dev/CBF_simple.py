@@ -273,8 +273,6 @@ class CBF_algorithm():
         for j in range(N):
             arr = np.array([x[0, j] - x[0, i], x[1, j] - x[1,i]])
             dist = np.linalg.norm(arr)
-            v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
-            scalar_prod = v @ arr
 
             if j == i or dist > 3 * safety_radius: 
                 plt.plot
@@ -361,10 +359,6 @@ class CBF_algorithm():
             self.dxu[0,i] = (0 - x[3,i])/dt 
             self.solver_failure += 1
 
-        if self.dxu[0,i] > max_acc or self.dxu[0,i] < min_acc:
-            print("Throttle out of bounds: ")
-            print(self.dxu[0,i])
-            self.dxu[0,i] = np.clip(self.dxu[0,i], -min_acc, max_acc)
         self.dxu[1,i] = utils.beta_to_delta(self.dxu[1,i])
 
     def check_collision(self, x, i):
@@ -693,6 +687,6 @@ def main_seed(args=None):
         plt.show()
 
 if __name__=='__main__':
-    main_seed()
-    # main1() 
+    # main_seed()
+    main1() 
         

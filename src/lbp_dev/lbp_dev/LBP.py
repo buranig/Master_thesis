@@ -476,10 +476,8 @@ class LBP_algorithm():
             # emergency stop
             print(f"Emergency stop for vehicle {i}")
             self.solver_failure += 1
-            if x[3]>0:
-                best_u = [min_acc, 0]
-            else:
-                best_u = [max_acc, 0]
+            best_u = [(0-x[3])/dt, 0]
+            best_u[0] = np.clip(best_u[0], min_acc, max_acc)
             
             best_trajectory = utils.predict_trajectory(x, best_u[0], best_u[1], predict_time)
             # best_trajectory = np.array([x[0:3], x[0:3]]*int(predict_time/dt))

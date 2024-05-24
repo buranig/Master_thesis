@@ -496,15 +496,7 @@ class DWA_algorithm():
                         best_u = [a, delta]
                         best_trajectory = trajectory
                         u_history = [[a, delta] for _ in range(len(trajectory-1))]
-                        if abs(best_u[0]) < robot_stuck_flag_cons \
-                                and abs(x[2]) < robot_stuck_flag_cons:
-                            # to ensure the robot do not get stuck in
-                            # best v=0 m/s (in front of an obstacle) and
-                            # best omega=0 rad/s (heading to the goal with
-                            # angle difference of 0)
-                            best_u[1] = -max_steer
-                            best_trajectory = trajectory
-                            u_history = [delta]*len(trajectory)
+
             # print(time.time()-old_time)
             if len(u_buf) > emergency_brake_distance:              
                 u_buf.pop(0)
@@ -532,10 +524,14 @@ class DWA_algorithm():
                 # emergency stop
                 print(f"Emergency stop for vehicle {i}")
                 solver_failure += 1
-                if x[3]>0:
-                    best_u = [min_acc, 0]
-                else:
-                    best_u = [max_acc, 0]
+                # if x[3]>0:
+                #     best_u = [min_acc, 0]
+                # else:
+                #     best_u = [max_acc, 0]
+                
+                best_u = [(0-x[3])/dt, 0]
+                best_u[0] = np.clip(best_u[0], min_acc, max_acc)
+
                 best_trajectory = np.array([x[0:3], x[0:3]])
                 u_history = best_u*int(predict_time/dt)
 

@@ -55,7 +55,7 @@ def random_seed(robot_num):
     trajectories = {}
     for i in range(robot_num):
         # generate a path for each robot
-        trajectories[i] = utils.create_seed(len_path=3)
+        trajectories[i] = utils.create_seed(len_path=4)
     # save the dictionary to a file
         
     seed = {}
@@ -111,5 +111,5 @@ def circular_seed(robot_num, R=10.0):
 if __name__ == "__main__":
 
     # circular_seed(R=1, robot_num=5)
-    random_seed(robot_num=15)
+    random_seed(robot_num=5)
     # random_seed()

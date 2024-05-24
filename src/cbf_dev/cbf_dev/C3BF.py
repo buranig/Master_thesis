@@ -2,6 +2,7 @@ import numpy as np
 
 from cvxopt import matrix, solvers
 from cvxopt import matrix
+from piqp import DenseSolver, PIQP_SOLVED
 from planner import utils as utils
 # import planner.utils as utils
 
@@ -52,7 +53,7 @@ linear_model = json_object["linear_model"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_2.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_4.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -248,6 +249,68 @@ class C3BF_algorithm():
 
         self.C3BF(i, x)
     
+    def closest_boundary_point(self, i, x):
+        """
+        Finds the closest boundary point to the robot.
+
+        Args:
+            i (int): Index of the robot.
+            x (numpy.ndarray): Array representing the current state of all robots.
+
+        Returns:
+            numpy.ndarray: Closest boundary point.
+
+        """
+        dx = 0
+        dy = 0
+
+        if abs(x[0,i] - boundary_points[0]) < abs(x[0,i] - boundary_points[1]):
+            dx = boundary_points[0] - x[0,i]
+            cpx = boundary_points[0]
+        else:
+            dx = boundary_points[1] - x[0,i]
+            cpx = boundary_points[1]
+        
+        if abs(x[1,i] - boundary_points[2]) < abs(x[1,i] - boundary_points[3]):
+            dy = boundary_points[2] - x[1,i]
+            cpy = boundary_points[2]
+        else:
+            dy = boundary_points[3] - x[1,i]
+            cpy = boundary_points[3]
+
+        if abs(dx) < abs(dy):
+            closest_point = np.array([cpx, x[1,i], np.pi/2])  
+            closest_point2 = np.array([cpx, x[1,i]+safety_radius, np.pi/2])
+            closest_point3 = np.array([cpx, x[1,i]-safety_radius, np.pi/2])
+        
+        # elif abs(dx) == abs(dy):
+        #     if cpx == boundary_points[0]:
+        #         if cpy == boundary_points[2]:
+        #             closest_point = np.array([cpx, cpy, np.pi/4])
+        #             closest_point2 = np.array([cpx, cpy+safety_radius, np.pi/2])
+        #             closest_point3 = np.array([cpx+safety_radius, cpy, 0.0])
+        #         else:
+        #             closest_point = np.array([cpx, cpy, -np.pi/4])
+        #             closest_point2 = np.array([cpx, cpy-safety_radius, np.pi])
+        #             closest_point3 = np.array([cpx+safety_radius, cpy, 0.0])
+        #     elif cpx == boundary_points[1]:
+        #         if cpy == boundary_points[2]:
+        #             closest_point = np.array([cpx, cpy, 3*np.pi/4])
+        #             closest_point2 = np.array([cpx, cpy+safety_radius, np.pi])
+        #             closest_point3 = np.array([cpx-safety_radius, cpy, 0.0])
+        #         else:
+        #             closest_point = np.array([cpx, cpy, -3*np.pi/4])
+        #             closest_point2 = np.array([cpx, cpy-safety_radius, np.pi/2])
+        #             closest_point3 = np.array([cpx-safety_radius, cpy, -np.pi])
+              
+        else:
+            closest_point = np.array([x[0,i], cpy, 0.0])
+            closest_point2 = np.array([x[0,i]+safety_radius, cpy, 0.0])
+            closest_point3 = np.array([x[0,i]-safety_radius, cpy, 0.0])
+        
+        return closest_point, closest_point2, closest_point3
+
+    
     def C3BF(self, i, x):
         """
         Computes the control input for the C3BF (Collision Cone Control Barrier Function) algorithm.
@@ -260,10 +323,23 @@ class C3BF_algorithm():
             numpy.ndarray: Filtered Control input dxu of shape (2, N).
 
         """
+        start = time.time()
+
         flag = True
         N = x.shape[1]
         M = self.dxu.shape[0]
         self.dxu[1,:] = utils.delta_to_beta_array(self.dxu[1,:])
+
+        # if i == 0:
+        closest_point, closest_point2, closest_point3 = self.closest_boundary_point(i, x)
+        circle = plt.Circle(closest_point[0:2], safety_radius/1.5, color='r', fill=False)
+        circle2 = plt.Circle(closest_point2[0:2], safety_radius/1.5, color='b', fill=False)
+        circle3 = plt.Circle(closest_point3[0:2], safety_radius/1.5, color='b', fill=False)
+        utils.plot_arrow(closest_point[0], closest_point[1], closest_point[2], length=2, width=1, color=color_dict[i])
+        self.ax.add_patch(circle)
+        self.ax.add_patch(circle2)
+        self.ax.add_patch(circle3)
+
 
         count = 0
         G = np.zeros([N-1,M])
@@ -284,8 +360,6 @@ class C3BF_algorithm():
         for j in range(N):
             arr = np.array([x[0, j] - x[0, i], x[1, j] - x[1,i]])
             dist = np.linalg.norm(arr)
-            v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
-            scalar_prod = v @ arr
 
             if j == i or dist > 2 * safety_radius: 
                 continue
@@ -317,52 +391,125 @@ class C3BF_algorithm():
             H[count] = np.array([barrier_gain*np.power(h, 3) + Lf_h])
             G[count,:] = -Lg_h
             count+=1
+        
+        # v_rel = np.array([x[3,i]*np.cos(closest_point[2]) - x[3,i]*np.cos(x[2,i]), 
+        #                   x[3,i]*np.sin(closest_point[2]) - x[3,i]*np.sin(x[2,i])])
+        # p_rel = np.array([closest_point[0]-x[0,i],
+        #                   closest_point[1]-x[1,i]])
+        
+        # cos_Phi = np.sqrt(abs(np.linalg.norm(p_rel)**2 - safety_radius**2))/np.linalg.norm(p_rel)
+        # tan_Phi_sq = safety_radius**2 / (np.linalg.norm(p_rel)**2 - safety_radius**2)
+        
+        # h = np.dot(p_rel, v_rel) + np.linalg.norm(v_rel) * np.linalg.norm(p_rel) * cos_Phi
+        
+        # gradH_1 = np.array([- (x[3,i]*np.cos(closest_point[2]) - x[3,i]*np.cos(x[2,i])), 
+        #                     - (x[3,i]*np.sin(closest_point[2]) - x[3,i]*np.sin(x[2,i])),
+        #                     x[3,i] * (np.sin(x[2,i]) * p_rel[0] - np.cos(x[2,i]) * p_rel[1]),
+        #                     -np.cos(x[2,i]) * p_rel[0] - np.sin(x[2,i]) * p_rel[1]])
+        
+        # gradH_21 = -(1 + tan_Phi_sq) * np.linalg.norm(v_rel)/np.linalg.norm(p_rel) * cos_Phi * p_rel 
+        # gradH_22 = np.dot(np.array([x[3,i]*np.sin(x[2,i]), -x[3,i]*np.cos(x[2,i])]), v_rel) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
+        # gradH_23 = - np.dot(v_rel, np.array([np.cos(x[2,i]), np.sin(x[2,i])])) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
 
-        # Adding arena boundary constraints
-        # Pos Y
-        h = ((x[1,i] - boundary_points[3])**2 - safety_radius**2 - Kv * abs(x[3,i]))
-        if x[3,i] >= 0:
-            gradH = np.array([0, 2*(x[1,i] - boundary_points[3]), 0, -Kv])
+        # gradH = gradH_1.reshape(4,1) + np.vstack([gradH_21.reshape(2,1), gradH_22, gradH_23])
+
+        # Lf_h = np.dot(gradH.T, f)
+        # Lg_h = np.dot(gradH.T, g)
+
+        # G = np.vstack([G, -Lg_h])
+        # H = np.vstack([H, barrier_gain*np.power(h, 3) + Lf_h])
+
+        # Closes point 1
+        Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - closest_point[0]) + np.sin(x[2, i]) * (x[1, i] - closest_point[1]))
+        Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - closest_point[1]) - np.sin(x[2, i]) * (x[0, i] - closest_point[0]))
+        h = (x[0, i] - closest_point[0]) * (x[0, i] - closest_point[0]) + (x[1, i] - closest_point[1]) * (x[1, i] - closest_point[1]) - (
+                    safety_radius/1.5 ** 2 + Kv * abs(x[3, i]))
+
+        H = np.vstack([H, arena_gain*np.power(h, 3) + Lf_h])
+
+        if x[3, i] >= 0:
+            G = np.vstack([G, [Kv, -Lg_h]])
+            # G[count, :] = np.array([Kv, -Lg_h])
         else:
-            gradH = np.array([0, 2*(x[1,i] - boundary_points[3]), 0, Kv])
+            G = np.vstack([G, [-Kv, -Lg_h]])
+            # G[count, :] = np.array([-Kv, -Lg_h])
+        
+        # Closest point 2
+        Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - closest_point2[0]) + np.sin(x[2, i]) * (x[1, i] - closest_point2[1]))
+        Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - closest_point2[1]) - np.sin(x[2, i]) * (x[0, i] - closest_point2[0]))
+        h = (x[0, i] - closest_point2[0]) * (x[0, i] - closest_point2[0]) + (x[1, i] - closest_point2[1]) * (x[1, i] - closest_point2[1]) - (
+                    safety_radius/1.5 ** 2 + Kv * abs(x[3, i]))
 
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
+        H = np.vstack([H, arena_gain*np.power(h, 3) + Lf_h])
 
-        # Neg Y
-        h = ((x[1,i] - boundary_points[2])**2 - safety_radius**2 - Kv * abs(x[3,i]))
-        if x[3,i] >= 0:
-            gradH = np.array([0, 2*(x[1,i] - boundary_points[2]), 0, -Kv])
+        if x[3, i] >= 0:
+            G = np.vstack([G, [Kv, -Lg_h]])
+            # G[count, :] = np.array([Kv, -Lg_h])
         else:
-            gradH = np.array([0, 2*(x[1,i] - boundary_points[2]), 0, Kv])
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
+            G = np.vstack([G, [-Kv, -Lg_h]])
+            # G[count, :] = np.array([-Kv, -Lg_h])
+        
+        # Closest point 3
+        Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - closest_point3[0]) + np.sin(x[2, i]) * (x[1, i] - closest_point3[1]))
+        Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - closest_point3[1]) - np.sin(x[2, i]) * (x[0, i] - closest_point3[0]))
+        h = (x[0, i] - closest_point3[0]) * (x[0, i] - closest_point3[0]) + (x[1, i] - closest_point3[1]) * (x[1, i] - closest_point3[1]) - (
+                    safety_radius/1.5 ** 2 + Kv * abs(x[3, i]))
 
-        # Pos X
-        h = ((x[0,i] - boundary_points[1])**2 - safety_radius**2 - Kv * abs(x[3,i]))
-        if x[3,i] >= 0:
-            gradH = np.array([2*(x[0,i] - boundary_points[1]), 0, 0, -Kv])
-        else:
-            gradH = np.array([2*(x[0,i] - boundary_points[1]), 0, 0, Kv])
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
+        H = np.vstack([H, arena_gain*np.power(h, 3) + Lf_h])
 
-        # Neg X
-        h = ((x[0,i] - boundary_points[0])**2 - safety_radius**2 - Kv * abs(x[3,i]))
-        if x[3,i] >= 0:
-            gradH = np.array([2*(x[0,i] - boundary_points[0]), 0, 0, -Kv])
+        if x[3, i] >= 0:
+            G = np.vstack([G, [Kv, -Lg_h]])
+            # G[count, :] = np.array([Kv, -Lg_h])
         else:
-            gradH = np.array([2*(x[0,i] - boundary_points[0]), 0, 0, Kv])
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
+            G = np.vstack([G, [-Kv, -Lg_h]])
+            # G[count, :] = np.array([-Kv, -Lg_h])
+
+
+        # # Adding arena boundary constraints
+        # # Pos Y
+        # h = ((x[1,i] - boundary_points[3])**2 - safety_radius**2 - Kv * abs(x[3,i]))
+        # if x[3,i] >= 0:
+        #     gradH = np.array([0, 2*(x[1,i] - boundary_points[3]), 0, -Kv])
+        # else:
+        #     gradH = np.array([0, 2*(x[1,i] - boundary_points[3]), 0, Kv])
+
+        # Lf_h = np.dot(gradH.T, f)
+        # Lg_h = np.dot(gradH.T, g)
+        # G = np.vstack([G, -Lg_h])
+        # H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
+
+        # # Neg Y
+        # h = ((x[1,i] - boundary_points[2])**2 - safety_radius**2 - Kv * abs(x[3,i]))
+        # if x[3,i] >= 0:
+        #     gradH = np.array([0, 2*(x[1,i] - boundary_points[2]), 0, -Kv])
+        # else:
+        #     gradH = np.array([0, 2*(x[1,i] - boundary_points[2]), 0, Kv])
+        # Lf_h = np.dot(gradH.T, f)
+        # Lg_h = np.dot(gradH.T, g)
+        # G = np.vstack([G, -Lg_h])
+        # H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
+
+        # # Pos X
+        # h = ((x[0,i] - boundary_points[1])**2 - safety_radius**2 - Kv * abs(x[3,i]))
+        # if x[3,i] >= 0:
+        #     gradH = np.array([2*(x[0,i] - boundary_points[1]), 0, 0, -Kv])
+        # else:
+        #     gradH = np.array([2*(x[0,i] - boundary_points[1]), 0, 0, Kv])
+        # Lf_h = np.dot(gradH.T, f)
+        # Lg_h = np.dot(gradH.T, g)
+        # G = np.vstack([G, -Lg_h])
+        # H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
+
+        # # Neg X
+        # h = ((x[0,i] - boundary_points[0])**2 - safety_radius**2 - Kv * abs(x[3,i]))
+        # if x[3,i] >= 0:
+        #     gradH = np.array([2*(x[0,i] - boundary_points[0]), 0, 0, -Kv])
+        # else:
+        #     gradH = np.array([2*(x[0,i] - boundary_points[0]), 0, 0, Kv])
+        # Lf_h = np.dot(gradH.T, f)
+        # Lg_h = np.dot(gradH.T, g)
+        # G = np.vstack([G, -Lg_h])
+        # H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
         
         # Input constraints
         G = np.vstack([G, [[0, 1], [0, -1]]])
@@ -375,21 +522,35 @@ class C3BF_algorithm():
         G = np.vstack([G, [[1, 0], [-1, 0]]])
         H = np.vstack([H, max_acc, -min_acc])
 
-        solvers.options['show_progress'] = False
-        try:
-            sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
-            self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
-        except:
+        start_solver = time.time()
+        solver = DenseSolver()
+        solver.settings.verbose = False
+        solver.setup(P, q, np.empty((0, P.shape[0])), np.empty((0,)), G, H)
+        status = solver.solve()
+        if status == PIQP_SOLVED:
+            self.dxu[:,i] = np.reshape(solver.result.x, (M,))
+        else:
             print(f"QP solver failed for robot {i}! Emergency stop.") 
             self.dxu[0,i] = (0 - x[3,i])/dt 
-            self.solver_failure += 1         
+            self.solver_failure += 1
+        end_solver = time.time()
+        end = time.time()
+        print(f"Time: {(end-start)*1e3} ms")
+        print(f"Solver time: {(end_solver-start_solver)*1e3} ms")
+
+        # solvers.options['show_progress'] = False
+        # try:
+        #     sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
+        #     self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
+        # except:
+        #     print(f"QP solver failed for robot {i}! Emergency stop.") 
+        #     self.dxu[0,i] = (0 - x[3,i])/dt 
+        #     self.solver_failure += 1         
+        
         if show_animation:
             circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius, color='b', fill=False)
             self.ax.add_patch(circle2)
-        if self.dxu[0,i] > max_acc or self.dxu[0,i] < min_acc:
-            print("Throttle out of bounds: ")
-            print(self.dxu[0,i])
-            self.dxu[0,i] = np.clip(self.dxu[0,i], -min_acc, max_acc)
+    
         self.dxu[1,i] = utils.beta_to_delta(self.dxu[1,i])    
 
     def check_collision(self, x, i):
@@ -460,9 +621,9 @@ def main1(args=None):
     # x = np.array([[5.0, 5.0], [-2.0, 2.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
     # u = np.array([[0, 0], [0, 0]])
     # targets = [[10, 2], [10, -2]]
-    x = np.array([[-5.0, 5.0], [0.0, 0.1], [-np.pi, 0.0], [0.0, 0.0], [0.0, 0.0]])
+    x = np.array([[5.0, 5.0], [5.0, -5.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
     u = np.array([[0, 0], [0, 0]])
-    targets = [[5.0, 0.0], [-5.0, 0.0]]
+    targets = [[20.0, -20.0], [20.0, 20.0]]
     
     # Step 4: Create paths for each robot
     traj = data['trajectories']
@@ -553,8 +714,8 @@ def main_seed(args=None):
             'key_release_event',
             lambda event: [exit(0) if event.key == 'escape' else None])
         
-        # x, break_flag = c3bf.run_3cbf(x, break_flag) 
-        x, break_flag = c3bf.go_to_goal(x, break_flag) 
+        x, break_flag = c3bf.run_3cbf(x, break_flag) 
+        # x, break_flag = c3bf.go_to_goal(x, break_flag) 
 
         trajectory = np.dstack([trajectory, np.concatenate((x, c3bf.dxu))])
         
@@ -574,6 +735,6 @@ def main_seed(args=None):
         plt.show()
         
 if __name__=='__main__':
-    main_seed()
-    # main1()
+    # main_seed()
+    main1()
         

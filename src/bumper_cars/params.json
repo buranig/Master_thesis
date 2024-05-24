@@ -1,13 +1,4 @@
 {
-    "CBF_robotarium":
-        {
-            "max_steer": 0.523599,
-            "max_speed": 6,
-            "min_speed": -1.0,
-            "safety_radius": 7,
-            "barrier_gain": 0.05, 
-            "magnitude_limit": 6
-        },
     "CBF_simple":
         {
             "max_steer": 0.785398,
@@ -109,7 +100,7 @@
     "timer_freq": 0.01,
     "plot_traj": false,
     "to_goal_stop_distance": 2.5,
-    "show_animation": false,
+    "show_animation": true,
     "add_noise": false,
     "noise_scale_param": 0.0,
     "linear_model": false

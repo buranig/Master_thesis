@@ -30,8 +30,7 @@ def add_car(context, ld):
 
     # One *state buffer* / *controller* / *safety controller* per car
     for car_num in range(int(carAmount_value)):
-        if car_num == 1:
-            continue
+
         # Assign names and numbers to each car
         car_i = car_num + int(offset_value)
         car_str = '' if car_i == 0 else str(car_i + 1)

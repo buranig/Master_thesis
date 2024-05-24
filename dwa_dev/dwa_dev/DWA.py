@@ -62,7 +62,7 @@ class DWA_algorithm(Controller):
         self.robot_num = robot_num 
         self.dilated_traj = []
         self.predicted_trajectory = None
-        self.u_hist = []
+        self.u_hist = [[0.0, 0.0]]
 
         # Opening YAML file
         with open(controller_path, 'r') as openfile:
@@ -74,10 +74,9 @@ class DWA_algorithm(Controller):
         self.a_resolution = yaml_object["DWA"]["a_resolution"] # [m/ss]
 
         self.to_goal_cost_gain = yaml_object["DWA"]["to_goal_cost_gain"]
-        self.speed_cost_gain = yaml_object["DWA"]["speed_cost_gain"]
         self.obstacle_cost_gain = yaml_object["DWA"]["obstacle_cost_gain"]
-        self.heading_cost_gain = yaml_object["DWA"]["heading_cost_gain"]
         self.dilation_factor = yaml_object["DWA"]["dilation_factor"]
+        self.emergency_brake_distance = yaml_object["DWA"]["emergency_brake_distance"]
         
         np.random.seed(1)
 
@@ -96,7 +95,7 @@ class DWA_algorithm(Controller):
         self.__update_others()
 
         # Compute control   
-        u, trajectory, u_history = self.__calc_control_and_trajectory(self.curr_state[self.robot_num])
+        u, trajectory = self.__calc_control_and_trajectory(self.curr_state[self.robot_num])
         self.dilated_traj[self.robot_num] = LineString(zip(trajectory[:, 0], trajectory[:, 1])).buffer(self.dilation_factor, cap_style=3)
 
         car_cmd.throttle = np.interp(u[0], [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
@@ -213,6 +212,8 @@ class DWA_algorithm(Controller):
 
         for i in range(self.curr_state.shape[0]):
             self.dilated_traj.append(Point(self.curr_state[i, 0], self.curr_state[i, 1]).buffer(self.dilation_factor, cap_style=3))
+
+        self.predicted_trajectory = np.array([self.curr_state[self.robot_num]]*int(self.ph/self.dt))
         
 
 
@@ -335,8 +336,7 @@ class DWA_algorithm(Controller):
             min_cost = float("inf")
             best_u = [0.0, 0.0]
             best_trajectory = np.array([x])
-            # u_buf = self.u_hist[self.robot_num]
-            # trajectory_buf = self.predicted_trajectory[self.robot_num]
+            
             ob = [self.dilated_traj[idx] for idx in range(len(self.dilated_traj)) if idx != self.robot_num]
             dw = self.__calc_dynamic_window()
 
@@ -344,36 +344,65 @@ class DWA_algorithm(Controller):
             nearest = utils.find_nearest(np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution), x[3])
 
             for a in np.arange(dw[0], dw[1]+self.v_resolution, self.v_resolution):
-                # delta_list = self.trajs[str(nearest)][str(a)].keys()
                 for delta in self.trajs[str(nearest)][str(a)]:
-                    
-                    # old_time = time.time()
+
                     geom = self.trajs[str(nearest)][str(a)][str(delta)]
                     geom = np.array(geom)
                     geom[:,0:2] = (geom[:,0:2]) @ utils.rotateMatrix(np.radians(90)-x[2]) + [x[0],x[1]]
-                    # print(time.time()-old_time)
                     geom[:,2] = geom[:,2] + x[2] - np.pi/2 #bringing also the yaw angle in the new frame
-
-                    # trajectory = predict_trajectory(x_init, a, delta)
                     trajectory = geom
-                    # calc cost
 
+                    # calc cost
                     to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(a, float(delta))
-                    # speed_cost = self.speed_cost_gain * (self.car_model.max_speed - trajectory[-1, 3])
-                    # if trajectory[-1, 3] <= 0.0:
-                    #     speed_cost = 5
-                    # else:
-                    #     speed_cost = 0.0
                     ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(trajectory, ob)
-                    # heading_cost = self.heading_cost_gain * self.__calc_to_goal_heading_cost(trajectory)
-                    final_cost = to_goal_cost + ob_cost #+  speed_cost  #+ heading_cost #+ speed_cost 
-                    # print("COSTS: ", to_goal_cost, speed_cost, ob_cost)
+                    final_cost = to_goal_cost + ob_cost
+
                     # search minimum trajectory
                     if min_cost >= final_cost:
                         min_cost = final_cost
                         best_u = [a, float(delta)]
                         best_trajectory = trajectory
-                        u_history = [[a, float(delta)] for _ in range(len(trajectory-1))]
+                        u_traj = [[a, float(delta)] for _ in range(len(trajectory-1))]
 
-            return best_u, best_trajectory, u_history
+            # Check if previous trajectory was better
+            if len(self.u_hist) > self.emergency_brake_distance:  
+                self.u_hist.pop(0)
+                trajectory_buf = self.predicted_trajectory[1:]
+
+                if self.robot_num ==0:
+                    print("Pred_traj: ", self.predicted_trajectory)
+                    print("u_hist: ", self.u_hist)
+
+                # Even when following the old trajectory, we need to update it to the position of the robot
+                trajectory_buf[:,0:2] -= trajectory_buf[1,0:2]
+                trajectory_buf[:,0:2] = (trajectory_buf[:,0:2]) @ utils.rotateMatrix(utils.normalize_angle(-x[2]+trajectory_buf[0,2]))
+                trajectory_buf[:,0:2] += x[0:2]
+                trajectory_buf[:,2] += utils.normalize_angle(x[2]-trajectory_buf[0,2])
+
+                to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(self.u_hist[0][0], self.u_hist[0][1])
+                ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(trajectory_buf, ob)
+                
+                final_cost = to_goal_cost + ob_cost 
+
+                if min_cost >= final_cost:      
+                    min_cost = final_cost
+                    best_u = self.u_hist[0]
+                    best_trajectory = trajectory_buf
+                    u_traj = self.u_hist
+
+            elif min_cost == np.inf:
+                # emergency stop
+                print(f"Emergency stop for vehicle {self.robot_num}")
+                # # if x[3]>0:
+                # #     best_u = [self.car_model.min_acc, 0]
+                # # else:
+                # #     best_u = [self.car_model.max_acc, 0]
+                best_u = [(0.0 - x[3])/self.dt, 0]
+                best_trajectory = np.array([x[0:3], x[0:3]] * int(self.ph/self.dt)) 
+                u_traj =  np.array([best_u]*int(self.ph/self.dt))
+
+            self.u_hist = u_traj
+            self.predicted_trajectory = best_trajectory
+
+            return best_u, best_trajectory
     

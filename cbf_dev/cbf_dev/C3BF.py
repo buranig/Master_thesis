@@ -157,7 +157,6 @@ class C3BF_algorithm(Controller):
         H = np.zeros([N-1,1])
 
         self.__closest_boundary_point(i, x)
-        print(f'Closest boundary point to car {i}: {self.closest_boundary_point}')
 
         # when the car goes backwards the yaw angle should be flipped --> Why??
         # x[2,i] = (1-np.sign(x[3,i]))*(np.pi/2) + x[2,i]
@@ -177,10 +176,8 @@ class C3BF_algorithm(Controller):
         for j in range(N):
             arr = np.array([x[0, j] - x[0, i], x[1, j] - x[1,i]])
             dist = np.linalg.norm(arr)
-            v = np.array([x[3,i]*np.cos(x[2,i]), x[3,i]*np.sin(x[2,i])])
-            scalar_prod = v @ arr
 
-            if j == i or dist > 10.0 * self.safety_radius: 
+            if j == i or dist > 2.0 * self.safety_radius: 
                 continue
 
             v_rel = np.array([x[3,j]*np.cos(x[2,j]) - x[3,i]*np.cos(x[2,i]), 
@@ -210,33 +207,35 @@ class C3BF_algorithm(Controller):
             H[count] = np.array([self.barrier_gain*np.power(h, 3) + Lf_h])
             G[count,:] = -Lg_h
             count+=1
-        
-        v_rel = np.array([-x[3,i]*np.cos(self.closest_boundary_point[2]) - x[3,i]*np.cos(x[2,i]), 
-                          -x[3,i]*np.sin(self.closest_boundary_point[2]) - x[3,i]*np.sin(x[2,i])])
-        p_rel = np.array([self.closest_boundary_point[0]-x[0,i],
-                            self.closest_boundary_point[1]-x[1,i]])
-        
-        cos_Phi = np.sqrt(abs(np.linalg.norm(p_rel)**2 - self.safety_radius**2))/np.linalg.norm(p_rel)
-        tan_Phi_sq = self.safety_radius**2 / (np.linalg.norm(p_rel)**2 - self.safety_radius**2)
-        
-        h = np.dot(p_rel, v_rel) + np.linalg.norm(v_rel) * np.linalg.norm(p_rel) * cos_Phi
-        
-        gradH_1 = np.array([- (-x[3,i]*np.cos(self.closest_boundary_point[2]) - x[3,i]*np.cos(x[2,i])), 
-                            - (-x[3,i]*np.sin(self.closest_boundary_point[2]) - x[3,i]*np.sin(x[2,i])),
-                            x[3,i] * (np.sin(x[2,i]) * p_rel[0] - np.cos(x[2,i]) * p_rel[1]),
-                            -np.cos(x[2,i]) * p_rel[0] - np.sin(x[2,i]) * p_rel[1]])
-        
-        gradH_21 = -(1 + tan_Phi_sq) * np.linalg.norm(v_rel)/np.linalg.norm(p_rel) * cos_Phi * p_rel 
-        gradH_22 = np.dot(np.array([x[3,i]*np.sin(x[2,i]), -x[3,i]*np.cos(x[2,i])]), v_rel) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
-        gradH_23 = - np.dot(v_rel, np.array([np.cos(x[2,i]), np.sin(x[2,i])])) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
 
-        gradH = gradH_1.reshape(4,1) + np.vstack([gradH_21.reshape(2,1), gradH_22, gradH_23])
+        # Adding arena boundary constraints
+        
+        # v_rel = np.array([-x[3,i]*np.cos(self.closest_boundary_point[2]) - x[3,i]*np.cos(x[2,i]), 
+        #                   -x[3,i]*np.sin(self.closest_boundary_point[2]) - x[3,i]*np.sin(x[2,i])])
+        # p_rel = np.array([self.closest_boundary_point[0]-x[0,i],
+        #                     self.closest_boundary_point[1]-x[1,i]])
+        
+        # cos_Phi = np.sqrt(abs(np.linalg.norm(p_rel)**2 - self.safety_radius**2))/np.linalg.norm(p_rel)
+        # tan_Phi_sq = self.safety_radius**2 / (np.linalg.norm(p_rel)**2 - self.safety_radius**2)
+        
+        # h = np.dot(p_rel, v_rel) + np.linalg.norm(v_rel) * np.linalg.norm(p_rel) * cos_Phi
+        
+        # gradH_1 = np.array([- (-x[3,i]*np.cos(self.closest_boundary_point[2]) - x[3,i]*np.cos(x[2,i])), 
+        #                     - (-x[3,i]*np.sin(self.closest_boundary_point[2]) - x[3,i]*np.sin(x[2,i])),
+        #                     x[3,i] * (np.sin(x[2,i]) * p_rel[0] - np.cos(x[2,i]) * p_rel[1]),
+        #                     -np.cos(x[2,i]) * p_rel[0] - np.sin(x[2,i]) * p_rel[1]])
+        
+        # gradH_21 = -(1 + tan_Phi_sq) * np.linalg.norm(v_rel)/np.linalg.norm(p_rel) * cos_Phi * p_rel 
+        # gradH_22 = np.dot(np.array([x[3,i]*np.sin(x[2,i]), -x[3,i]*np.cos(x[2,i])]), v_rel) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
+        # gradH_23 = - np.dot(v_rel, np.array([np.cos(x[2,i]), np.sin(x[2,i])])) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
 
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
+        # gradH = gradH_1.reshape(4,1) + np.vstack([gradH_21.reshape(2,1), gradH_22, gradH_23])
 
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, self.barrier_gain*np.power(h, 3) + Lf_h])
+        # Lf_h = np.dot(gradH.T, f)
+        # Lg_h = np.dot(gradH.T, g)
+
+        # G = np.vstack([G, -Lg_h])
+        # H = np.vstack([H, self.barrier_gain*np.power(h, 3) + Lf_h])
 
         # H[count] = np.array([self.barrier_gain*np.power(h, 3) + Lf_h])
         # G[count,:] = -Lg_h
@@ -286,12 +285,24 @@ class C3BF_algorithm(Controller):
         # Lg_h = np.dot(gradH.T, g)
         # G = np.vstack([G, -Lg_h])
         # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        
+        closest_point = self.__compute_closest_point(i,x)
+        Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - closest_point[0]) + np.sin(x[2, i]) * (x[1, i] - closest_point[1]))
+        Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - closest_point[1]) - np.sin(x[2, i]) * (x[0, i] - closest_point[0]))
+        h = (x[0, i] - closest_point[0]) * (x[0, i] - closest_point[0]) + (x[1, i] - closest_point[1]) * (x[1, i] - closest_point[1]) - (self.safety_radius ** 2 + self.Kv * abs(x[3, i]))
+        H = np.vstack([H, self.arena_gain*np.power(h, 3) + Lf_h])
+
+        if x[3, i] >= 0:
+                G = np.vstack([G, [self.Kv, -Lg_h]])
+        else:
+                G = np.vstack([G, [-self.Kv, -Lg_h]])
+
 
         # Input constraints
         G = np.vstack([G, [[0, 1], [0, -1]]])
         H = np.vstack([H, self.__delta_to_beta(self.car_model.max_steer), -self.__delta_to_beta(-self.car_model.max_steer)])
-        # G = np.vstack([G, [[0, x[3,i]/self.car_model.Lr], [0, x[3,i]/self.car_model.Lr]]])
-        # H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
+        G = np.vstack([G, [[0, x[3,i]/self.car_model.Lr], [0, x[3,i]/self.car_model.Lr]]])
+        H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)]) # TODO: Tune these 50 degrees per second
         G = np.vstack([G, [[1, 0], [-1, 0]]])
         H = np.vstack([H, self.car_model.max_acc, - self.car_model.min_acc])
 
@@ -307,5 +318,30 @@ class C3BF_algorithm(Controller):
         except:
             print("QP solver failed")   
             self.solver_failure += 1   
+            self.dxu[0] = (0.0 - x[3, i])/self.dt
             return None      
         
+    def __compute_closest_point(self, i, x):
+        dx = 0
+        dy = 0
+
+        if abs(x[0,i] - self.boundary_points[0]) < abs(x[0,i] - self.boundary_points[1]):
+            dx = self.boundary_points[0] - x[0,i]
+            cpx = self.boundary_points[0]
+        else:
+            dx = self.boundary_points[1] - x[0,i]
+            cpx = self.boundary_points[1]
+        
+        if abs(x[1,i] - self.boundary_points[2]) < abs(x[1,i] - self.boundary_points[3]):
+            dy = self.boundary_points[2] - x[1,i]
+            cpy = self.boundary_points[2]
+        else:
+            dy = self.boundary_points[3] - x[1,i]
+            cpy = self.boundary_points[3]
+
+        if abs(dx) < abs(dy):
+            closest_point = np.array([cpx, x[1,i], np.pi/2])  
+        else:
+            closest_point = np.array([x[0,i], cpy, 0.0])
+        
+        return closest_point

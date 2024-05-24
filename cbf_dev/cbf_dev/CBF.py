@@ -230,8 +230,7 @@ class CBF_algorithm(Controller):
             return self.dxu
         
         except:
-            if self.robot_num ==3:
-                print("QP solver failed")
-            self.solver_failure += 1
-            return None
-
+            print("QP solver failed")   
+            self.solver_failure += 1   
+            self.dxu[0] = (0.0 - x[3, i])/self.dt
+            return None      

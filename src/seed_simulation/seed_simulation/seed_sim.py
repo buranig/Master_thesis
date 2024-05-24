@@ -940,15 +940,15 @@ def main():
             else:
                 print(f"\tMPC-Discrete already executed for {filename}, for noise scaling {noise_scale_param}.\n")
             
-            # if 'C3BF_MPC' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise):
-            #     cbf_mpc_trajectory, cbf_mpc_computational_time, cbf_mpc_solver_failure = cbf_mpc_sim(seed, robot_num)
-            #     print(f"C3BF_MPC average computational time: {sum(cbf_mpc_computational_time) / len(cbf_mpc_computational_time)}\n")
-            #     cbf_mpc_data = data_process.post_process_simultation(cbf_mpc_trajectory, cbf_mpc_computational_time, method="C3BF_MPC", 
-            #                                                          solver_failure=cbf_mpc_solver_failure)
-            #     data.append(cbf_mpc_data)
-            #     plt.close()
-            # else:
-            #     print(f"\tC3BF_MPC already executed for {filename}, for noise scaling {noise_scale_param}.\n")
+            if 'C3BF_MPC' not in list(df_temp["Method"]) or (noise_scale_param not in list(df_temp["Noise Scaling"]) and add_noise) or model_type not in list(df.loc[(df["File Name"] == filename) & (df["Method"] == 'C3BF_MPC')]["Model Type"]):
+                cbf_mpc_trajectory, cbf_mpc_computational_time, cbf_mpc_solver_failure = cbf_mpc_sim(seed, robot_num)
+                print(f"C3BF_MPC average computational time: {sum(cbf_mpc_computational_time) / len(cbf_mpc_computational_time)}\n")
+                cbf_mpc_data = data_process.post_process_simultation(cbf_mpc_trajectory, cbf_mpc_computational_time, method="C3BF_MPC", 
+                                                                     solver_failure=cbf_mpc_solver_failure)
+                data.append(cbf_mpc_data)
+                plt.close()
+            else:
+                print(f"\tC3BF_MPC already executed for {filename}, for noise scaling {noise_scale_param}.\n")
 
         else:
             dwa_trajectory, dwa_computational_time, dwa_solver_failure = dwa_sim(seed, robot_num)   

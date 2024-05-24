@@ -132,9 +132,9 @@ class C3BF_algorithm(Controller):
             dy = abs(x[1,i]-self.boundary_points[3])
 
         if dx < dy:
-            self.closest_boundary_point = (cpx, x[1,i], 0.0)
+            self.closest_boundary_point = (cpx, x[1,i], np.pi/2)
         else:
-            self.closest_boundary_point = (x[0,i], cpy, np.pi/2)
+            self.closest_boundary_point = (x[0,i], cpy, 0.0)
 
     def __C3BF(self, i, x):
         """
@@ -237,9 +237,12 @@ class C3BF_algorithm(Controller):
         # G = np.vstack([G, -Lg_h])
         # H = np.vstack([H, self.barrier_gain*np.power(h, 3) + Lf_h])
 
-        # H[count] = np.array([self.barrier_gain*np.power(h, 3) + Lf_h])
-        # G[count,:] = -Lg_h
+        if x[3, i] >= 0:
+            G = np.vstack([G, [self.Kv, -Lg_h]])
+        else:
+            G = np.vstack([G, [-self.Kv, -Lg_h]])
 
+       
         # # Adding arena boundary constraints
         # # Pos Y
         # h = ((x[1, i] - self.boundary_points[3]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))

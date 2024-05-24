@@ -11,9 +11,9 @@ from shapely.geometry import Point, Polygon, LineString
 from shapely import intersection, distance
 from shapely.plotting import plot_polygon, plot_line
 
-from bumper_cars.classes.CarModel import State, CarModel
+from bumper_cars.classes.State import State
 from bumper_cars.classes.Controller import Controller
-from lar_utils import car_utils as utils
+from bumper_cars.utils import car_utils as utils
 from lar_msgs.msg import CarControlStamped, CarStateStamped
 from typing import List
 import os

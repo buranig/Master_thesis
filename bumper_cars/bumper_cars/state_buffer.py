@@ -2,14 +2,13 @@
     
 import rclpy
 from rclpy.node import Node
-from lar_msgs.msg import CarStateStamped as State, CarControlStamped
-from lar_msgs.srv import EnvState, CarCommand
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, qos_profile_sensor_data
+from lar_msgs.msg import CarStateStamped, CarControlStamped
+from bumper_msgs.srv import EnvState, CarCommand
+from rclpy.qos import qos_profile_sensor_data
 
 class StateBuffer(Node):
     def __init__(self):
         super().__init__('state_buffer')
-        # qos_profile = QoSProfile(reliability=QoSReliabilityPolicy.BEST_EFFORT)
 
         # Initialise car number
         self.declare_parameter('carNumber', 0)
@@ -32,13 +31,13 @@ class StateBuffer(Node):
 
         for i in range(int(self.car_amount)):
             car_str = '' if i==0 else str(i+1)
-            self.sub_state.append(self.create_subscription(State, topic_str + car_str + "/state",\
+            self.sub_state.append(self.create_subscription(CarStateStamped, topic_str + car_str + "/state",\
                                              lambda msg, car_i=i: self._received_state(msg, car_i), qos_profile_sensor_data))
             self.sub_cmd.append(self.create_subscription(CarControlStamped, topic_str + car_str + "/desired_control",\
                                              lambda msg, car_i=i: self._received_cmd(msg, car_i), qos_profile_sensor_data))
         
         # Initialize states (at default) and update bit
-        self.env_state = [State()] * self.car_amount
+        self.env_state = [CarStateStamped()] * self.car_amount
         self.updated = [False] * self.car_amount
 
     def _get_env_state(self, request, response):

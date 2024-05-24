@@ -9,8 +9,8 @@ C3BF:
   arena_gain: 7.0
   Kv: 0.2
 DWA:
-  a_resolution: 0.01
-  v_resolution: 0.01
+  a_resolution: 0.05
+  v_resolution: 0.05
   delta_resolution: 5
   emergency_brake_distance: 5
   to_goal_cost_gain: 1

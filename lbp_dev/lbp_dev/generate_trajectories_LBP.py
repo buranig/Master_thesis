@@ -13,8 +13,8 @@ sys.path.append(str(path_planning_dir))
 from matplotlib import pyplot as plt
 import numpy as np
 import math
-from lar_utils import car_utils as utils
-from bumper_cars.classes.CarModel import State
+from bumper_cars.utils import car_utils as utils
+from bumper_cars.classes.State import State
 from lbp_dev.LBP import LBP_algorithm as LBP
 from lar_msgs.msg import CarControlStamped
 import json

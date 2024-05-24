@@ -10,9 +10,8 @@ from scipy.optimize import minimize, NonlinearConstraint
 import time
 import os
 
-from bumper_cars.classes.CarModel import State, CarModel
 from bumper_cars.classes.Controller import Controller
-from lar_utils import car_utils as utils
+from bumper_cars.utils import car_utils as utils
 from lar_msgs.msg import CarControlStamped, CarStateStamped
 from typing import List
 

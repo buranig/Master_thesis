@@ -2,9 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 
-from bumper_cars.classes.CarModel import State, CarModel
+from bumper_cars.classes.State import State
 from bumper_cars.classes.Controller import Controller
-from lar_utils import car_utils as utils
+from bumper_cars.utils import car_utils as utils
 from lar_msgs.msg import CarControlStamped, CarStateStamped
 from typing import List
 
@@ -131,7 +131,7 @@ class DWA_algorithm(Controller):
         initial_state.y = 0.0
         initial_state.yaw = np.radians(90.0)
 
-        other_delta = np.random.normal(0.0, 0.1, int((dw[3] - dw[2])/self.delta_resolution)) #TODO: modify hardcoded std and number generation
+        other_delta = np.random.normal(0.0, 0.1, 10) #TODO: modify hardcoded std and number generation
         for v in np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution):
             initial_state.v = v
             traj = []
@@ -368,10 +368,6 @@ class DWA_algorithm(Controller):
             if len(self.u_hist) > self.emergency_brake_distance:  
                 self.u_hist.pop(0)
                 trajectory_buf = self.predicted_trajectory[1:]
-
-                if self.robot_num ==0:
-                    print("Pred_traj: ", self.predicted_trajectory)
-                    print("u_hist: ", self.u_hist)
 
                 # Even when following the old trajectory, we need to update it to the position of the robot
                 trajectory_buf[:,0:2] -= trajectory_buf[1,0:2]

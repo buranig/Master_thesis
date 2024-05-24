@@ -4,16 +4,12 @@ import yaml
 import math
 import numpy as np
 import os
-from lar_utils.car_utils import normalize_angle
+
+from bumper_cars.classes.State import State
+
+from bumper_cars.utils.car_utils import normalize_angle
 from lar_msgs.msg import CarControlStamped
 
-class State:
-    def __init__(self, x = 0.0, y = 0.0, v = 0.0, yaw = 0.0, omega = 0.0):
-        self.x = x
-        self.y = y
-        self.v = v
-        self.yaw = yaw
-        self.omega = omega
 
 class CarModel:
     # Init state of car

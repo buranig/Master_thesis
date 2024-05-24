@@ -4,13 +4,12 @@ import rclpy
 import yaml
 from rclpy.node import Node
 import numpy as np
-from lar_utils import car_utils as utils
+from bumper_cars.utils import car_utils as utils
 
 # Plot goal in Rviz
 from visualization_msgs.msg import Marker
 
 # import control models
-# from planner import utils
 from dwa_dev.DWA import DWA_algorithm as DWA
 from cbf_dev.CBF import CBF_algorithm as CBF
 from cbf_dev.C3BF import C3BF_algorithm as C3BF
@@ -26,8 +25,8 @@ controller_map = {
 }
 
 
-from lar_msgs.msg import CarControlStamped, CarStateStamped
-from lar_msgs.srv import EnvState, CarCommand
+from lar_msgs.msg import CarControlStamped
+from bumper_msgs.srv import EnvState, CarCommand
 
 
 class CollisionAvoidance(Node):

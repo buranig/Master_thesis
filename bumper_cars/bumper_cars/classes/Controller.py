@@ -5,7 +5,8 @@ import numpy as np
 from typing import List
 
 # import car model
-from bumper_cars.classes.CarModel import CarModel, State
+from bumper_cars.classes.State import State
+from bumper_cars.classes.CarModel import CarModel
 from lar_msgs.msg import CarControlStamped, CarStateStamped
 
 

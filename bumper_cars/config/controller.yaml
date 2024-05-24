@@ -5,8 +5,8 @@ CBF:
   Kv: 0.2
 C3BF:
   safety_radius: 0.2
-  barrier_gain: 7.0
-  arena_gain: 0.5
+  barrier_gain: 1.0
+  arena_gain: 7.0
   Kv: 0.2
 DWA:
   a_resolution: 0.01
@@ -46,4 +46,4 @@ Controller:
 Simulation:
   width: 4.3
   height: 3.3
-  show_animation: true
+  show_animation: false

@@ -36,3 +36,7 @@ Terminal 4 (_optional_):
 ros2 run dwa_dev view_trajs
 ```
 
+# Dependencies
+
+```
+pip3 install shapely cvxopt

@@ -1,5 +1,5 @@
 CBF:
-  safety_radius: 0.2
+  safety_radius: 0.1
   barrier_gain: 7.0
   arena_gain: 7.0
   Kv: 0.2

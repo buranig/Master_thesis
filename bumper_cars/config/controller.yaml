@@ -4,18 +4,17 @@ CBF:
   arena_gain: 7.0
   Kv: 0.2
 C3BF:
-  safety_radius: 0.1
+  safety_radius: 0.2
   barrier_gain: 7.0
-  arena_gain: 0.5
+  arena_gain: 7.0
   Kv: 0.2
 DWA:
   a_resolution: 0.01
   v_resolution: 0.01
   delta_resolution: 5
+  emergency_brake_distance: 5
   to_goal_cost_gain: 1
-  speed_cost_gain: 1
   obstacle_cost_gain: 2
-  heading_cost_gain: 1
   dilation_factor: 0.1
 LBP:
   a_resolution: 0.05
@@ -44,6 +43,6 @@ Controller:
   add_noise: false
   noise_scale: 0.4
 Simulation:
-  width: 4.3
-  height: 3.3
-  show_animation: true
+  width: 10
+  height: 10
+  show_animation: false

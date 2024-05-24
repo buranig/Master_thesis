@@ -252,8 +252,8 @@ class CBF_algorithm():
         self.dxu[1,:] = utils.delta_to_beta_array(self.dxu[1,:])
 
         count = 0
-        G = np.zeros([N - 1, M])
-        H = np.zeros([N - 1, 1])
+        G = np.zeros([N - 1 + 10, M])
+        H = np.zeros([N - 1 + 10, 1])
 
         # when the car goes backwards the yaw angle should be flipped --> Why??
         # x[2,i] = (1-np.sign(x[3,i]))*(np.pi/2) + x[2,i]
@@ -275,7 +275,6 @@ class CBF_algorithm():
             dist = np.linalg.norm(arr)
 
             if j == i or dist > 3 * safety_radius: 
-                plt.plot
                 continue
 
             Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
@@ -293,13 +292,29 @@ class CBF_algorithm():
             count += 1
 
         # Add the input constraint
-        G = np.vstack([G, [[0, 1], [0, -1]]])
-        H = np.vstack([H, utils.delta_to_beta(max_steer), -utils.delta_to_beta(-max_steer)])
-        # TODO: check whether to keep the following constraints
-        G = np.vstack([G, [[0, x[3,i]/Lr], [0, x[3,i]/Lr]]])
-        H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
-        G = np.vstack([G, [[1, 0], [-1, 0]]])
-        H = np.vstack([H, max_acc, -min_acc])
+        G[count, :] = np.array([0, 1])
+        H[count] = np.array([utils.delta_to_beta(max_steer)])
+        count += 1
+
+        G[count, :] = np.array([0, -1])
+        H[count] = np.array([-utils.delta_to_beta(-max_steer)])
+        count += 1
+
+        G[count, :] = np.array([0, x[3,i]/Lr])
+        H[count] = np.array([np.deg2rad(50)])
+        count += 1
+
+        G[count, :] = np.array([0, x[3,i]/Lr])
+        H[count] = np.array([np.deg2rad(50)])
+        count += 1
+
+        G[count, :] = np.array([1, 0])
+        H[count] = np.array([max_acc])
+        count += 1
+
+        G[count, :] = np.array([-1, 0])
+        H[count] = np.array([-min_acc])
+        count += 1
 
         # Adding arena boundary constraints
         # Pos Y
@@ -311,8 +326,10 @@ class CBF_algorithm():
 
         Lf_h = np.dot(gradH.T, f)
         Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([arena_gain * h ** 3 + Lf_h])])
+        G[count, :] = np.array([-Lg_h])
+        H[count] = np.array([arena_gain * h ** 3 + Lf_h])
+        # G = np.vstack([G, -Lg_h])
+        # H = np.vstack([H, np.array([arena_gain * h ** 3 + Lf_h])])
 
         # Neg Y
         h = ((x[1, i] - boundary_points[2]) ** 2 - safety_radius ** 2 - Kv * abs(x[3, i]))
@@ -322,8 +339,8 @@ class CBF_algorithm():
             gradH = np.array([0, 2 * (x[1, i] - boundary_points[2]), 0, Kv])
         Lf_h = np.dot(gradH.T, f)
         Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([arena_gain * h ** 3 + Lf_h])])
+        G[count, :] = np.array([-Lg_h])
+        H[count] = np.array([arena_gain * h ** 3 + Lf_h])
 
         # Pos X
         h = ((x[0, i] - boundary_points[1]) ** 2 - safety_radius ** 2 - Kv * abs(x[3, i]))
@@ -333,8 +350,8 @@ class CBF_algorithm():
             gradH = np.array([2 * (x[0, i] - boundary_points[1]), 0, 0, Kv])
         Lf_h = np.dot(gradH.T, f)
         Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([arena_gain * h ** 3 + Lf_h])])
+        G[count, :] = np.array([-Lg_h])
+        H[count] = np.array([arena_gain * h ** 3 + Lf_h])
 
         # Neg X
         h = ((x[0, i] - boundary_points[0]) ** 2 - safety_radius ** 2 - Kv * abs(x[3, i]))
@@ -344,16 +361,16 @@ class CBF_algorithm():
             gradH = np.array([2 * (x[0, i] - boundary_points[0]), 0, 0, Kv])
         Lf_h = np.dot(gradH.T, f)
         Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([arena_gain * h ** 3 + Lf_h])])
+        G[count, :] = np.array([-Lg_h])
+        H[count] = np.array([arena_gain * h ** 3 + Lf_h])
 
         solvers.options['show_progress'] = False
         try:
             sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
             self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
-            if show_animation:
-                circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius+ Kv * abs(x[3, i]), color='b', fill=False)
-                self.ax.add_patch(circle2)
+            # if show_animation:
+            #     circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius+ Kv * abs(x[3, i]), color='b', fill=False)
+            #     self.ax.add_patch(circle2)
         except:
             print(f"QP solver failed for robot {i}! Emergency stop.") 
             self.dxu[0,i] = (0 - x[3,i])/dt 
@@ -421,10 +438,10 @@ def main(args=None):
     ax = fig.add_subplot(111)
     
     # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
-    x0, y, yaw, v, omega, model_type = utils.samplegrid(width_init, height_init, min_dist, robot_num, safety_init)
+    x0, y, yaw, v, omega, model_type = utils.samplegrid(width_init, height_init, robot_num)
 
     # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v])
+    x = np.array([x0, y, yaw, v, omega])
     
     # Step 4: Create paths for each robot
     paths = [utils.create_path() for _ in range(robot_num)]
@@ -432,13 +449,7 @@ def main(args=None):
     # Step 5: Extract the target coordinates from the paths
     targets = [[path[0].x, path[0].y] for path in paths]
 
-    cbf = CBF_algorithm(targets, paths, robot_num)
-
-    # Step 6: Create a MultiControl object
-    multi_control = MultiControl()
-    
-    # Step 7: Initialize the multi_control list with ControlInputs objects
-    multi_control.multi_control = [ControlInputs(delta=0.0, throttle=0.0) for _ in range(robot_num)]
+    cbf = CBF_algorithm(targets, paths, robot_num=robot_num, ax=ax)
     
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
@@ -454,7 +465,9 @@ def main(args=None):
                 cbf.targets[i] = (paths[i][0].x, paths[i][0].y)
 
             cbf.control_robot(i, x)
-            x, multi_control = update_robot_state(i, x, cbf.dxu, multi_control, targets)
+            x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], cbf.dxu[:, i])
+            utils.plot_robot_and_arrows(i, x, cbf.dxu, cbf.targets, cbf.ax)
+            # x, multi_control = update_robot_state(i, x, cbf.dxu, multi_control, targets)
         
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")

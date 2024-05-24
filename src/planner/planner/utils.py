@@ -522,7 +522,7 @@ def rot_mat_2d(angle):
     """
     return Rot.from_euler('z', angle).as_matrix()[0:2, 0:2]
 
-def samplegrid(width_init, height_init, min_dist, robot_num, safety_init):
+def samplegrid(width_init, height_init, robot_num):
     """
     Generate random grid coordinates for robots in a given map.
 

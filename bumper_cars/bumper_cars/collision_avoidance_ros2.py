@@ -96,14 +96,15 @@ class CollisionAvoidance(Node):
         self.rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)  # Convert HSV to RGB
         
         if self.debug_rviz:   
-            self.debug_publisher = self.create_publisher(Marker, '/debug_markers', 10)
+            self.debug_publisher = self.create_publisher(Marker, '/debug_markers'+self.car_str, 10)
+
+            if self.car_i == 0:
+                self.publish_map(self.algorithm.boundary_points)
 
             alg = self.car_alg.lower() 
             if alg == "cbf" or alg == "c3bf":
                 self.car_radius_publish(self.algorithm.safety_radius)
 
-            if self.car_i == 0:
-                self.publish_map(self.algorithm.boundary_points)
             
 
 
@@ -180,7 +181,7 @@ class CollisionAvoidance(Node):
         marker.header.frame_id = "world"
         marker.header.stamp = self.get_clock().now().to_msg()
 
-        marker.ns = ""
+        marker.ns = "world_map"
         marker.id = 0
         marker.type = Marker.LINE_STRIP
         marker.action = Marker.ADD

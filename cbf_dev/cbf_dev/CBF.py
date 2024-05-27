@@ -1,7 +1,6 @@
 import numpy as np
 
-from cvxopt import matrix, solvers
-from cvxopt import matrix
+from piqp import DenseSolver, PIQP_SOLVED
 
 from lar_msgs.msg import CarControlStamped, CarStateStamped
 from typing import List
@@ -13,12 +12,6 @@ from bumper_cars.classes.Controller import Controller
 # For the parameter file
 import yaml
 
-# For plotting
-import matplotlib.pyplot as plt
-color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-fig = plt.figure(1, dpi=90, figsize=(10,10))
-ax= fig.add_subplot(111)
-
 np.random.seed(1)
 
 class CBF_algorithm(Controller):
@@ -29,7 +22,7 @@ class CBF_algorithm(Controller):
 
         ## Init public parameters
         self.robot_num = robot_num
-        self.dxu = np.zeros((2, 1), dtype=float)
+        self.dxu = np.zeros((2, ), dtype=float)
         self.solver_failure = 0
 
         # Opening YAML file
@@ -41,6 +34,8 @@ class CBF_algorithm(Controller):
         self.barrier_gain = yaml_object["CBF"]["barrier_gain"]
         self.arena_gain = yaml_object["CBF"]["arena_gain"]
         self.Kv = yaml_object["CBF"]["Kv"] # interval [0.5-1]
+
+        self.closest_point = (0.0, 0.0)
 
     ################# PUBLIC METHODS
 
@@ -55,30 +50,15 @@ class CBF_algorithm(Controller):
         # Compute control   
         u = self.__CBF(self.robot_num, self.curr_state)
 
-        # If solver did not fail
-        if u is not None:
-            car_cmd.throttle = np.interp(u[0], [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
-            car_cmd.steering = np.interp(u[1], [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
+        # Project it to range [-1, 1]
+        car_cmd.throttle = np.interp(u[0], [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
+        car_cmd.steering = np.interp(u[1], [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
             
-        # Debug visualization
-        if self.show_animation and self.robot_num == 0:
-            plt.cla()
-            plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-            for i in range(self.curr_state.shape[1]):
-                self.plot_robot(self.curr_state[0, i], self.curr_state[1, i], self.curr_state[2, i])
-                self.plot_arrow(self.curr_state[0, i], self.curr_state[1, i], self.curr_state[2, i] + self.dxu[1], length=0.3, width=0.05)
-                self.plot_arrow(self.curr_state[0, i], self.curr_state[1, i], self.curr_state[2, i], length=0.1, width=0.05)
-            self.plot_map()
-            plt.axis("equal")
-            plt.grid(True)
-            plt.pause(0.00001)
-
         return car_cmd
 
     def set_goal(self, goal: CarControlStamped) -> None:
         self.dxu[0] = np.interp(goal.throttle, [-1, 1], [self.car_model.min_acc, self.car_model.max_acc]) * self.car_model.acc_gain
         self.dxu[1] = np.interp(goal.steering, [-1, 1], [-self.car_model.max_steer, self.car_model.max_steer])
-        print("Desired goal: ",self.dxu[0], self.dxu[1])
         
     ################# PRIVATE METHODS
     def __delta_to_beta(self, delta):
@@ -123,31 +103,32 @@ class CBF_algorithm(Controller):
             numpy.ndarray: Filtered Control input dxu of shape (2, N).
 
         """
-        N = x.shape[1]              # Number of robots
-        M = self.dxu.shape[0]       # Number of control inputs
+        N = x.shape[1]
+        M = self.dxu.shape[0]
         self.dxu[1] = self.__delta_to_beta(self.dxu[1])
 
-        G = np.zeros([N - 1, M])
-        H = np.zeros([N - 1, 1])
-
-        # when the car goes backwards the yaw angle should be flipped --> Why??
-        # x[2,i] = (1-np.sign(x[3,i]))*(np.pi/2) + x[2,i]
-        f = np.array([x[3, i] * np.cos(x[2, i]),
-                      x[3, i] * np.sin(x[2, i]),
-                      0,
-                      0]).reshape(4, 1)
-        g = np.array([[0, -x[3, i] * np.sin(x[2, i])],
-                      [0, x[3, i] * np.cos(x[2, i])],
-                      [0, x[3, i] / self.car_model.Lr],
-                      [1, 0]]).reshape(4, 2)
-
-        P = np.identity(2) * 2
-        q = np.array([- 2 * self.dxu[0], - 2 * self.dxu[1]])
-
         count = 0
-        for j in range(N):
+        G = np.zeros([N-1 + 9,M])
+        H = np.zeros([N-1 + 9,1]) 
 
-            if j == i: continue
+        # # f = np.array([x[3,i]*np.cos(x[2,i]),
+        # #                     x[3,i]*np.sin(x[2,i]), 
+        # #                     0, 
+        # #                     0]).reshape(4,1)
+        # # g = np.array([[0, -x[3,i]*np.sin(x[2,i])], 
+        # #                 [0, x[3,i]*np.cos(x[2,i])], 
+        # #                 [0, x[3,i]/self.car_model.Lr],
+        # #                 [1, 0]]).reshape(4,2)
+        
+        P = np.identity(2)*2
+        q = np.array([-2 * self.dxu[0], - 2 * self.dxu[1]])
+
+        for j in range(N):
+            arr = np.array([x[0, j] - x[0, i], x[1, j] - x[1,i]])
+            dist = np.linalg.norm(arr)
+
+            if j == i or dist > 2 * self.safety_radius: 
+                continue
             
             Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
             Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - x[1, j]) - np.sin(x[2, i]) * (x[0, i] - x[0, j]))
@@ -164,73 +145,81 @@ class CBF_algorithm(Controller):
 
             count += 1
 
+        # Closest point on the boundary
+        self.__compute_closest_point(i, x)
+        Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - self.closest_point[0]) + np.sin(x[2, i]) * (x[1, i] - self.closest_point[1]))
+        Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - self.closest_point[1]) - np.sin(x[2, i]) * (x[0, i] - self.closest_point[0]))
+        h = (x[0, i] - self.closest_point[0]) * (x[0, i] - self.closest_point[0]) + (x[1, i] - self.closest_point[1]) * (x[1, i] - self.closest_point[1]) - (
+                    self.safety_radius ** 2 + self.Kv * abs(x[3, i]))
+
+        H[count] = np.array([self.barrier_gain * np.power(h, 3) + Lf_h])
+
+        if x[3, i] >= 0:
+            G[count, :] = np.array([self.Kv, -Lg_h])
+        else:
+            G[count, :] = np.array([-self.Kv, -Lg_h])
+        count+=1
+
+
+
         # Add the input constraint
-        G = np.vstack([G, [[0, 1], [0, -1]]])
-        H = np.vstack([H, self.__delta_to_beta(self.car_model.max_steer), -self.__delta_to_beta(-self.car_model.max_steer)])
-        # TODO: check whether to keep the following constraints
-        # G = np.vstack([G, [[0, x[3,i]/self.car_model.Lr], [0, x[3,i]/self.car_model.Lr]]])
-        # H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
-        G = np.vstack([G, [[1, 0], [-1, 0]]])
-        H = np.vstack([H, self.car_model.max_acc, - self.car_model.min_acc])
+        G[count, :] = np.array([0, 1])
+        H[count] = np.array([self.__delta_to_beta(self.car_model.max_steer)])
+        count += 1
 
-        # Adding arena boundary constraints
-        # Pos Y
-        h = ((x[1, i] - self.boundary_points[3]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
-        if x[3, i] >= 0:
-            gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[3]), 0, -self.Kv])
-        else:
-            gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[3]), 0, self.Kv])
+        G[count, :] = np.array([0, -1])
+        H[count] = np.array([-self.__delta_to_beta(-self.car_model.max_steer)])
+        count += 1
 
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        # # # # Removed these constraints to allow sharper turns
+        # # # G[count, :] = np.array([0, x[3,i]/self.car_model.Lr])
+        # # # H[count] = np.array([np.deg2rad(50)])
+        # # # count += 1
 
-        # Neg Y
-        h = ((x[1, i] - self.boundary_points[2]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
-        if x[3, i] >= 0:
-            gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[2]), 0, -self.Kv])
-        else:
-            gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[2]), 0, self.Kv])
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        # # # G[count, :] = np.array([0, x[3,i]/self.car_model.Lr])
+        # # # H[count] = np.array([np.deg2rad(50)])
+        # # # count += 1
 
-        # Pos X
-        h = ((x[0, i] - self.boundary_points[1]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
-        if x[3, i] >= 0:
-            gradH = np.array([2 * (x[0, i] - self.boundary_points[1]), 0, 0, -self.Kv])
-        else:
-            gradH = np.array([2 * (x[0, i] - self.boundary_points[1]), 0, 0, self.Kv])
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        G[count, :] = np.array([1, 0])
+        H[count] = np.array([self.car_model.max_acc])
+        count += 1
 
-        # Neg X
-        h = ((x[0, i] - self.boundary_points[0]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
-        if x[3, i] >= 0:
-            gradH = np.array([2 * (x[0, i] - self.boundary_points[0]), 0, 0, -self.Kv])
-        else:
-            gradH = np.array([2 * (x[0, i] - self.boundary_points[0]), 0, 0, self.Kv])
-        Lf_h = np.dot(gradH.T, f)
-        Lg_h = np.dot(gradH.T, g)
-        G = np.vstack([G, -Lg_h])
-        H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        G[count, :] = np.array([-1, 0])
+        H[count] = np.array([-self.car_model.min_acc])
 
-        solvers.options['show_progress'] = False
-
-        try:
-            sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
-            self.dxu = np.reshape(np.array(sol['x']), (M,))
-            self.dxu[0] = np.clip(self.dxu[0], self.car_model.min_acc, self.car_model.max_acc)
+        solver = DenseSolver()
+        solver.settings.verbose = False
+        solver.setup(P, q, np.empty((0, P.shape[0])), np.empty((0,)), G, H)
+        status = solver.solve()
+        if status == PIQP_SOLVED:
+            self.dxu[:] = np.reshape(solver.result.x, (M,))
             self.dxu[1] = self.__beta_to_delta(self.dxu[1])
-            self.dxu[1] = np.clip(self.dxu[1], -self.car_model.max_steer, self.car_model.max_steer)
-            return self.dxu
+        else:
+            print(f"QP solver failed for robot {i}! Emergency stop.") 
+            self.dxu[0] = (0 - x[3,i])/self.dt 
+            self.solver_failure += 1
+
+        return self.dxu      
+
+    def __compute_closest_point(self, i, x):
+        dx = 0
+        dy = 0
+
+        if abs(x[0,i] - self.boundary_points[0]) < abs(x[0,i] - self.boundary_points[1]):
+            dx = self.boundary_points[0] - x[0,i]
+            cpx = self.boundary_points[0]
+        else:
+            dx = self.boundary_points[1] - x[0,i]
+            cpx = self.boundary_points[1]
         
-        except:
-            print("QP solver failed")   
-            self.solver_failure += 1   
-            self.dxu[0] = (0.0 - x[3, i])/self.dt
-            return None      
+        if abs(x[1,i] - self.boundary_points[2]) < abs(x[1,i] - self.boundary_points[3]):
+            dy = self.boundary_points[2] - x[1,i]
+            cpy = self.boundary_points[2]
+        else:
+            dy = self.boundary_points[3] - x[1,i]
+            cpy = self.boundary_points[3]
+            
+        if abs(dx) < abs(dy):
+            self.closest_point = np.array([cpx, x[1,i]])  
+        else:
+            self.closest_point = np.array([x[0,i], cpy])

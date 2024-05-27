@@ -1,12 +1,12 @@
 CBF:
   safety_radius: 0.1
   barrier_gain: 7.0
-  arena_gain: 7.0
+  arena_gain: 7.0   #Currently not used
   Kv: 0.2
 C3BF:
   safety_radius: 0.1
-  barrier_gain: 1.0
-  arena_gain: 1000.0
+  barrier_gain: 7.0
+  arena_gain: 7.0   #Currently not used
   Kv: 0.2
 DWA:
   a_resolution: 0.05

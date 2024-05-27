@@ -105,7 +105,7 @@ class CollisionAvoidance(Node):
     def joy_request(self):
         self.joy_future = self.joy_cli.call_async(self.joy_req)
         rclpy.spin_until_future_complete(self, self.joy_future)
-        return self.joy_future.result()
+        return self.joy_future.result().ca_activated
 
     def run(self):
         while rclpy.ok():
@@ -130,7 +130,7 @@ class CollisionAvoidance(Node):
             if self.car_i == 0: # Only move car 0
                 ca_active = self.joy_request()
 
-            if ca_active.ca_activated:
+            if ca_active:
                 # Set desired action as a goal for the CA algorithm
                 self.algorithm.set_goal(des_action.cmd)
 

@@ -126,7 +126,9 @@ class CollisionAvoidance(Node):
             des_action = self.cmd_request()
 
             # Check if CA is activated
-            ca_active = self.joy_request()
+            ca_active = False
+            if self.car_i == 0: # Only move car 0
+                ca_active = self.joy_request()
 
             if ca_active.ca_activated:
                 # Set desired action as a goal for the CA algorithm

@@ -637,8 +637,8 @@ if __name__ == '__main__':
     robot_num = seed['robot_num']
 
     # main_lbp(seed, robot_num)
-    main_dwa(seed, robot_num)
+    # main_dwa(seed, robot_num)
     # main_mpc(seed, robot_num)
     # main_c3bf(seed, robot_num)
-    # main_cbf(seed, robot_num)
+    main_cbf(seed, robot_num)
     # main_cbf_controller(seed, robot_num)  

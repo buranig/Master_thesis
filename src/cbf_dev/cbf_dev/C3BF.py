@@ -340,8 +340,8 @@ class C3BF_algorithm():
         # self.ax.add_patch(circle3)
 
         count = 0
-        G = np.zeros([N-1,M])
-        H = np.zeros([N-1,1])
+        G = np.zeros([N-1 + 9,M])
+        H = np.zeros([N-1 + 9,1]) 
 
         f = np.array([x[3,i]*np.cos(x[2,i]),
                             x[3,i]*np.sin(x[2,i]), 
@@ -396,14 +396,15 @@ class C3BF_algorithm():
         h = (x[0, i] - closest_point[0]) * (x[0, i] - closest_point[0]) + (x[1, i] - closest_point[1]) * (x[1, i] - closest_point[1]) - (
                     safety_radius/1.5 ** 2 + Kv * abs(x[3, i]))
 
-        H = np.vstack([H, arena_gain*np.power(h, 3) + Lf_h])
+        H[count] = np.array([barrier_gain * np.power(h, 3) + Lf_h])
 
         if x[3, i] >= 0:
-            G = np.vstack([G, [Kv, -Lg_h]])
-            # G[count, :] = np.array([Kv, -Lg_h])
+            # G = np.vstack([G, [Kv, -Lg_h]])
+            G[count, :] = np.array([Kv, -Lg_h])
         else:
-            G = np.vstack([G, [-Kv, -Lg_h]])
-            # G[count, :] = np.array([-Kv, -Lg_h])
+            # G = np.vstack([G, [-Kv, -Lg_h]])
+            G[count, :] = np.array([-Kv, -Lg_h])
+        count+=1
         
         # Closest point 2
         Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - closest_point2[0]) + np.sin(x[2, i]) * (x[1, i] - closest_point2[1]))
@@ -411,14 +412,15 @@ class C3BF_algorithm():
         h = (x[0, i] - closest_point2[0]) * (x[0, i] - closest_point2[0]) + (x[1, i] - closest_point2[1]) * (x[1, i] - closest_point2[1]) - (
                     safety_radius/1.5 ** 2 + Kv * abs(x[3, i]))
 
-        H = np.vstack([H, arena_gain*np.power(h, 3) + Lf_h])
+        H[count] = np.array([barrier_gain * np.power(h, 3) + Lf_h])
 
         if x[3, i] >= 0:
-            G = np.vstack([G, [Kv, -Lg_h]])
-            # G[count, :] = np.array([Kv, -Lg_h])
+            # G = np.vstack([G, [Kv, -Lg_h]])
+            G[count, :] = np.array([Kv, -Lg_h])
         else:
-            G = np.vstack([G, [-Kv, -Lg_h]])
-            # G[count, :] = np.array([-Kv, -Lg_h])
+            # G = np.vstack([G, [-Kv, -Lg_h]])
+            G[count, :] = np.array([-Kv, -Lg_h])
+        count+=1
         
         # Closest point 3
         Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - closest_point3[0]) + np.sin(x[2, i]) * (x[1, i] - closest_point3[1]))
@@ -426,72 +428,39 @@ class C3BF_algorithm():
         h = (x[0, i] - closest_point3[0]) * (x[0, i] - closest_point3[0]) + (x[1, i] - closest_point3[1]) * (x[1, i] - closest_point3[1]) - (
                     safety_radius/1.5 ** 2 + Kv * abs(x[3, i]))
 
-        H = np.vstack([H, arena_gain*np.power(h, 3) + Lf_h])
+        H[count] = np.array([barrier_gain * np.power(h, 3) + Lf_h])
 
         if x[3, i] >= 0:
-            G = np.vstack([G, [Kv, -Lg_h]])
-            # G[count, :] = np.array([Kv, -Lg_h])
+            # G = np.vstack([G, [Kv, -Lg_h]])
+            G[count, :] = np.array([Kv, -Lg_h])
         else:
-            G = np.vstack([G, [-Kv, -Lg_h]])
-            # G[count, :] = np.array([-Kv, -Lg_h])
-
-
-        # # Adding arena boundary constraints
-        # # Pos Y
-        # h = ((x[1,i] - boundary_points[3])**2 - safety_radius**2 - Kv * abs(x[3,i]))
-        # if x[3,i] >= 0:
-        #     gradH = np.array([0, 2*(x[1,i] - boundary_points[3]), 0, -Kv])
-        # else:
-        #     gradH = np.array([0, 2*(x[1,i] - boundary_points[3]), 0, Kv])
-
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
-
-        # # Neg Y
-        # h = ((x[1,i] - boundary_points[2])**2 - safety_radius**2 - Kv * abs(x[3,i]))
-        # if x[3,i] >= 0:
-        #     gradH = np.array([0, 2*(x[1,i] - boundary_points[2]), 0, -Kv])
-        # else:
-        #     gradH = np.array([0, 2*(x[1,i] - boundary_points[2]), 0, Kv])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
-
-        # # Pos X
-        # h = ((x[0,i] - boundary_points[1])**2 - safety_radius**2 - Kv * abs(x[3,i]))
-        # if x[3,i] >= 0:
-        #     gradH = np.array([2*(x[0,i] - boundary_points[1]), 0, 0, -Kv])
-        # else:
-        #     gradH = np.array([2*(x[0,i] - boundary_points[1]), 0, 0, Kv])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
-
-        # # Neg X
-        # h = ((x[0,i] - boundary_points[0])**2 - safety_radius**2 - Kv * abs(x[3,i]))
-        # if x[3,i] >= 0:
-        #     gradH = np.array([2*(x[0,i] - boundary_points[0]), 0, 0, -Kv])
-        # else:
-        #     gradH = np.array([2*(x[0,i] - boundary_points[0]), 0, 0, Kv])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([arena_gain*h**3 + Lf_h])])
+            # G = np.vstack([G, [-Kv, -Lg_h]])
+            G[count, :] = np.array([-Kv, -Lg_h])
+        count+=1
         
-        # Input constraints
-        G = np.vstack([G, [[0, 1], [0, -1]]])
-        H = np.vstack([H, utils.delta_to_beta(max_steer), -utils.delta_to_beta(-max_steer)])
-        # TODO: Keeping the following constraints for solves some problem with the circular_seed_10.json --> why??
-        G = np.vstack([G, [[0, x[3,i]/Lr], [0, x[3,i]/Lr]]])
-        H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)])
-        # G = np.vstack([G, [[0, 1], [0, -1]]])
-        # H = np.vstack([H, self.dxu[1,i]+delta_to_beta(5), -self.dxu[1,i]+delta_to_beta(5)])
-        G = np.vstack([G, [[1, 0], [-1, 0]]])
-        H = np.vstack([H, max_acc, -min_acc])
+        # Add the input constraint
+        G[count, :] = np.array([0, 1])
+        H[count] = np.array([utils.delta_to_beta(max_steer)])
+        count += 1
+
+        G[count, :] = np.array([0, -1])
+        H[count] = np.array([-utils.delta_to_beta(-max_steer)])
+        count += 1
+
+        G[count, :] = np.array([0, x[3,i]/Lr])
+        H[count] = np.array([np.deg2rad(50)])
+        count += 1
+
+        G[count, :] = np.array([0, x[3,i]/Lr])
+        H[count] = np.array([np.deg2rad(50)])
+        count += 1
+
+        G[count, :] = np.array([1, 0])
+        H[count] = np.array([max_acc])
+        count += 1
+
+        G[count, :] = np.array([-1, 0])
+        H[count] = np.array([-min_acc])
 
         start_solver = time.time()
         solver = DenseSolver()
@@ -507,16 +476,7 @@ class C3BF_algorithm():
         end_solver = time.time()
         end = time.time()
         print(f"Time: {(end-start)*1e3} ms")
-        print(f"Solver time: {(end_solver-start_solver)*1e3} ms")
-
-        # solvers.options['show_progress'] = False
-        # try:
-        #     sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
-        #     self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
-        # except:
-        #     print(f"QP solver failed for robot {i}! Emergency stop.") 
-        #     self.dxu[0,i] = (0 - x[3,i])/dt 
-        #     self.solver_failure += 1         
+        print(f"Solver time: {(end_solver-start_solver)*1e3} ms")       
         
         if show_animation:
             circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius, color='b', fill=False)
@@ -706,6 +666,6 @@ def main_seed(args=None):
         plt.show()
         
 if __name__=='__main__':
-    # main_seed()
-    main1()
+    main_seed()
+    # main1()
         

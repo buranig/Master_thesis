@@ -26,7 +26,7 @@ controller_map = {
 
 
 from lar_msgs.msg import CarControlStamped
-from bumper_msgs.srv import EnvState, CarCommand
+from bumper_msgs.srv import EnvState, CarCommand, JoySafety
 
 
 class CollisionAvoidance(Node):
@@ -65,6 +65,7 @@ class CollisionAvoidance(Node):
         # Service to query state
         self.state_cli = self.create_client(EnvState, 'env_state' + self.car_str)
         self.cmd_cli = self.create_client(CarCommand, 'car_cmd')
+        self.joy_cli = self.create_client(JoySafety, 'joy_safety')
         while not self.state_cli.wait_for_service(timeout_sec=1.0) or not self.cmd_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
         
@@ -72,6 +73,7 @@ class CollisionAvoidance(Node):
         self.state_req = EnvState.Request()
         self.cmd_req = CarCommand.Request()
         self.cmd_req.car = self.car_i
+        self.joy_req = JoySafety.Request()
 
         if self.source == 'sim':
             self.publisher_ = self.create_publisher(CarControlStamped, '/sim/car'+self.car_str+'/set/control', 10)
@@ -100,6 +102,11 @@ class CollisionAvoidance(Node):
         rclpy.spin_until_future_complete(self, self.cmd_future)
         return self.cmd_future.result()
 
+    def joy_request(self):
+        self.joy_future = self.joy_cli.call_async(self.joy_req)
+        rclpy.spin_until_future_complete(self, self.joy_future)
+        return self.joy_future.result()
+
     def run(self):
         while rclpy.ok():
             # Update the current state of the car (and do rcply spin to update timer)
@@ -108,24 +115,30 @@ class CollisionAvoidance(Node):
                 curr_car = curr_state.env_state[self.car_i] # Select desired car
                 updated_state = utils.carStateStamped_to_State(curr_car)
                 self.algorithm.set_state(updated_state)
-            except:                
+            except:
                 continue
 
             # Skip rest if no update
             if self.update_time == False:
                 continue
 
-            # Compute desired action
+            # Check desired action
             des_action = self.cmd_request()
 
-            # Set desired action as a goal for the CA algorithm
-            self.algorithm.set_goal(des_action.cmd)
+            # Check if CA is activated
+            ca_active = self.joy_request()
 
-            # Compute safe control input
-            safe_cmd = self.algorithm.compute_cmd(curr_state.env_state)
+            if ca_active.ca_activated:
+                # Set desired action as a goal for the CA algorithm
+                self.algorithm.set_goal(des_action.cmd)
+
+                # Compute safe control input
+                cmd_out = self.algorithm.compute_cmd(curr_state.env_state)
+            else:
+                cmd_out = des_action.cmd
 
             # Send command to car
-            self.publisher_.publish(safe_cmd)
+            self.publisher_.publish(cmd_out)
 
             # Wait for next period
             self.update_time = False

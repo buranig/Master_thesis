@@ -124,6 +124,17 @@ def generate_launch_description():
         default_value='False'
     )
 
+    # State buffer
+    joySafety_node = Node(
+        package='bumper_cars',
+        executable='joy_safety',
+        name='joy_safety_node',
+        emulate_tty=True,
+        output='both'
+    )
+
+    ld.add_action(joySafety_node)
+
     ld.add_action(carNumber_arg)
     ld.add_action(carNumOffset_arg)
     ld.add_action(source_target_arg)

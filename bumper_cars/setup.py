@@ -28,6 +28,7 @@ setup(
         'console_scripts': [
             "collision_avoidance_ros2 = bumper_cars.collision_avoidance_ros2:main",
             "state_buffer = bumper_cars.state_buffer:main",
+            "joy_safety = bumper_cars.joy_safety:main",
         ],
     },
 )

@@ -43,7 +43,7 @@ class C3BF_algorithm(Controller):
         self.arena_gain = yaml_object["C3BF"]["arena_gain"]
         self.Kv = yaml_object["C3BF"]["Kv"] # interval [0.5-1]
 
-        self.closest_boundary_point = (0.0, 0.0, 0.0)
+        self.closest_point = (0.0, 0.0)
 
     ################# PUBLIC METHODS
 
@@ -177,7 +177,7 @@ class C3BF_algorithm(Controller):
             arr = np.array([x[0, j] - x[0, i], x[1, j] - x[1,i]])
             dist = np.linalg.norm(arr)
 
-            if j == i or dist > 2.0 * self.safety_radius: 
+            if j == i or dist > 10.0 * self.safety_radius: 
                 continue
 
             v_rel = np.array([x[3,j]*np.cos(x[2,j]) - x[3,i]*np.cos(x[2,i]), 
@@ -208,101 +208,101 @@ class C3BF_algorithm(Controller):
             G[count,:] = -Lg_h
             count+=1
 
-        # Adding arena boundary constraints
+        # # # # # Adding arena boundary constraints
         
-        # v_rel = np.array([-x[3,i]*np.cos(self.closest_boundary_point[2]) - x[3,i]*np.cos(x[2,i]), 
-        #                   -x[3,i]*np.sin(self.closest_boundary_point[2]) - x[3,i]*np.sin(x[2,i])])
-        # p_rel = np.array([self.closest_boundary_point[0]-x[0,i],
-        #                     self.closest_boundary_point[1]-x[1,i]])
+        # # # # v_rel = np.array([-x[3,i]*np.cos(self.closest_boundary_point[2]) - x[3,i]*np.cos(x[2,i]), 
+        # # # #                   -x[3,i]*np.sin(self.closest_boundary_point[2]) - x[3,i]*np.sin(x[2,i])])
+        # # # # p_rel = np.array([self.closest_boundary_point[0]-x[0,i],
+        # # # #                     self.closest_boundary_point[1]-x[1,i]])
         
-        # cos_Phi = np.sqrt(abs(np.linalg.norm(p_rel)**2 - self.safety_radius**2))/np.linalg.norm(p_rel)
-        # tan_Phi_sq = self.safety_radius**2 / (np.linalg.norm(p_rel)**2 - self.safety_radius**2)
+        # # # # cos_Phi = np.sqrt(abs(np.linalg.norm(p_rel)**2 - self.safety_radius**2))/np.linalg.norm(p_rel)
+        # # # # tan_Phi_sq = self.safety_radius**2 / (np.linalg.norm(p_rel)**2 - self.safety_radius**2)
         
-        # h = np.dot(p_rel, v_rel) + np.linalg.norm(v_rel) * np.linalg.norm(p_rel) * cos_Phi
+        # # # # h = np.dot(p_rel, v_rel) + np.linalg.norm(v_rel) * np.linalg.norm(p_rel) * cos_Phi
         
-        # gradH_1 = np.array([- (-x[3,i]*np.cos(self.closest_boundary_point[2]) - x[3,i]*np.cos(x[2,i])), 
-        #                     - (-x[3,i]*np.sin(self.closest_boundary_point[2]) - x[3,i]*np.sin(x[2,i])),
-        #                     x[3,i] * (np.sin(x[2,i]) * p_rel[0] - np.cos(x[2,i]) * p_rel[1]),
-        #                     -np.cos(x[2,i]) * p_rel[0] - np.sin(x[2,i]) * p_rel[1]])
+        # # # # gradH_1 = np.array([- (-x[3,i]*np.cos(self.closest_boundary_point[2]) - x[3,i]*np.cos(x[2,i])), 
+        # # # #                     - (-x[3,i]*np.sin(self.closest_boundary_point[2]) - x[3,i]*np.sin(x[2,i])),
+        # # # #                     x[3,i] * (np.sin(x[2,i]) * p_rel[0] - np.cos(x[2,i]) * p_rel[1]),
+        # # # #                     -np.cos(x[2,i]) * p_rel[0] - np.sin(x[2,i]) * p_rel[1]])
         
-        # gradH_21 = -(1 + tan_Phi_sq) * np.linalg.norm(v_rel)/np.linalg.norm(p_rel) * cos_Phi * p_rel 
-        # gradH_22 = np.dot(np.array([x[3,i]*np.sin(x[2,i]), -x[3,i]*np.cos(x[2,i])]), v_rel) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
-        # gradH_23 = - np.dot(v_rel, np.array([np.cos(x[2,i]), np.sin(x[2,i])])) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
+        # # # # gradH_21 = -(1 + tan_Phi_sq) * np.linalg.norm(v_rel)/np.linalg.norm(p_rel) * cos_Phi * p_rel 
+        # # # # gradH_22 = np.dot(np.array([x[3,i]*np.sin(x[2,i]), -x[3,i]*np.cos(x[2,i])]), v_rel) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
+        # # # # gradH_23 = - np.dot(v_rel, np.array([np.cos(x[2,i]), np.sin(x[2,i])])) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
 
-        # gradH = gradH_1.reshape(4,1) + np.vstack([gradH_21.reshape(2,1), gradH_22, gradH_23])
+        # # # # gradH = gradH_1.reshape(4,1) + np.vstack([gradH_21.reshape(2,1), gradH_22, gradH_23])
 
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
+        # # # # Lf_h = np.dot(gradH.T, f)
+        # # # # Lg_h = np.dot(gradH.T, g)
 
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, self.barrier_gain*np.power(h, 3) + Lf_h])
+        # # # # G = np.vstack([G, -Lg_h])
+        # # # # H = np.vstack([H, self.barrier_gain*np.power(h, 3) + Lf_h])
 
-        # H[count] = np.array([self.barrier_gain*np.power(h, 3) + Lf_h])
-        # G[count,:] = -Lg_h
+        # # # # H[count] = np.array([self.barrier_gain*np.power(h, 3) + Lf_h])
+        # # # # G[count,:] = -Lg_h
 
-        # # Adding arena boundary constraints
-        # # Pos Y
-        # h = ((x[1, i] - self.boundary_points[3]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
-        # if x[3, i] >= 0:
-        #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[3]), 0, -self.Kv])
-        # else:
-        #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[3]), 0, self.Kv])
+        # # # Adding arena boundary constraints
+        # # # Pos Y
+        # # h = ((x[1, i] - self.boundary_points[3]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
+        # # if x[3, i] >= 0:
+        # #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[3]), 0, -self.Kv])
+        # # else:
+        # #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[3]), 0, self.Kv])
 
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        # # Lf_h = np.dot(gradH.T, f)
+        # # Lg_h = np.dot(gradH.T, g)
+        # # G = np.vstack([G, -Lg_h])
+        # # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
 
-        # # Neg Y
-        # h = ((x[1, i] - self.boundary_points[2]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
-        # if x[3, i] >= 0:
-        #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[2]), 0, -self.Kv])
-        # else:
-        #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[2]), 0, self.Kv])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        # # # Neg Y
+        # # h = ((x[1, i] - self.boundary_points[2]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
+        # # if x[3, i] >= 0:
+        # #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[2]), 0, -self.Kv])
+        # # else:
+        # #     gradH = np.array([0, 2 * (x[1, i] - self.boundary_points[2]), 0, self.Kv])
+        # # Lf_h = np.dot(gradH.T, f)
+        # # Lg_h = np.dot(gradH.T, g)
+        # # G = np.vstack([G, -Lg_h])
+        # # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
 
-        # # Pos X
-        # h = ((x[0, i] - self.boundary_points[1]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
-        # if x[3, i] >= 0:
-        #     gradH = np.array([2 * (x[0, i] - self.boundary_points[1]), 0, 0, -self.Kv])
-        # else:
-        #     gradH = np.array([2 * (x[0, i] - self.boundary_points[1]), 0, 0, self.Kv])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        # # # Pos X
+        # # h = ((x[0, i] - self.boundary_points[1]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
+        # # if x[3, i] >= 0:
+        # #     gradH = np.array([2 * (x[0, i] - self.boundary_points[1]), 0, 0, -self.Kv])
+        # # else:
+        # #     gradH = np.array([2 * (x[0, i] - self.boundary_points[1]), 0, 0, self.Kv])
+        # # Lf_h = np.dot(gradH.T, f)
+        # # Lg_h = np.dot(gradH.T, g)
+        # # G = np.vstack([G, -Lg_h])
+        # # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
 
-        # # Neg X
-        # h = ((x[0, i] - self.boundary_points[0]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
-        # if x[3, i] >= 0:
-        #     gradH = np.array([2 * (x[0, i] - self.boundary_points[0]), 0, 0, -self.Kv])
-        # else:
-        #     gradH = np.array([2 * (x[0, i] - self.boundary_points[0]), 0, 0, self.Kv])
-        # Lf_h = np.dot(gradH.T, f)
-        # Lg_h = np.dot(gradH.T, g)
-        # G = np.vstack([G, -Lg_h])
-        # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
+        # # # Neg X
+        # # h = ((x[0, i] - self.boundary_points[0]) ** 2 - self.safety_radius ** 2 - self.Kv * abs(x[3, i]))
+        # # if x[3, i] >= 0:
+        # #     gradH = np.array([2 * (x[0, i] - self.boundary_points[0]), 0, 0, -self.Kv])
+        # # else:
+        # #     gradH = np.array([2 * (x[0, i] - self.boundary_points[0]), 0, 0, self.Kv])
+        # # Lf_h = np.dot(gradH.T, f)
+        # # Lg_h = np.dot(gradH.T, g)
+        # # G = np.vstack([G, -Lg_h])
+        # # H = np.vstack([H, np.array([self.arena_gain * h ** 3 + Lf_h])])
         
-        # closest_point = self.__compute_closest_point(i,x)
-        # Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - closest_point[0]) + np.sin(x[2, i]) * (x[1, i] - closest_point[1]))
-        # Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - closest_point[1]) - np.sin(x[2, i]) * (x[0, i] - closest_point[0]))
-        # h = (x[0, i] - closest_point[0]) * (x[0, i] - closest_point[0]) + (x[1, i] - closest_point[1]) * (x[1, i] - closest_point[1]) - (self.safety_radius ** 2 + self.Kv * abs(x[3, i]))
-        # H = np.vstack([H, self.arena_gain*np.power(h, 3) + Lf_h])
+        closest_point = self.__compute_closest_point(i,x)
+        Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - closest_point[0]) + np.sin(x[2, i]) * (x[1, i] - closest_point[1]))
+        Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - closest_point[1]) - np.sin(x[2, i]) * (x[0, i] - closest_point[0]))
+        h = (x[0, i] - closest_point[0]) * (x[0, i] - closest_point[0]) + (x[1, i] - closest_point[1]) * (x[1, i] - closest_point[1]) - (self.safety_radius ** 2 + self.Kv * abs(x[3, i]))
+        H = np.vstack([H, self.arena_gain*np.power(h, 3) + Lf_h])
 
-        # if x[3, i] >= 0:
-        #         G = np.vstack([G, [self.Kv, -Lg_h]])
-        # else:
-        #         G = np.vstack([G, [-self.Kv, -Lg_h]])
+        if x[3, i] >= 0:
+                G = np.vstack([G, [self.Kv, -Lg_h]])
+        else:
+                G = np.vstack([G, [-self.Kv, -Lg_h]])
 
 
         # Input constraints
         G = np.vstack([G, [[0, 1], [0, -1]]])
         H = np.vstack([H, self.__delta_to_beta(self.car_model.max_steer), -self.__delta_to_beta(-self.car_model.max_steer)])
-        G = np.vstack([G, [[0, x[3,i]/self.car_model.Lr], [0, x[3,i]/self.car_model.Lr]]])
-        H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)]) # TODO: Tune these 50 degrees per second
+        # G = np.vstack([G, [[0, x[3,i]/self.car_model.Lr], [0, x[3,i]/self.car_model.Lr]]])
+        # H = np.vstack([H, np.deg2rad(50), np.deg2rad(50)]) # TODO: Tune these 50 degrees per second
         G = np.vstack([G, [[1, 0], [-1, 0]]])
         H = np.vstack([H, self.car_model.max_acc, - self.car_model.min_acc])
 
@@ -338,10 +338,12 @@ class C3BF_algorithm(Controller):
         else:
             dy = self.boundary_points[3] - x[1,i]
             cpy = self.boundary_points[3]
+            
 
+        #Update as attribute for Debug and return for code clarity
         if abs(dx) < abs(dy):
-            closest_point = np.array([cpx, x[1,i], np.pi/2])  
+            self.closest_point = np.array([cpx, x[1,i]])  
         else:
-            closest_point = np.array([x[0,i], cpy, 0.0])
+            self.closest_point = np.array([x[0,i], cpy])
         
-        return closest_point
+        return self.closest_point

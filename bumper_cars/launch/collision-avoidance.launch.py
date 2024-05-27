@@ -30,7 +30,6 @@ def add_car(context, ld):
 
     # One *state buffer* / *controller* / *safety controller* per car
     for car_num in range(int(carAmount_value)):
-
         # Assign names and numbers to each car
         car_i = car_num + int(offset_value)
         car_str = '' if car_i == 0 else str(car_i + 1)
@@ -61,7 +60,8 @@ def add_car(context, ld):
                     {'alg': LaunchConfiguration('alg')},
                     {'car_i': car_i},
                     {'gen_traj': LaunchConfiguration('gen_traj')},
-                    {'source': LaunchConfiguration('source_target')}
+                    {'source': LaunchConfiguration('source_target')},
+                    {'debug_rviz': LaunchConfiguration('debug_rviz')}
             ],
             emulate_tty=True,
             output='both'
@@ -124,6 +124,12 @@ def generate_launch_description():
         default_value='False'
     )
 
+    debug_rviz = DeclareLaunchArgument(
+        'debug_rviz',
+        description='boolean to select whether to draw the debug information in rviz',
+        default_value='True'
+    )
+
     # State buffer
     joySafety_node = Node(
         package='bumper_cars',
@@ -140,6 +146,7 @@ def generate_launch_description():
     ld.add_action(source_target_arg)
     ld.add_action(car_alg)
     ld.add_action(gen_traj)
+    ld.add_action(debug_rviz)
     ld.add_action(OpaqueFunction(function=add_car, args=[ld]))
 
     return ld

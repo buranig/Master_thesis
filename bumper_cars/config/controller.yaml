@@ -11,7 +11,7 @@ C3BF:
 DWA:
   a_resolution: 0.05
   v_resolution: 0.05
-  delta_resolution: 5
+  delta_resolution: 5  #Currently used as number of samples for the angles
   emergency_brake_distance: 5
   to_goal_cost_gain: 1
   obstacle_cost_gain: 2
@@ -45,4 +45,4 @@ Controller:
 Simulation:
   width: 4.3
   height: 3.3
-  show_animation: false
+  show_animation: true

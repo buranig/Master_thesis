@@ -112,8 +112,8 @@ def longitudinal_velocity(vx:float, vy:float, angle_rad:float):
     Computes the longitudinal velocity given the velocities on the X/Y axis and
     angle 
     """
-    return math.sqrt(vx**2 + vy**2)
-
+    dot_prod = vx*math.cos(angle_rad) + vy*math.sin(angle_rad)
+    return np.sign(dot_prod) * math.sqrt(vx**2 + vy**2)
 
 def rotateMatrix(a):
     """
@@ -168,8 +168,9 @@ def carStateStamped_to_array(car_list: List[CarStateStamped]) -> np.array:
     car_array = np.empty((car_num, 5))
     for i in range(len(car_list)):
         car_i = car_list[i]
-        curr_v = longitudinal_velocity(car_i.vel_x, car_i.vel_y, car_i.turn_angle)
-        np_car_i = np.array([car_i.pos_x, car_i.pos_y, car_i.turn_angle, curr_v, car_i.turn_rate])
+        norm_angle = normalize_angle(car_i.turn_angle)
+        curr_v = longitudinal_velocity(car_i.vel_x, car_i.vel_y, norm_angle)
+        np_car_i = np.array([car_i.pos_x, car_i.pos_y, norm_angle, curr_v, car_i.turn_rate])
         car_array[i,:] = np_car_i
     return car_array
 

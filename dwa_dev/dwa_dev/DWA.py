@@ -70,7 +70,8 @@ class DWA_algorithm(Controller):
             yaml_object = yaml.safe_load(openfile)
 
         self.v_resolution = yaml_object["DWA"]["v_resolution"] # [m/s]
-        self.delta_resolution = math.radians(yaml_object["DWA"]["delta_resolution"])# [rad]
+        # self.delta_resolution = math.radians(yaml_object["DWA"]["delta_resolution"])# [rad]
+        self.delta_resolution = yaml_object["DWA"]["delta_resolution"]# [rad]       #TODO: CHANGE NAME IN YAML FILE
         self.a_resolution = yaml_object["DWA"]["a_resolution"] # [m/ss]
 
         self.to_goal_cost_gain = yaml_object["DWA"]["to_goal_cost_gain"]
@@ -131,7 +132,8 @@ class DWA_algorithm(Controller):
         initial_state.y = 0.0
         initial_state.yaw = np.radians(90.0)
 
-        other_delta = np.random.normal(0.0, 0.1, 10) #TODO: modify hardcoded std and number generation
+        other_delta = abs(np.random.normal(0.0, 0.1, int(self.delta_resolution)))
+
         for v in np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution):
             initial_state.v = v
             traj = []
@@ -142,10 +144,15 @@ class DWA_algorithm(Controller):
                 init_delta = np.array([0.0, dw[2], dw[3]])
                 delta_list = np.hstack((init_delta, other_delta))
                 for delta in delta_list:
+                    # Calc traj for angle
                     cmd.steering = np.interp(delta, [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
-
                     traj.append(self.__calc_trajectory(initial_state, cmd))
                     u_total.append([a, delta])
+                    # Repeat for mirrored angle
+                    cmd.steering = np.interp(-delta, [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
+                    traj.append(self.__calc_trajectory(initial_state, cmd))
+                    u_total.append([a, -delta])
+
 
             traj = np.array(traj)
             temp2 = {}
@@ -177,14 +184,6 @@ class DWA_algorithm(Controller):
             car_state.omega = self.curr_state[i][4]
             traj_i = self.__calc_trajectory(car_state, emptyControl )
             self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1])).buffer(self.dilation_factor, cap_style=3)
-
-    # def __simulate_input(self, car_cmd: CarControlStamped) -> State:
-    #     curr_state = self.car_model.step(car_cmd, self.dt)
-    #     t = self.dt
-    #     while t<self.ph:
-    #         curr_state = self.car_model.step(car_cmd, self.dt, curr_state=curr_state)
-    #         t += self.dt
-    #     return curr_state
 
     def __calc_trajectory(self, curr_state:State, cmd:CarControlStamped):
         """
@@ -268,7 +267,6 @@ class DWA_algorithm(Controller):
                 if dilated.intersects(obstacle):
                     return np.inf # collision        
                 elif distance(dilated, obstacle) < min_distance:
-                    continue #TODO: Modify this so that it doesn't just act on collisions
                     min_distance = distance(dilated, obstacle)
             distance_cost = 1/(min_distance * 10)
         else:
@@ -287,37 +285,12 @@ class DWA_algorithm(Controller):
         Returns:
             float: Cost to the goal.
         """
-        # dx = goal[0] - trajectory[-1, 0]
-        # dy = goal[1] - trajectory[-1, 1]
-
-        # cost = math.hypot(dx, dy)
 
         dx = self.goal.throttle - a
         dy = self.goal.steering - delta
 
         cost = np.sqrt(dx**2+dy**2)
         return cost
-
-    def __calc_to_goal_heading_cost(self, trajectory):
-        """
-        Calculate the cost to the goal with angle difference.
-
-        Args:
-            trajectory (numpy.ndarray): Trajectory.
-            goal (list): Goal position [x(m), y(m)].
-
-        Returns:
-            float: Cost to the goal with angle difference.
-        """
-        dx = self.goal.x - trajectory[-1, 0]
-        dy = self.goal.y - trajectory[-1, 1]
-
-        # either using the angle difference or the distance --> if we want to use the angle difference, we need to normalize the angle before taking the difference
-        error_angle = utils.normalize_angle(math.atan2(dy, dx))
-        cost_angle = error_angle - utils.normalize_angle(trajectory[-1, 2])
-        cost_angle = abs(cost_angle)
-
-        return cost_angle
     
 
     def __calc_control_and_trajectory(self, x):
@@ -389,16 +362,10 @@ class DWA_algorithm(Controller):
             elif min_cost == np.inf:
                 # emergency stop
                 print(f"Emergency stop for vehicle {self.robot_num}")
-                # # if x[3]>0:
-                # #     best_u = [self.car_model.min_acc, 0]
-                # # else:
-                # #     best_u = [self.car_model.max_acc, 0]
                 best_u = [(0.0 - x[3])/self.dt, 0]
                 best_trajectory = np.array([x[0:3], x[0:3]] * int(self.ph/self.dt)) 
                 u_traj =  np.array([best_u]*int(self.ph/self.dt))
-
             self.u_hist = u_traj
             self.predicted_trajectory = best_trajectory
-
             return best_u, best_trajectory
     

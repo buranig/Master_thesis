@@ -1,4 +1,3 @@
-import time
 import numpy as np
 import math
 
@@ -160,6 +159,18 @@ class DWA_algorithm(Controller):
 
     ################## PRIVATE METHODS
 
+
+    def __transform_point(self, x, y, ref_x, ref_y, ref_yaw):
+        # Translate point
+        dx = x - ref_x
+        dy = y - ref_y
+
+        # Rotate point
+        rel_x = np.cos(-ref_yaw) * dx - np.sin(-ref_yaw) * dy
+        rel_y = np.sin(-ref_yaw) * dx + np.cos(-ref_yaw) * dy
+
+        return rel_x, rel_y
+
     def __update_others(self):
         emptyControl = CarControlStamped()
         for i in range(len(self.dilated_traj)):
@@ -172,33 +183,54 @@ class DWA_algorithm(Controller):
             car_state.v = self.curr_state[i][3]
             car_state.omega = self.curr_state[i][4]
 
+            ref_x = self.curr_state[self.robot_num][0]
+            ref_y = self.curr_state[self.robot_num][1]
+            ref_yaw = self.curr_state[self.robot_num][2]
+            ref_v = self.curr_state[self.robot_num][3]
+            ref_omega = self.curr_state[self.robot_num][4]
+
             # Compute the relative position
-            dx = car_state.x - self.curr_state[self.robot_num][0]
-            dy = car_state.y - self.curr_state[self.robot_num][1]
+            dx = car_state.x - ref_x
+            dy = car_state.y - ref_y
             dtheta = car_state.yaw - self.curr_state[self.robot_num][2]
 
             # Rotate the relative position to the reference frame of the skipped car
-            rel_x = np.cos(-self.curr_state[self.robot_num][2]) * dx - np.sin(-self.curr_state[self.robot_num][2]) * dy
-            rel_y = np.sin(-self.curr_state[self.robot_num][2]) * dx + np.cos(-self.curr_state[self.robot_num][2]) * dy
+            rel_x = np.cos(-ref_yaw) * dx - np.sin(-ref_yaw) * dy
+            rel_y = np.sin(-ref_yaw) * dx + np.cos(-ref_yaw) * dy
             rel_yaw = dtheta  # assuming small angles, otherwise normalize angle
 
             # Compute the relative velocity components
             vx = car_state.v * np.cos(car_state.yaw)
             vy = car_state.v * np.sin(car_state.yaw)
-            ref_vx = self.curr_state[self.robot_num][3] * np.cos(self.curr_state[self.robot_num][2])
-            ref_vy = self.curr_state[self.robot_num][3] * np.sin(self.curr_state[self.robot_num][2])
+            ref_vx = ref_v * np.cos(ref_yaw)
+            ref_vy = ref_v * np.sin(ref_yaw)
 
             rel_vx = vx - ref_vx
             rel_vy = vy - ref_vy
 
             # Rotate the relative velocity to the reference frame of the skipped car
-            rel_vx_transformed = np.cos(-self.curr_state[self.robot_num][2]) * rel_vx - np.sin(-self.curr_state[self.robot_num][2]) * rel_vy
-            rel_vy_transformed = np.sin(-self.curr_state[self.robot_num][2]) * rel_vx + np.cos(-self.curr_state[self.robot_num][2]) * rel_vy
+            rel_vx_transformed = np.cos(-ref_yaw) * rel_vx - np.sin(-ref_yaw) * rel_vy
+            rel_vy_transformed = np.sin(-ref_yaw) * rel_vx + np.cos(-ref_yaw) * rel_vy
 
             # Calculate the magnitude of the relative velocity
             rel_v = np.sqrt(rel_vx_transformed**2 + rel_vy_transformed**2)
-            rel_omega = car_state.omega - self.curr_state[self.robot_num][4] 
+            rel_omega = car_state.omega - ref_omega
             
+            ########
+            # Also move the borders
+            xp = self.width_init/2
+            xn = - xp
+            yp = self.height_init/2
+            yn = -yp
+            self.p1x, self.p1y = self.__transform_point(xn,yn,ref_x,ref_y,ref_yaw)
+            self.p2x, self.p2y = self.__transform_point(xp,yn,ref_x,ref_y,ref_yaw)
+            self.p3x, self.p3y = self.__transform_point(xp,yp,ref_x,ref_y,ref_yaw)
+            self.p4x, self.p4y = self.__transform_point(xn,yp,ref_x,ref_y,ref_yaw)
+            x_list = [self.p1x,self.p2x, self.p3x, self.p4x, self.p1x]
+            y_list = [self.p1y,self.p2y, self.p3y, self.p4y, self.p1y]
+            self.borders = LineString(zip(x_list, y_list)).buffer(self.dilation_factor, cap_style=3)
+
+
             ###############################
             #TODO: Check if this is correct
             ###############################
@@ -274,7 +306,7 @@ class DWA_algorithm(Controller):
 
         return dw
 
-    def __calc_obstacle_cost(self, nearest, a, delta):
+    def __calc_obstacle_cost(self, nearest=None, a=None, delta=None, dilated=None):
         """
         Calculate the obstacle cost.
 
@@ -285,26 +317,10 @@ class DWA_algorithm(Controller):
         Returns:
             float: Obstacle cost.
         """
-        # Retrieve previously dilated trajectory
-        dilated = self.trajs[nearest][a][delta]
-        # print(dilated)
+        # Retrieve previously dilated trajectory (if not initialized)
+        if dilated is None:
+            dilated = self.trajs[nearest][a][delta] 
 
-        # minxp = min(abs(self.width_init/2-trajectory[:, 0]))
-        # minxn = min(abs(-self.width_init/2-trajectory[:, 0]))
-        # minyp = min(abs(self.height_init/2-trajectory[:, 1]))
-        # minyn = min(abs(-self.height_init/2-trajectory[:, 1]))
-        # min_distance = min(minxp, minxn, minyp, minyn)
-        # line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
-        # dilated = line.buffer(self.dilation_factor, cap_style=3)
-
-        # x = trajectory[:, 0]
-        # y = trajectory[:, 1]
-
-        # # check if the trajectory is out of bounds
-        # if any(element < -self.width_init/2+self.car_model.width/2 or element > self.width_init/2-self.car_model.width/2 for element in x):
-        #     return np.inf
-        # if any(element < -self.height_init/2+self.car_model.width/2 or element > self.height_init/2-self.car_model.width/2 for element in y):
-        #     return np.inf
         min_distance = np.inf
         if self.ob:
             dist = distance(dilated, self.ob)
@@ -352,12 +368,14 @@ class DWA_algorithm(Controller):
             min_cost = float("inf")
             best_u = [0.0, 0.0]
             best_trajectory = np.array([x])
-            start_time = time.time()
 
-            self.ob = None
+            # Variables needed for faster computation
+            self.ob = self.borders
             obstacles = [self.dilated_traj[idx] for idx in range(len(self.dilated_traj)) if idx != self.robot_num]
             for ob in obstacles:
                 self.ob = ob if self.ob is None else union(self.ob, ob)
+
+            
             dw = self.__calc_dynamic_window()
 
             # evaluate all trajectory with sampled input in dynamic window
@@ -376,31 +394,25 @@ class DWA_algorithm(Controller):
                         min_cost = final_cost
                         best_u = [a, float(delta)]
 
-            ##Commented temporarily because I don't want to deal with changes of reference
-            # # # # # # # Check if previous trajectory was better
-            # # # # # # if len(self.u_hist) > self.emergency_brake_distance:  
-            # # # # # #     self.u_hist.pop(0)
-            # # # # # #     trajectory_buf = self.predicted_trajectory[1:]
+            best_trajectory = self.trajs[str(nearest)][str(best_u[0])][str(best_u[1])]
+            u_traj = [[a, float(delta)] for _ in range(int(self.delta_resolution)+3)] #TODO: Check if this 3 has to remain here
 
-            # # # # # #     # Even when following the old trajectory, we need to update it to the position of the robot
-            # # # # # #     trajectory_buf[:,0:2] -= trajectory_buf[1,0:2]
-            # # # # # #     trajectory_buf[:,0:2] = (trajectory_buf[:,0:2]) @ utils.rotateMatrix(utils.normalize_angle(-x[2]+trajectory_buf[0,2]))
-            # # # # # #     trajectory_buf[:,0:2] += x[0:2]
-            # # # # # #     trajectory_buf[:,2] += utils.normalize_angle(x[2]-trajectory_buf[0,2])
+            # Check if previous trajectory was better
+            if len(self.u_hist) > self.emergency_brake_distance:  
+                self.u_hist.pop(0)
+                trajectory_buf = self.predicted_trajectory
 
-            # # # # # #     to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(self.u_hist[0][0], self.u_hist[0][1])
-            # # # # # #     ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(trajectory_buf, ob)
+                to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(self.u_hist[0][0], self.u_hist[0][1])
+                ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(dilated=trajectory_buf)
                 
-            # # # # # #     final_cost = to_goal_cost + ob_cost 
+                final_cost = to_goal_cost + ob_cost 
 
-            # # # # # #     if min_cost >= final_cost:      
-            # # # # # #         min_cost = final_cost
-            # # # # # #         best_u = self.u_hist[0]
-            # # # # # #         best_trajectory = trajectory_buf
-            # # # # # #         u_traj = self.u_hist
-            first_stop = time.time()
-            # # # # # # el
-            if min_cost == np.inf:
+                if min_cost >= final_cost:      
+                    min_cost = final_cost
+                    best_u = self.u_hist[0]
+                    best_trajectory = trajectory_buf
+                    u_traj = self.u_hist
+            elif min_cost == np.inf:
                 # emergency stop
                 print(f"Emergency stop for vehicle {self.robot_num}")
                 best_u = [(0.0 - x[3])/self.dt, 0]
@@ -408,15 +420,7 @@ class DWA_algorithm(Controller):
                 line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
                 best_trajectory = line.buffer(self.dilation_factor, cap_style=3)
                 u_traj =  np.array([best_u]*int(self.ph/self.dt))
-            else:
-                best_trajectory = self.trajs[str(nearest)][str(best_u[0])][str(best_u[1])]
-                u_traj = [[a, float(delta)] for _ in range(int(self.delta_resolution)+3)] #TODO: Check if this 3 has to remain here
 
-            done = time.time()
-
-            print("Time difference: ", done-start_time)
-            print("First loop: ", first_stop-start_time)
-            print("Second stop: ", done-first_stop)
             self.u_hist = u_traj
             self.predicted_trajectory = best_trajectory
             return best_u, best_trajectory

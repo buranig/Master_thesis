@@ -48,9 +48,9 @@ class CarModel:
 
         # Linear/nonlinear model
         model_type = yaml_object["model_type"]
-        if model_type == 'linear':
+        if model_type == 'kinematic':
             self.next_state = self.__linear_model_callback
-        elif model_type == 'nonlinear':
+        elif model_type == 'dynamic':
             self.next_state = self.__nonlinear_model_callback
         else:
             raise Exception("Wrong value for 'model_type'")

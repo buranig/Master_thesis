@@ -20,4 +20,4 @@ m: 0.144                    # Vehicle mass
 ################  Friction coefficients  ############################################
 c_a: 0.8                   # Drag coefficient
 c_r1: 0.1                  # Friction coefficient
-model_type: 'linear'        # Function used for state prediction ('linear'/'nonlinear')
+model_type: 'kinematic'        # Function used for state prediction ('kinematic'/'dynamic')

@@ -101,9 +101,10 @@ class CollisionAvoidance(Node):
             if self.car_i == 0:
                 self.publish_map(self.algorithm.boundary_points)
 
-            alg = self.car_alg.lower() 
-            if alg == "cbf" or alg == "c3bf":
+            self.alg = self.car_alg.lower() 
+            if self.alg == "cbf" or self.alg == "c3bf":
                 self.car_radius_publish(self.algorithm.safety_radius)
+
 
             
 
@@ -168,7 +169,10 @@ class CollisionAvoidance(Node):
 
             # Draw debug info in Rviz
             if self.debug_rviz:
-                self.barrier_publisher(self.algorithm.closest_point)
+                if self.alg == "dwa":
+                    self.publish_trajectory(self.algorithm.predicted_trajectory)
+                elif self.alg == "cbf" or self.alg == "c3bf":
+                    self.barrier_publisher(self.algorithm.closest_point)
 
 
             # Wait for next period
@@ -276,7 +280,31 @@ class CollisionAvoidance(Node):
 
         self.debug_publisher.publish(marker)
     
-    
+    def publish_trajectory(self, trajectory: List[List[float]]):
+        marker = Marker()
+        marker.header = Header()
+        marker.header.frame_id = "world"
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = "predicted_trajectory"
+        marker.id = 100
+        marker.type = Marker.LINE_STRIP
+        marker.action = Marker.ADD
+        # Define the points for the line strip
+        points = []
+        for point in trajectory:
+            p = Point(x=point[0], y=point[1], z=0.0)
+            points.append(p)
+        marker.points = points
+        # Define the color and scale of the line strip
+        marker.scale.x = 0.01  # Line width
+        color = ColorRGBA()
+        color.r = self.rgb[0]
+        color.g = self.rgb[1]
+        color.b = self.rgb[2]
+        color.a = 1.0
+        marker.color = color
+        self.debug_publisher.publish(marker)
+
 
 def main(args=None):
     rclpy.init(args=args)

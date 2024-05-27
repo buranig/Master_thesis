@@ -49,6 +49,7 @@ class PS4Controller(object):
         pygame.joystick.init()
         self.controller = pygame.joystick.Joystick(0)
         self.controller.init()
+        self.collision_avoidance = False
 
     def listen(self):
         """Listen for events to happen"""
@@ -107,10 +108,17 @@ class PS4Controller(object):
                 delta = self.mapping_ranges(-self.axis_data[3], -1.0, 1.0, -max_steer, max_steer)
             else:
                 delta = 0.0
-        
-        # pprint.pprint(f'Throttle: {throttle}, steering: {delta}\n')
 
-        return throttle, delta
+        if self.button_data[5]:
+            self.collision_avoidance = True
+            print('Collision Avoidance -- Active')
+        elif self.button_data[4]:
+            self.collision_avoidance = False
+            print('Collision Avoidance -- Inactive')        
+        # pprint.pprint(f'Throttle: {throttle}, steering: {delta}\n')
+        # print(self.collision_avoidance)
+
+        return throttle, delta, self.collision_avoidance
 
         
 

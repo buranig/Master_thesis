@@ -15,7 +15,7 @@
             "max_acc": 100,
             "min_acc": -100,
             "safety_radius": 2,
-            "barrier_gain": 0.01, 
+            "barrier_gain": 0.1, 
             "arena_gain": 0.01,
             "Kv": 0.1
         },

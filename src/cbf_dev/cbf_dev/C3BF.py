@@ -322,7 +322,7 @@ class C3BF_algorithm():
             numpy.ndarray: Filtered Control input dxu of shape (2, N).
 
         """
-        start = time.time()
+        # start = time.time()
 
         flag = True
         N = x.shape[1]
@@ -473,10 +473,10 @@ class C3BF_algorithm():
             print(f"QP solver failed for robot {i}! Emergency stop.") 
             self.dxu[0,i] = (0 - x[3,i])/dt 
             self.solver_failure += 1
-        end_solver = time.time()
-        end = time.time()
-        print(f"Time: {(end-start)*1e3} ms")
-        print(f"Solver time: {(end_solver-start_solver)*1e3} ms")       
+        # end_solver = time.time()
+        # end = time.time()
+        # print(f"Time: {(end-start)*1e3} ms")
+        # print(f"Solver time: {(end_solver-start_solver)*1e3} ms")       
         
         if show_animation:
             circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius, color='b', fill=False)

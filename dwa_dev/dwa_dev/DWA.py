@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+import time
 import numpy as np
 import math
 
@@ -13,14 +13,9 @@ from typing import List
 import yaml
 import json
 
-from shapely.geometry import Point, LineString
-from shapely import distance
+from shapely.geometry import Point, LineString, mapping
+from shapely import distance, union
 import os
-
-
-# For animation purposes
-fig = plt.figure(1, dpi=90, figsize=(10,10))
-ax= fig.add_subplot(111)
 
 
 class DWA_algorithm(Controller):
@@ -78,7 +73,10 @@ class DWA_algorithm(Controller):
         self.obstacle_cost_gain = yaml_object["DWA"]["obstacle_cost_gain"]
         self.dilation_factor = yaml_object["DWA"]["dilation_factor"]
         self.emergency_brake_distance = yaml_object["DWA"]["emergency_brake_distance"]
-        
+
+        # Empty obstacle set
+        self.ob = None
+        self.trajectory = None
         np.random.seed(1)
 
     ################# PUBLIC METHODS
@@ -97,20 +95,12 @@ class DWA_algorithm(Controller):
 
         # Compute control   
         u, trajectory = self.__calc_control_and_trajectory(self.curr_state[self.robot_num])
-        self.dilated_traj[self.robot_num] = LineString(zip(trajectory[:, 0], trajectory[:, 1])).buffer(self.dilation_factor, cap_style=3)
+        self.dilated_traj[self.robot_num] = trajectory
+        self.trajectory = trajectory.exterior.coords
+        # mapping(trajectory)["coordinates"][0]
 
         car_cmd.throttle = np.interp(u[0], [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
         car_cmd.steering = np.interp(u[1], [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
-
-        # Debug visualization
-        if self.show_animation and self.robot_num == 0:
-            plt.cla()
-            plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
-            for i in range(self.curr_state.shape[0]):
-                self.plot_robot_trajectory(self.curr_state[i], u, trajectory, self.dilated_traj[i], [0,0], ax)
-            plt.axis("equal")
-            plt.grid(True)
-            plt.pause(0.00001)
 
         return car_cmd
 
@@ -130,9 +120,11 @@ class DWA_algorithm(Controller):
         initial_state = State()
         initial_state.x = 0.0
         initial_state.y = 0.0
-        initial_state.yaw = np.radians(90.0)
+        initial_state.yaw = 0.0
 
         other_delta = abs(np.random.normal(0.0, 0.1, int(self.delta_resolution)))
+        init_delta = np.array([0.0, dw[2], dw[3]])
+        delta_list = np.hstack((init_delta, other_delta))
 
         for v in np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution):
             initial_state.v = v
@@ -141,8 +133,6 @@ class DWA_algorithm(Controller):
             cmd = CarControlStamped()
             for a in np.arange(dw[0], dw[1]+self.a_resolution, self.a_resolution):
                 cmd.throttle = np.interp(a, [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
-                init_delta = np.array([0.0, dw[2], dw[3]])
-                delta_list = np.hstack((init_delta, other_delta))
                 for delta in delta_list:
                     # Calc traj for angle
                     cmd.steering = np.interp(delta, [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
@@ -152,7 +142,6 @@ class DWA_algorithm(Controller):
                     cmd.steering = np.interp(-delta, [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
                     traj.append(self.__calc_trajectory(initial_state, cmd))
                     u_total.append([a, -delta])
-
 
             traj = np.array(traj)
             temp2 = {}
@@ -182,6 +171,45 @@ class DWA_algorithm(Controller):
             car_state.yaw = self.curr_state[i][2]
             car_state.v = self.curr_state[i][3]
             car_state.omega = self.curr_state[i][4]
+
+            # Compute the relative position
+            dx = car_state.x - self.curr_state[self.robot_num][0]
+            dy = car_state.y - self.curr_state[self.robot_num][1]
+            dtheta = car_state.yaw - self.curr_state[self.robot_num][2]
+
+            # Rotate the relative position to the reference frame of the skipped car
+            rel_x = np.cos(-self.curr_state[self.robot_num][2]) * dx - np.sin(-self.curr_state[self.robot_num][2]) * dy
+            rel_y = np.sin(-self.curr_state[self.robot_num][2]) * dx + np.cos(-self.curr_state[self.robot_num][2]) * dy
+            rel_yaw = dtheta  # assuming small angles, otherwise normalize angle
+
+            # Compute the relative velocity components
+            vx = car_state.v * np.cos(car_state.yaw)
+            vy = car_state.v * np.sin(car_state.yaw)
+            ref_vx = self.curr_state[self.robot_num][3] * np.cos(self.curr_state[self.robot_num][2])
+            ref_vy = self.curr_state[self.robot_num][3] * np.sin(self.curr_state[self.robot_num][2])
+
+            rel_vx = vx - ref_vx
+            rel_vy = vy - ref_vy
+
+            # Rotate the relative velocity to the reference frame of the skipped car
+            rel_vx_transformed = np.cos(-self.curr_state[self.robot_num][2]) * rel_vx - np.sin(-self.curr_state[self.robot_num][2]) * rel_vy
+            rel_vy_transformed = np.sin(-self.curr_state[self.robot_num][2]) * rel_vx + np.cos(-self.curr_state[self.robot_num][2]) * rel_vy
+
+            # Calculate the magnitude of the relative velocity
+            rel_v = np.sqrt(rel_vx_transformed**2 + rel_vy_transformed**2)
+            rel_omega = car_state.omega - self.curr_state[self.robot_num][4] 
+            
+            ###############################
+            #TODO: Check if this is correct
+            ###############################
+
+            # Update the car state to the relative state
+            car_state.x = rel_x
+            car_state.y = rel_y
+            car_state.yaw = rel_yaw
+            car_state.v = rel_v
+            car_state.omega = rel_omega
+
             traj_i = self.__calc_trajectory(car_state, emptyControl )
             self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1])).buffer(self.dilation_factor, cap_style=3)
 
@@ -209,9 +237,21 @@ class DWA_algorithm(Controller):
         with open(self.dir_path + '/../config/trajectories.json', 'r') as file:
             self.trajs = json.load(file)
 
+        # Dilate them for later inference
+        for v in np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution):            
+            for a in np.arange(self.car_model.min_acc, self.car_model.max_acc+self.a_resolution, self.a_resolution):
+                diff_deltas = self.trajs[str(v)][str(a)].keys()
+                for delta in diff_deltas:
+                    trajectory = np.array(self.trajs[str(v)][str(a)][delta])
+                    line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
+                    dilated = line.buffer(self.dilation_factor, cap_style=3)
+                    self.trajs[str(v)][str(a)][str(delta)] = dilated
+
+        # Initialize traj for each vehicle
         for i in range(self.curr_state.shape[0]):
             self.dilated_traj.append(Point(self.curr_state[i, 0], self.curr_state[i, 1]).buffer(self.dilation_factor, cap_style=3))
 
+        # Initialize the predicted trajectory
         self.predicted_trajectory = np.array([self.curr_state[self.robot_num]]*int(self.ph/self.dt))
         
 
@@ -234,7 +274,7 @@ class DWA_algorithm(Controller):
 
         return dw
 
-    def __calc_obstacle_cost(self, trajectory, ob):
+    def __calc_obstacle_cost(self, nearest, a, delta):
         """
         Calculate the obstacle cost.
 
@@ -245,33 +285,36 @@ class DWA_algorithm(Controller):
         Returns:
             float: Obstacle cost.
         """
-        minxp = min(abs(self.width_init/2-trajectory[:, 0]))
-        minxn = min(abs(-self.width_init/2-trajectory[:, 0]))
-        minyp = min(abs(self.height_init/2-trajectory[:, 1]))
-        minyn = min(abs(-self.height_init/2-trajectory[:, 1]))
-        min_distance = min(minxp, minxn, minyp, minyn)
-        line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
-        dilated = line.buffer(self.dilation_factor, cap_style=3)
+        # Retrieve previously dilated trajectory
+        dilated = self.trajs[nearest][a][delta]
+        # print(dilated)
 
-        x = trajectory[:, 0]
-        y = trajectory[:, 1]
+        # minxp = min(abs(self.width_init/2-trajectory[:, 0]))
+        # minxn = min(abs(-self.width_init/2-trajectory[:, 0]))
+        # minyp = min(abs(self.height_init/2-trajectory[:, 1]))
+        # minyn = min(abs(-self.height_init/2-trajectory[:, 1]))
+        # min_distance = min(minxp, minxn, minyp, minyn)
+        # line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
+        # dilated = line.buffer(self.dilation_factor, cap_style=3)
 
-        # check if the trajectory is out of bounds
-        if any(element < -self.width_init/2+self.car_model.width/2 or element > self.width_init/2-self.car_model.width/2 for element in x):
-            return np.inf
-        if any(element < -self.height_init/2+self.car_model.width/2 or element > self.height_init/2-self.car_model.width/2 for element in y):
-            return np.inf
+        # x = trajectory[:, 0]
+        # y = trajectory[:, 1]
 
-        if ob:
-            for obstacle in ob:
-                if dilated.intersects(obstacle):
-                    return np.inf # collision        
-                elif distance(dilated, obstacle) < min_distance:
-                    min_distance = distance(dilated, obstacle)
+        # # check if the trajectory is out of bounds
+        # if any(element < -self.width_init/2+self.car_model.width/2 or element > self.width_init/2-self.car_model.width/2 for element in x):
+        #     return np.inf
+        # if any(element < -self.height_init/2+self.car_model.width/2 or element > self.height_init/2-self.car_model.width/2 for element in y):
+        #     return np.inf
+        min_distance = np.inf
+        if self.ob:
+            dist = distance(dilated, self.ob)
+            if dilated.intersection(self.ob):
+                return np.inf # collision        
+            elif dist < min_distance:
+                min_distance = dist
             distance_cost = 1/(min_distance * 10)
         else:
             distance_cost = 0.0
-        # print("Robot: "+str(self.robot_num) + " distance: " + str(min_distance))
         return distance_cost
 
     def __calc_to_goal_cost(self, a = 0.0, delta = 0.0):
@@ -309,62 +352,71 @@ class DWA_algorithm(Controller):
             min_cost = float("inf")
             best_u = [0.0, 0.0]
             best_trajectory = np.array([x])
-            
-            ob = [self.dilated_traj[idx] for idx in range(len(self.dilated_traj)) if idx != self.robot_num]
+            start_time = time.time()
+
+            self.ob = None
+            obstacles = [self.dilated_traj[idx] for idx in range(len(self.dilated_traj)) if idx != self.robot_num]
+            for ob in obstacles:
+                self.ob = ob if self.ob is None else union(self.ob, ob)
             dw = self.__calc_dynamic_window()
 
             # evaluate all trajectory with sampled input in dynamic window
             nearest = utils.find_nearest(np.arange(self.car_model.min_speed, self.car_model.max_speed+self.v_resolution, self.v_resolution), x[3])
 
-            for a in np.arange(dw[0], dw[1]+self.v_resolution, self.v_resolution):
+            for a in np.arange(dw[0], dw[1]+self.a_resolution, self.a_resolution):
                 for delta in self.trajs[str(nearest)][str(a)]:
-
-                    geom = self.trajs[str(nearest)][str(a)][str(delta)]
-                    geom = np.array(geom)
-                    geom[:,0:2] = (geom[:,0:2]) @ utils.rotateMatrix(np.radians(90)-x[2]) + [x[0],x[1]]
-                    geom[:,2] = geom[:,2] + x[2] - np.pi/2 #bringing also the yaw angle in the new frame
-                    trajectory = geom
-
+                
                     # calc cost
                     to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(a, float(delta))
-                    ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(trajectory, ob)
+                    ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(str(nearest),str(a),str(delta))
                     final_cost = to_goal_cost + ob_cost
 
                     # search minimum trajectory
                     if min_cost >= final_cost:
                         min_cost = final_cost
                         best_u = [a, float(delta)]
-                        best_trajectory = trajectory
-                        u_traj = [[a, float(delta)] for _ in range(len(trajectory-1))]
 
-            # Check if previous trajectory was better
-            if len(self.u_hist) > self.emergency_brake_distance:  
-                self.u_hist.pop(0)
-                trajectory_buf = self.predicted_trajectory[1:]
+            ##Commented temporarily because I don't want to deal with changes of reference
+            # # # # # # # Check if previous trajectory was better
+            # # # # # # if len(self.u_hist) > self.emergency_brake_distance:  
+            # # # # # #     self.u_hist.pop(0)
+            # # # # # #     trajectory_buf = self.predicted_trajectory[1:]
 
-                # Even when following the old trajectory, we need to update it to the position of the robot
-                trajectory_buf[:,0:2] -= trajectory_buf[1,0:2]
-                trajectory_buf[:,0:2] = (trajectory_buf[:,0:2]) @ utils.rotateMatrix(utils.normalize_angle(-x[2]+trajectory_buf[0,2]))
-                trajectory_buf[:,0:2] += x[0:2]
-                trajectory_buf[:,2] += utils.normalize_angle(x[2]-trajectory_buf[0,2])
+            # # # # # #     # Even when following the old trajectory, we need to update it to the position of the robot
+            # # # # # #     trajectory_buf[:,0:2] -= trajectory_buf[1,0:2]
+            # # # # # #     trajectory_buf[:,0:2] = (trajectory_buf[:,0:2]) @ utils.rotateMatrix(utils.normalize_angle(-x[2]+trajectory_buf[0,2]))
+            # # # # # #     trajectory_buf[:,0:2] += x[0:2]
+            # # # # # #     trajectory_buf[:,2] += utils.normalize_angle(x[2]-trajectory_buf[0,2])
 
-                to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(self.u_hist[0][0], self.u_hist[0][1])
-                ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(trajectory_buf, ob)
+            # # # # # #     to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(self.u_hist[0][0], self.u_hist[0][1])
+            # # # # # #     ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(trajectory_buf, ob)
                 
-                final_cost = to_goal_cost + ob_cost 
+            # # # # # #     final_cost = to_goal_cost + ob_cost 
 
-                if min_cost >= final_cost:      
-                    min_cost = final_cost
-                    best_u = self.u_hist[0]
-                    best_trajectory = trajectory_buf
-                    u_traj = self.u_hist
-
-            elif min_cost == np.inf:
+            # # # # # #     if min_cost >= final_cost:      
+            # # # # # #         min_cost = final_cost
+            # # # # # #         best_u = self.u_hist[0]
+            # # # # # #         best_trajectory = trajectory_buf
+            # # # # # #         u_traj = self.u_hist
+            first_stop = time.time()
+            # # # # # # el
+            if min_cost == np.inf:
                 # emergency stop
                 print(f"Emergency stop for vehicle {self.robot_num}")
                 best_u = [(0.0 - x[3])/self.dt, 0]
-                best_trajectory = np.array([x[0:3], x[0:3]] * int(self.ph/self.dt)) 
+                trajectory = np.array([x[0:3], x[0:3]] * int(self.ph/self.dt)) 
+                line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
+                best_trajectory = line.buffer(self.dilation_factor, cap_style=3)
                 u_traj =  np.array([best_u]*int(self.ph/self.dt))
+            else:
+                best_trajectory = self.trajs[str(nearest)][str(best_u[0])][str(best_u[1])]
+                u_traj = [[a, float(delta)] for _ in range(int(self.delta_resolution)+3)] #TODO: Check if this 3 has to remain here
+
+            done = time.time()
+
+            print("Time difference: ", done-start_time)
+            print("First loop: ", first_stop-start_time)
+            print("Second stop: ", done-first_stop)
             self.u_hist = u_traj
             self.predicted_trajectory = best_trajectory
             return best_u, best_trajectory

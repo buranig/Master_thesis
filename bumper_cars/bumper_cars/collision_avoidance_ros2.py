@@ -170,7 +170,7 @@ class CollisionAvoidance(Node):
             # Draw debug info in Rviz
             if self.debug_rviz:
                 if self.alg == "dwa":
-                    self.publish_trajectory(self.algorithm.predicted_trajectory)
+                    self.publish_trajectory(self.algorithm.trajectory)
                 elif self.alg == "cbf" or self.alg == "c3bf":
                     self.barrier_publisher(self.algorithm.closest_point)
 
@@ -283,12 +283,13 @@ class CollisionAvoidance(Node):
     def publish_trajectory(self, trajectory: List[List[float]]):
         marker = Marker()
         marker.header = Header()
-        marker.header.frame_id = "world"
+        marker.header.frame_id = "body" + self.car_str
         marker.header.stamp = self.get_clock().now().to_msg()
         marker.ns = "predicted_trajectory"
         marker.id = 100
         marker.type = Marker.LINE_STRIP
         marker.action = Marker.ADD
+        
         # Define the points for the line strip
         points = []
         for point in trajectory:

@@ -46,7 +46,7 @@ class Controller:
         # Size of map
         self.width_init = yaml_object["Simulation"]["width"]
         self.height_init = yaml_object["Simulation"]["height"]
-        self.boundary_points = np.array([-self.width_init/2+0.154, self.width_init/2+0.154, -self.height_init/2+0.081, self.height_init/2+0.081])
+        self.boundary_points = np.array([-self.width_init/2, self.width_init/2, -self.height_init/2, self.height_init/2])
 
         # Noise params
         self.add_noise = yaml_object["Controller"]["add_noise"]
@@ -70,77 +70,30 @@ class Controller:
     def _add_noise(self, car_list : List[CarModel]) -> List[CarModel]:
         raise Exception("Hereditary function doesn't implement '_add_noise'")
 
+    def offset_track(self, off:List[int]):
+        ref_x = off[0]
+        ref_y = off[1]
+        ref_yaw = off[2]
+
+        # Also move the borders
+        xp = self.width_init/2
+        xn = - xp
+        yp = self.height_init/2
+        yn = -yp
+        self.p1x, self.p1y = self.__transform_point(xn,yn,ref_x,ref_y,ref_yaw)
+        self.p2x, self.p2y = self.__transform_point(xp,yn,ref_x,ref_y,ref_yaw)
+        self.p3x, self.p3y = self.__transform_point(xp,yp,ref_x,ref_y,ref_yaw)
+        self.p4x, self.p4y = self.__transform_point(xn,yp,ref_x,ref_y,ref_yaw)
 
 
+    #TODO: possibly move this to utils
+    def __transform_point(self, x, y, ref_x, ref_y, ref_yaw):
+        # Translate point
+        dx = x - ref_x
+        dy = y - ref_y
 
+        # Rotate point
+        rel_x = np.cos(-ref_yaw) * dx - np.sin(-ref_yaw) * dy
+        rel_y = np.sin(-ref_yaw) * dx + np.cos(-ref_yaw) * dy
 
-
-
-    def plot_robot_trajectory(self, x, u, predicted_trajectory, dilated_traj, targets, ax):
-        """
-        Plots the robot and arrows for visualization.
-
-        Args:
-            i (int): Index of the robot.
-            x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
-            multi_control (numpy.ndarray): Control inputs of shape (2, N).
-            targets (list): List of target points.
-
-        """
-        plt.plot(predicted_trajectory[:, 0], predicted_trajectory[:, 1], "-", color=color_dict[0])
-        plot_polygon(dilated_traj, ax=ax, add_points=False, alpha=0.5, color=color_dict[0])
-        # plt.plot(x[0], x[1], "xr")
-        # plt.plot(targets[0], targets[1], "x", color=color_dict[0], markersize=15)
-        self.plot_robot(x[0], x[1], x[2])
-        self.plot_arrow(x[0], x[1], x[2], length=0.5, width=0.05)
-        # self.plot_arrow(x[0], x[1], x[2] + u[1], length=0.5, width=0.1)
-        self.plot_map()
-
-
-    def plot_arrow(self, x, y, yaw, length=0.2, width=0.1):  # pragma: no cover
-        """
-        Plot an arrow.
-
-        Args:
-            x (float): X-coordinate of the arrow.
-            y (float): Y-coordinate of the arrow.
-            yaw (float): Yaw angle of the arrow.
-            length (float, optional): Length of the arrow. Defaults to 0.5.
-            width (float, optional): Width of the arrow. Defaults to 0.1.
-        """
-        plt.arrow(x, y, length * math.cos(yaw), length * math.sin(yaw),
-                head_length=width, head_width=width)
-        plt.plot(x, y)
-
-    def plot_robot(self, x, y, yaw):  
-        """
-        Plot the robot.
-
-        Args:
-            x (float): X-coordinate of the robot.
-            y (float): Y-coordinate of the robot.
-            yaw (float): Yaw angle of the robot.
-            i (int): Index of the robot.
-        """
-        outline = np.array([[-self.car_model.L / 2, self.car_model.L / 2,
-                                (self.car_model.L / 2), -self.car_model.L / 2,
-                                -self.car_model.L / 2],
-                            [self.car_model.width / 2, self.car_model.width / 2,
-                                - self.car_model.width / 2, -self.car_model.width / 2,
-                                self.car_model.width / 2]])
-        Rot1 = np.array([[math.cos(yaw), math.sin(yaw)],
-                            [-math.sin(yaw), math.cos(yaw)]])
-        outline = (outline.T.dot(Rot1)).T
-        outline[0, :] += x
-        outline[1, :] += y
-        plt.plot(np.array(outline[0, :]).flatten(),
-                    np.array(outline[1, :]).flatten(), color_dict[0])
-
-    def plot_map(self):
-        """
-        Plot the map.
-        """
-        corner_x = [-self.width_init/2.0 + 0.154, self.width_init/2.0 + 0.154, self.width_init/2.0 + 0.154, -self.width_init/2.0 + 0.154, -self.width_init/2.0 + 0.154]
-        corner_y = [self.height_init/2.0 + 0.081, self.height_init/2.0 + 0.081, -self.height_init/2.0 + 0.081, -self.height_init/2.0 + 0.081, self.height_init/2.0 + 0.081]
-
-        plt.plot(corner_x, corner_y)
+        return rel_x, rel_y

@@ -262,12 +262,6 @@ class LBP_algorithm():
                         self.reached_goal[i] = True
                     else: 
                         self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
-
-                if self.check_goal_reached(x, i):
-                    # print(f"Vehicle {i} reached goal!!")
-                    u[:, i] = np.zeros(2)
-                    x[3, i] = 0
-                    self.reached_goal[i] = True
                 else:
                     t_prev = time.time()
                     x, u = self.update_robot_state(x, u, dt, i)
@@ -292,7 +286,7 @@ class LBP_algorithm():
                     u[:, i] = np.zeros(2)
                     x[3, i] = 0
                     self.reached_goal[i] = True
-                    print(f"Vehicle {i} reached goal!!")
+                    # print(f"Vehicle {i} reached goal!!")
                 else:
                     t_prev = time.time()
                     x, u = self.update_robot_state(x, u, dt, i)

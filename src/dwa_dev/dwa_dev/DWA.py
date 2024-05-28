@@ -65,8 +65,12 @@ linear_model = json_object["linear_model"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/dwa_dev/trajectories.json', 'r') as file:
-    data = json.load(file)
+if linear_model:
+    with open('/home/giacomo/thesis_ws/src/dwa_dev/trajectories.json', 'r') as file:
+        data = json.load(file)
+else:
+    with open('/home/giacomo/thesis_ws/src/dwa_dev/dynamic_trajectories.json', 'r') as file:
+        data = json.load(file)
 
 with open('/home/giacomo/thesis_ws/src/seeds/seed_8.json', 'r') as file:
     seed = json.load(file)
@@ -319,14 +323,11 @@ class DWA_algorithm():
                         u[:, i] = np.zeros(2)
                         x[3, i] = 0
                         self.reached_goal[i] = True
+                        self.dilated_traj[i] = Point(x[0, i], x[1, i]).buffer(L/2, cap_style=3)
+                        self.predicted_trajectory[i] = np.array([x[0:5, i]]*int(predict_time/dt))
                     else: 
                         self.targets[i] = (self.paths[i][0].x, self.paths[i][0].y)
 
-                if self.check_goal_reached(x, i):
-                    print(f"Vehicle {i} reached goal!!")
-                    u[:, i] = np.zeros(2)
-                    x[3, i] = 0
-                    self.reached_goal[i] = True
                 else:
                     t_prev = time.time()
                     x, u = self.update_robot_state(x, u, dt, i)
@@ -467,7 +468,8 @@ class DWA_algorithm():
             nearest = find_nearest(np.arange(min_speed, max_speed+v_resolution, v_resolution), x[3])
 
             for a in np.arange(dw[0], dw[1]+v_resolution, v_resolution):
-                for delta in np.arange(dw[2], dw[3]+delta_resolution, delta_resolution):
+                delta_keys = data[str(nearest)][str(a)].keys()
+                for delta in delta_keys:
 
                     # old_time = time.time()
                     geom = data[str(nearest)][str(a)][str(delta)]

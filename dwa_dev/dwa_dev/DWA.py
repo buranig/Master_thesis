@@ -95,8 +95,9 @@ class DWA_algorithm(Controller):
         # Compute control   
         u, trajectory = self.__calc_control_and_trajectory(self.curr_state[self.robot_num])
         self.dilated_traj[self.robot_num] = trajectory
-        self.trajectory = trajectory.exterior.coords
-        # mapping(trajectory)["coordinates"][0]
+        # self.trajectory = trajectory.exterior.coords
+        self.trajectory = trajectory.buffer(self.car_model.width * self.dilation_factor, cap_style=3).exterior.coords
+        
 
         car_cmd.throttle = np.interp(u[0], [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
         car_cmd.steering = np.interp(u[1], [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
@@ -228,7 +229,7 @@ class DWA_algorithm(Controller):
             self.p4x, self.p4y = self.__transform_point(xn,yp,ref_x,ref_y,ref_yaw)
             x_list = [self.p1x,self.p2x, self.p3x, self.p4x, self.p1x]
             y_list = [self.p1y,self.p2y, self.p3y, self.p4y, self.p1y]
-            self.borders = LineString(zip(x_list, y_list)).buffer(self.dilation_factor, cap_style=3)
+            self.borders = LineString(zip(x_list, y_list)) #.buffer(self.dilation_factor, cap_style=3)
 
 
             ###############################
@@ -243,7 +244,7 @@ class DWA_algorithm(Controller):
             car_state.omega = rel_omega
 
             traj_i = self.__calc_trajectory(car_state, emptyControl )
-            self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1])).buffer(self.dilation_factor, cap_style=3)
+            self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1]))#.buffer(self.dilation_factor, cap_style=3)
 
     def __calc_trajectory(self, curr_state:State, cmd:CarControlStamped):
         """
@@ -276,12 +277,12 @@ class DWA_algorithm(Controller):
                 for delta in diff_deltas:
                     trajectory = np.array(self.trajs[str(v)][str(a)][delta])
                     line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
-                    dilated = line.buffer(self.dilation_factor, cap_style=3)
+                    dilated = line#.buffer(self.dilation_factor, cap_style=3)
                     self.trajs[str(v)][str(a)][str(delta)] = dilated
 
         # Initialize traj for each vehicle
         for i in range(self.curr_state.shape[0]):
-            self.dilated_traj.append(Point(self.curr_state[i, 0], self.curr_state[i, 1]).buffer(self.dilation_factor, cap_style=3))
+            self.dilated_traj.append(Point(self.curr_state[i, 0], self.curr_state[i, 1]))#.buffer(self.dilation_factor, cap_style=3))
 
         # Initialize the predicted trajectory
         self.predicted_trajectory = np.array([self.curr_state[self.robot_num]]*int(self.ph/self.dt))
@@ -324,7 +325,8 @@ class DWA_algorithm(Controller):
         min_distance = np.inf
         if self.ob:
             dist = distance(dilated, self.ob)
-            if dilated.intersection(self.ob):
+            # if dilated.intersection(self.ob):
+            if dist < self.dilation_factor * self.car_model.width:
                 return np.inf # collision        
             elif dist < min_distance:
                 min_distance = dist
@@ -418,7 +420,7 @@ class DWA_algorithm(Controller):
                 best_u = [(0.0 - x[3])/self.dt, 0]
                 trajectory = np.array([x[0:3], x[0:3]] * int(self.ph/self.dt)) 
                 line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
-                best_trajectory = line.buffer(self.dilation_factor, cap_style=3)
+                best_trajectory = line#.buffer(self.dilation_factor, cap_style=3)
                 u_traj =  np.array([best_u]*int(self.ph/self.dt))
 
             self.u_hist = u_traj

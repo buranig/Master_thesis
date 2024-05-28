@@ -37,6 +37,11 @@ arena_gain = json_object["C3BF"]["arena_gain"]
 Kv = json_object["C3BF"]["Kv"] # interval [0.5-1]
 Lr = L / 2.0  # [m]
 Lf = L - Lr
+Cf = json_object["Car_model"]["Cf"]  # N/rad
+Cr = json_object["Car_model"]["Cr"] # N/rad
+Iz = json_object["Car_model"]["Iz"]  # kg/m2
+m = json_object["Car_model"]["m"]  # kg
+# Aerodynamic and friction coefficients
 WB = json_object["Controller"]["WB"]
 robot_num = 5 #json_object["robot_num"]
 safety_init = json_object["safety"]
@@ -245,7 +250,7 @@ class C3BF_algorithm():
         # x = self.check_collision(x, i)
         x1 = utils.array_to_state(x[:, i])
         cmd.throttle, cmd.delta = utils.pure_pursuit_steer_control(self.targets[i], x1)
-        self.dxu[0, i], self.dxu[1, i] = cmd.throttle, cmd.delta
+        self.dxu[0, i], self.dxu[1, i] = cmd.throttle, cmd.delta-x[6, i]
 
         self.C3BF(i, x)
     
@@ -327,7 +332,7 @@ class C3BF_algorithm():
         flag = True
         N = x.shape[1]
         M = self.dxu.shape[0]
-        self.dxu[1,:] = utils.delta_to_beta_array(self.dxu[1,:])
+        self.dxu[1,i] = utils.delta_to_beta(self.dxu[1,i])
 
         # if i == 0:
         closest_point, closest_point2, closest_point3 = self.closest_boundary_point(i, x)
@@ -343,17 +348,27 @@ class C3BF_algorithm():
         G = np.zeros([N-1 + 9,M])
         H = np.zeros([N-1 + 9,1]) 
 
-        f = np.array([x[3,i]*np.cos(x[2,i]),
-                            x[3,i]*np.sin(x[2,i]), 
-                            0, 
-                            0]).reshape(4,1)
-        g = np.array([[0, -x[3,i]*np.sin(x[2,i])], 
-                        [0, x[3,i]*np.cos(x[2,i])], 
-                        [0, x[3,i]/Lr],
-                        [1, 0]]).reshape(4,2)
+        kf = -Cf
+        kr = -Cr
+        
+        f = np.array([x[3,i]*np.cos(x[2,i])-x[4,i]*np.sin(x[2,i]),
+                      x[3,i]*np.sin(x[2,i])+x[4,i]*np.cos(x[2,i]),
+                      x[5,i],
+                      x[4,i]*x[5,i]+1/m*kf*(np.arctan2(x[4,i]+Lf*x[5,i], x[3,i])-utils.beta_to_delta(x[6,i]))*np.sin(utils.beta_to_delta(x[6,i])),
+                      -x[3,i]*x[5,i] + 1/m*(kf*(np.arctan2(x[4,i]+Lf*x[5,i], x[3,i])-utils.beta_to_delta(x[6,i]))*np.sin(utils.beta_to_delta(x[6,i])) + kr*np.arctan2(x[4,i]-Lr*x[5,i],x[3,i])),
+                      1/Iz*(Lf*kf*(np.arctan2(x[4,i]+Lf*x[5,i], x[3,i])-utils.beta_to_delta(x[6,i]))*np.sin(utils.beta_to_delta(x[6,i])) + Lr*kr*np.arctan2(x[4,i]-Lr*x[5,i],x[3,i])),
+                      0]).reshape(7,1)
+        
+        g = np.array([[0, 0],
+                      [0, 0],
+                      [0, 0],
+                      [1, 0],
+                      [0, 0],
+                      [0, 0],
+                      [0, 1]]).reshape(7,2)
         
         P = np.identity(2)*2
-        q = np.array([-2 * self.dxu[0, i], - 2 * utils.delta_to_beta(self.dxu[1,i])])
+        q = np.array([-2 * self.dxu[0, i], - 2 * self.dxu[1,i]])
         
         for j in range(N):
             arr = np.array([x[0, j] - x[0, i], x[1, j] - x[1,i]])
@@ -362,8 +377,9 @@ class C3BF_algorithm():
             if j == i or dist > 2 * safety_radius: 
                 continue
 
-            v_rel = np.array([x[3,j]*np.cos(x[2,j]) - x[3,i]*np.cos(x[2,i]), 
-                                x[3,j]*np.sin(x[2,j]) - x[3,i]*np.sin(x[2,i])])
+            v_rel = np.array([(x[3,j]*np.cos(utils.delta_to_beta(x[6,j])-x[4,j]*np.sin(utils.delta_to_beta(x[6,j])))) - (x[3,i]*np.cos(utils.delta_to_beta(x[6,i])-x[4,i]*np.sin(utils.delta_to_beta(x[6,i])))), 
+                              (x[3,j]*np.sin(utils.delta_to_beta(x[6,j])+x[4,j]*np.cos(utils.delta_to_beta(x[6,j])))) - (x[3,i]*np.sin(utils.delta_to_beta(x[6,i])+x[4,i]*np.cos(utils.delta_to_beta(x[6,i]))))])
+            
             p_rel = np.array([x[0,j]-x[0,i],
                                 x[1,j]-x[1,i]])
             
@@ -372,16 +388,28 @@ class C3BF_algorithm():
             
             h = np.dot(p_rel, v_rel) + np.linalg.norm(v_rel) * np.linalg.norm(p_rel) * cos_Phi
             
-            gradH_1 = np.array([- (x[3,j]*np.cos(x[2,j]) - x[3,i]*np.cos(x[2,i])), 
-                                - (x[3,j]*np.sin(x[2,j]) - x[3,i]*np.sin(x[2,i])),
-                                x[3,i] * (np.sin(x[2,i]) * p_rel[0] - np.cos(x[2,i]) * p_rel[1]),
-                                -np.cos(x[2,i]) * p_rel[0] - np.sin(x[2,i]) * p_rel[1]])
+            gradH_1 = np.array([- v_rel[0], 
+                                - v_rel[1],
+                                0,
+                                - np.cos(utils.delta_to_beta(x[6,i])) * p_rel[0] - np.sin(utils.delta_to_beta(x[6,i])) * p_rel[1],
+                                np.sin(utils.delta_to_beta(x[6,i])) * p_rel[0] - np.cos(utils.delta_to_beta(x[6,i])) * p_rel[1],
+                                0,
+                                (x[3,i]*np.sin(utils.delta_to_beta(x[6,i])) + x[4,i]*np.cos(utils.delta_to_beta(x[6,i])))*p_rel[0] + (-x[3,i]*np.cos(utils.delta_to_beta(x[6,i])) + x[4,i]*np.sin(utils.delta_to_beta(x[6,i])))*p_rel[1]])
             
             gradH_21 = -(1 + tan_Phi_sq) * np.linalg.norm(v_rel)/np.linalg.norm(p_rel) * cos_Phi * p_rel 
-            gradH_22 = np.dot(np.array([x[3,i]*np.sin(x[2,i]), -x[3,i]*np.cos(x[2,i])]), v_rel) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
-            gradH_23 = - np.dot(v_rel, np.array([np.cos(x[2,i]), np.sin(x[2,i])])) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
+            gradH_22 = -p_rel * np.linalg.norm(v_rel) * cos_Phi / np.linalg.norm(p_rel) 
+            gradH_212 = gradH_21 + gradH_22
+            gradH_23 = np.vstack([gradH_212.reshape(2,1), 
+                                  0, 
+                                  -np.dot(v_rel, np.array([np.cos(utils.delta_to_beta(x[6,i])), np.sin(utils.delta_to_beta(x[6,i]))])), 
+                                  np.dot(v_rel, np.array([np.sin(utils.delta_to_beta(x[6,i])), -np.cos(utils.delta_to_beta(x[6,i]))])), 
+                                  0, 
+                                  np.dot(v_rel, np.array([x[4,i]*np.cos(utils.delta_to_beta(x[6,i])) + x[3,i]*np.sin(utils.delta_to_beta(x[6,i])), 
+                                                          x[4,i]*np.sin(utils.delta_to_beta(x[6,i])) - x[3,i]*np.cos(utils.delta_to_beta(x[6,i]))]))])
+            # gradH_22 = np.dot(np.array([x[3,i]*np.sin(x[2,i]), -x[3,i]*np.cos(x[2,i])]), v_rel) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
+            # gradH_23 = - np.dot(v_rel, np.array([np.cos(x[2,i]), np.sin(x[2,i])])) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
 
-            gradH = gradH_1.reshape(4,1) + np.vstack([gradH_21.reshape(2,1), gradH_22, gradH_23])
+            gradH = gradH_1.reshape(7,1) + gradH_23.reshape(7,1)
 
             Lf_h = np.dot(gradH.T, f)
             Lg_h = np.dot(gradH.T, g)
@@ -438,22 +466,22 @@ class C3BF_algorithm():
             G[count, :] = np.array([-Kv, -Lg_h])
         count+=1
         
-        # Add the input constraint
-        G[count, :] = np.array([0, 1])
-        H[count] = np.array([utils.delta_to_beta(max_steer)])
-        count += 1
+        # # Add the input constraint
+        # G[count, :] = np.array([0, 1])
+        # H[count] = np.array([utils.delta_to_beta(max_steer)])
+        # count += 1
 
-        G[count, :] = np.array([0, -1])
-        H[count] = np.array([-utils.delta_to_beta(-max_steer)])
-        count += 1
+        # G[count, :] = np.array([0, -1])
+        # H[count] = np.array([-utils.delta_to_beta(-max_steer)])
+        # count += 1
 
-        G[count, :] = np.array([0, x[3,i]/Lr])
-        H[count] = np.array([np.deg2rad(50)])
-        count += 1
+        # G[count, :] = np.array([0, x[3,i]/Lr])
+        # H[count] = np.array([np.deg2rad(50)])
+        # count += 1
 
-        G[count, :] = np.array([0, x[3,i]/Lr])
-        H[count] = np.array([np.deg2rad(50)])
-        count += 1
+        # G[count, :] = np.array([0, x[3,i]/Lr])
+        # H[count] = np.array([np.deg2rad(50)])
+        # count += 1
 
         G[count, :] = np.array([1, 0])
         H[count] = np.array([max_acc])
@@ -482,7 +510,7 @@ class C3BF_algorithm():
             circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius, color='b', fill=False)
             self.ax.add_patch(circle2)
     
-        self.dxu[1,i] = utils.beta_to_delta(self.dxu[1,i])    
+        self.dxu[1,i] = utils.beta_to_delta(self.dxu[1,i])   
 
     def check_collision(self, x, i):
         """
@@ -620,11 +648,13 @@ def main_seed(args=None):
     x0 = initial_state['x']
     y = initial_state['y']
     yaw = initial_state['yaw']
+    u = [0.0]*len(initial_state['x'])
     v = initial_state['v']
     omega = [0.0]*len(initial_state['x'])
+    delta = [0.0]*len(initial_state['x'])
 
     # Step 3: Create an array x with the initial values
-    x = np.array([x0, y, yaw, v, omega])
+    x = np.array([x0, y, yaw, u, v, omega, delta])
     u = np.zeros((2, robot_num))
 
     trajectory = np.zeros((x.shape[0]+u.shape[0], robot_num, 1))

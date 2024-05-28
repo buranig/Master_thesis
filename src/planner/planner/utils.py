@@ -219,38 +219,31 @@ def nonlinear_model_numpy_stable(x, u, dt=dt):
     Returns:
         numpy.ndarray: The updated state of the system.
     """
-
-    
-    initial_state = State(x=x[0], y=x[1], yaw=x[2], v=x[3], omega=x[4])
-    cmd = ControlInputs(throttle=float(u[0]), delta=float(u[1]))
-    state = State()
-
-    #dt = time.time() - old_time
-    cmd.throttle = np.clip(cmd.throttle, car_min_acc, car_max_acc)
-    cmd.delta = np.clip(cmd.delta, -max_steer, max_steer)
-
-    beta = math.atan2((Lr * math.tan(cmd.delta) / L), 1.0)
-    ux = initial_state.v * math.cos(beta)
-    v = initial_state.v * math.sin(beta)
+    state = np.zeros((7,1))
+    delta_delta = u[1]
+    u[1] =+ x[6]
+    u[0] = np.clip(u[0], car_min_acc, car_max_acc)
+    u[1] = np.clip(u[1], -max_steer, max_steer)
 
     kf = -Cf
     kr = -Cr
 
-    state.x = initial_state.x + ux * math.cos(initial_state.yaw) * dt - v * math.sin(initial_state.yaw) * dt
-    state.y = initial_state.y + ux * math.sin(initial_state.yaw) * dt + v * math.cos(initial_state.yaw) * dt
-    state.yaw = initial_state.yaw + initial_state.omega * dt
-    ux = ux + cmd.throttle * dt
-    v = (m*ux*v+dt*(Lf*kf-Lr*kr)*initial_state.omega - dt*kf*cmd.delta*ux - dt*m*ux**2*initial_state.omega)/(m*ux - dt*(kf+kr))
-    # Added sign(ux) to allow for reverse motion
-    state.v = math.sqrt(ux**2 + v**2)*np.sign(ux)
-    state.v = np.clip(state.v, min_speed, max_speed)
-    state.omega = (Iz*ux*initial_state.omega+ dt*(Lf*kf-Lr*kr)*v - dt*Lf*kf*cmd.delta*ux)/(Iz*ux - dt*(Lf**2*kf+Lr**2*kr))
+    state[0] = x[0] + x[3] * math.cos(x[2]) * dt - x[4] * math.sin(x[2]) * dt
+    state[1] = x[1] + x[3] * math.sin(x[2]) * dt + x[4] * math.cos(x[2]) * dt
+    state[2] = x[2] + x[5] * dt
+    state[3] = x[3] + u[0] * dt
+    state[4] = (m*x[3]*x[4]+dt*(Lf*kf-Lr*kr)*x[5] - dt*kf*u[1]*x[3] - dt*m*x[3]**2*x[5])/(m*x[3] - dt*(kf+kr))
+    # Added sign(x[3]) to allow for reverse motion
+    state[5] = (Iz*x[3]*x[5]+ dt*(Lf*kf-Lr*kr)*x[4] - dt*Lf*kf*u[1]*x[3])/(Iz*x[3] - dt*(Lf**2*kf+Lr**2*kr))
+    state[6] += delta_delta
 
-    x[0] = state.x
-    x[1] = state.y
-    x[2] = state.yaw
-    x[3] = state.v
-    x[4] = state.omega
+    x[0] = state[0]
+    x[1] = state[1]
+    x[2] = state[2]
+    x[3] = state[3]
+    x[4] = state[4]
+    x[5] = state[5]
+    x[6] = state[6]
 
     return x
 

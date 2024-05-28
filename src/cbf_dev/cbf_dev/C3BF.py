@@ -353,7 +353,7 @@ class C3BF_algorithm():
                         [1, 0]]).reshape(4,2)
         
         P = np.identity(2)*2
-        q = np.array([-2 * self.dxu[0, i], - 2 * self.dxu[1,i]])
+        q = np.array([-2 * self.dxu[0, i], - 2 * utils.delta_to_beta(self.dxu[1,i])])
         
         for j in range(N):
             arr = np.array([x[0, j] - x[0, i], x[1, j] - x[1,i]])

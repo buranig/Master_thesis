@@ -250,7 +250,7 @@ class CBF_algorithm():
         """
         N = x.shape[1]
         M = self.dxu.shape[0]
-        self.dxu[1,:] = utils.delta_to_beta_array(self.dxu[1,:])
+        self.dxu[1,i] = utils.delta_to_beta(self.dxu[1,i])
 
         count = 0
         G = np.zeros([N - 1 + 10, M])

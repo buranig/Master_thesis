@@ -7,6 +7,7 @@ from typing import List
 # import car model
 from bumper_cars.classes.State import State
 from bumper_cars.classes.CarModel import CarModel
+from bumper_cars.utils import car_utils as utils
 from lar_msgs.msg import CarControlStamped, CarStateStamped
 
 
@@ -46,7 +47,12 @@ class Controller:
         # Size of map
         self.width_init = yaml_object["Simulation"]["width"]
         self.height_init = yaml_object["Simulation"]["height"]
-        self.boundary_points = np.array([-self.width_init/2, self.width_init/2, -self.height_init/2, self.height_init/2])
+        self.off_x = yaml_object["Simulation"]["off_x"]
+        self.off_y = yaml_object["Simulation"]["off_y"]
+        self.boundary_points = np.array([[-self.width_init/2 + self.off_x, -self.height_init/2 + self.off_y],\
+                                         [self.width_init/2 + self.off_x, -self.height_init/2 + self.off_y],\
+                                         [self.width_init/2 + self.off_x, self.height_init/2 + self.off_y],\
+                                         [-self.width_init/2 + self.off_x, self.height_init/2 + self.off_y]])
 
         # Noise params
         self.add_noise = yaml_object["Controller"]["add_noise"]
@@ -75,25 +81,10 @@ class Controller:
         ref_y = off[1]
         ref_yaw = off[2]
 
-        # Also move the borders
-        xp = self.width_init/2
-        xn = - xp
-        yp = self.height_init/2
-        yn = -yp
-        self.p1x, self.p1y = self.__transform_point(xn,yn,ref_x,ref_y,ref_yaw)
-        self.p2x, self.p2y = self.__transform_point(xp,yn,ref_x,ref_y,ref_yaw)
-        self.p3x, self.p3y = self.__transform_point(xp,yp,ref_x,ref_y,ref_yaw)
-        self.p4x, self.p4y = self.__transform_point(xn,yp,ref_x,ref_y,ref_yaw)
+        for i in range(len(self.boundary_points)):
+            pos_x = self.boundary_points[i][0]
+            pos_y = self.boundary_points[i][1]
+            new_x, new_y = utils.transform_point(pos_x,pos_y, 0.0, 0.0,ref_yaw)
+            self.boundary_points[i][0] = new_x + ref_x
+            self.boundary_points[i][1] = new_y + ref_y
 
-
-    #TODO: possibly move this to utils
-    def __transform_point(self, x, y, ref_x, ref_y, ref_yaw):
-        # Translate point
-        dx = x - ref_x
-        dy = y - ref_y
-
-        # Rotate point
-        rel_x = np.cos(-ref_yaw) * dx - np.sin(-ref_yaw) * dy
-        rel_y = np.sin(-ref_yaw) * dx + np.cos(-ref_yaw) * dy
-
-        return rel_x, rel_y

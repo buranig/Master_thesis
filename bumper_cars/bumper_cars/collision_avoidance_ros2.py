@@ -92,6 +92,18 @@ class CollisionAvoidance(Node):
         self.timer = self.create_timer(self.dt, self.timer_callback)
         self.update_time = False
 
+        # Get track position
+        track_msg = self.track_request()
+        while track_msg.updated == False:
+            print("Getting track position")
+            track_msg = self.track_request()
+        track_pos = track_msg.track_state
+        print("Final track position: ", track_pos)
+        # Set track boundaries offset
+        track_offset = [track_pos.x, track_pos.y, track_pos.theta]
+        self.algorithm.offset_track(track_offset)
+
+
         #Plot map in Rviz
         hue = (self.car_i * 0.618033988749895) % 1  # Use golden ratio conjugate to distribute colors
         self.rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)  # Convert HSV to RGB
@@ -100,7 +112,9 @@ class CollisionAvoidance(Node):
             self.debug_publisher = self.create_publisher(Marker, '/debug_markers'+self.car_str, 10)
 
             if self.car_i == 0:
+                print(self.algorithm.boundary_points)
                 self.publish_map(self.algorithm.boundary_points)
+                self.barrier_publisher([0.5,1.25])
 
             self.alg = self.car_alg.lower() 
             if self.alg == "cbf" or self.alg == "c3bf":
@@ -132,30 +146,21 @@ class CollisionAvoidance(Node):
     def track_request(self):
         self.track_future = self.track_cli.call_async(self.track_req)
         rclpy.spin_until_future_complete(self, self.track_future)
-        return self.track_future.result().track_state
+        return self.track_future.result()
 
     def run(self):
         ca_active = True
         
-        # Get track position
-        base = Pose2D()
-        track_pos = self.track_request()
-        while base == track_pos:
-            print("Getting track position")
-            track_pos = self.track_request()
-        track_offset = [track_pos.x, track_pos.y, track_pos.theta]
-        self.algorithm.offset_track(track_offset)
-
         while rclpy.ok():
             # Update the current state of the car (and do rcply spin to update timer)
-            try:
-                curr_state = self.state_request() # Might return empty list
-                curr_car = curr_state.env_state[self.car_i] # Select desired car
-                updated_state = utils.carStateStamped_to_State(curr_car)
-                self.algorithm.set_state(updated_state)
-            except:
+            curr_state = self.state_request()
+            if curr_state.updated == False:
                 continue
 
+            curr_car = curr_state.env_state[self.car_i] # Select desired car
+            updated_state = utils.carStateStamped_to_State(curr_car)
+            self.algorithm.set_state(updated_state)
+            
             # Skip rest if no update
             if self.update_time == False:
                 continue
@@ -204,12 +209,12 @@ class CollisionAvoidance(Node):
 
         # Define the points for the line strip
         points = [
-            Point(x=boundary_points[0], y=boundary_points[2], z=0.0),
-            Point(x=boundary_points[0], y=boundary_points[3], z=0.0),
-            Point(x=boundary_points[1], y=boundary_points[3], z=0.0),
-            Point(x=boundary_points[1], y=boundary_points[2], z=0.0),
-            Point(x=boundary_points[0], y=boundary_points[2], z=0.0),
-        ]
+            Point(x=boundary_points[0][0], y=boundary_points[0][1], z=0.0),
+            Point(x=boundary_points[1][0], y=boundary_points[1][1], z=0.0),
+            Point(x=boundary_points[2][0], y=boundary_points[2][1], z=0.0),
+            Point(x=boundary_points[3][0], y=boundary_points[3][1], z=0.0),
+            Point(x=boundary_points[0][0], y=boundary_points[0][1], z=0.0)
+            ]
 
         marker.points = points
 

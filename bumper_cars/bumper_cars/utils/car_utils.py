@@ -210,3 +210,14 @@ def pure_pursuit_steer_control(target, pose, max_steer=0.5, L=1.0, Lf=0.5, max_s
     # delta = delta
     throttle = 3 * (desired_speed-pose.v)
     return throttle, delta
+
+def transform_point(x, y, ref_x, ref_y, ref_yaw):
+    # Translate point
+    dx = x - ref_x
+    dy = y - ref_y
+
+    # Rotate point
+    rel_x = np.cos(ref_yaw) * dx - np.sin(ref_yaw) * dy
+    rel_y = np.sin(ref_yaw) * dx + np.cos(ref_yaw) * dy
+
+    return rel_x, rel_y

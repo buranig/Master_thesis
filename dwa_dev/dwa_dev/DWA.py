@@ -122,7 +122,10 @@ class DWA_algorithm(Controller):
         initial_state.y = 0.0
         initial_state.yaw = 0.0
 
-        other_delta = abs(np.random.normal(0.0, 0.1, int(self.delta_resolution)))
+        mean = 0.0
+        std = self.car_model.max_steer/2.0
+
+        other_delta = abs(np.random.normal(mean, std, int(self.delta_resolution)))
         init_delta = np.array([0.0, dw[2], dw[3]])
         delta_list = np.hstack((init_delta, other_delta))
 
@@ -161,19 +164,15 @@ class DWA_algorithm(Controller):
     ################## PRIVATE METHODS
 
 
-    def __transform_point(self, x, y, ref_x, ref_y, ref_yaw):
-        # Translate point
-        dx = x - ref_x
-        dy = y - ref_y
-
-        # Rotate point
-        rel_x = np.cos(-ref_yaw) * dx - np.sin(-ref_yaw) * dy
-        rel_y = np.sin(-ref_yaw) * dx + np.cos(-ref_yaw) * dy
-
-        return rel_x, rel_y
-
     def __update_others(self):
         emptyControl = CarControlStamped()
+
+        ref_x = self.curr_state[self.robot_num][0]
+        ref_y = self.curr_state[self.robot_num][1]
+        ref_yaw = self.curr_state[self.robot_num][2]
+        ref_v = self.curr_state[self.robot_num][3]
+        ref_omega = self.curr_state[self.robot_num][4]
+
         for i in range(len(self.dilated_traj)):
             if i == self.robot_num:
                 continue
@@ -184,16 +183,10 @@ class DWA_algorithm(Controller):
             car_state.v = self.curr_state[i][3]
             car_state.omega = self.curr_state[i][4]
 
-            ref_x = self.curr_state[self.robot_num][0]
-            ref_y = self.curr_state[self.robot_num][1]
-            ref_yaw = self.curr_state[self.robot_num][2]
-            ref_v = self.curr_state[self.robot_num][3]
-            ref_omega = self.curr_state[self.robot_num][4]
-
             # Compute the relative position
             dx = car_state.x - ref_x
             dy = car_state.y - ref_y
-            dtheta = car_state.yaw - self.curr_state[self.robot_num][2]
+            dtheta = car_state.yaw - ref_yaw
 
             # Rotate the relative position to the reference frame of the skipped car
             rel_x = np.cos(-ref_yaw) * dx - np.sin(-ref_yaw) * dy
@@ -217,19 +210,6 @@ class DWA_algorithm(Controller):
             rel_v = np.sqrt(rel_vx_transformed**2 + rel_vy_transformed**2)
             rel_omega = car_state.omega - ref_omega
             
-            ########
-            # Also move the borders
-            xp = self.width_init/2
-            xn = - xp
-            yp = self.height_init/2
-            yn = -yp
-            self.p1x, self.p1y = self.__transform_point(xn,yn,ref_x,ref_y,ref_yaw)
-            self.p2x, self.p2y = self.__transform_point(xp,yn,ref_x,ref_y,ref_yaw)
-            self.p3x, self.p3y = self.__transform_point(xp,yp,ref_x,ref_y,ref_yaw)
-            self.p4x, self.p4y = self.__transform_point(xn,yp,ref_x,ref_y,ref_yaw)
-            x_list = [self.p1x,self.p2x, self.p3x, self.p4x, self.p1x]
-            y_list = [self.p1y,self.p2y, self.p3y, self.p4y, self.p1y]
-            self.borders = LineString(zip(x_list, y_list)) #.buffer(self.dilation_factor, cap_style=3)
 
 
             ###############################
@@ -245,6 +225,21 @@ class DWA_algorithm(Controller):
 
             traj_i = self.__calc_trajectory(car_state, emptyControl )
             self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1]))#.buffer(self.dilation_factor, cap_style=3)
+
+        ########
+        # Also move the borders
+        x_list = []
+        y_list = []
+        for i in range(len(self.boundary_points)):
+            pos_x = self.boundary_points[i][0]
+            pos_y = self.boundary_points[i][1]
+            new_x, new_y = utils.transform_point(pos_x,pos_y,ref_x,ref_y,ref_yaw)
+            x_list.append(new_x)
+            y_list.append(new_y)
+            
+        x_list.append(x_list[0])
+        y_list.append(y_list[0])
+        self.borders = LineString(zip(x_list, y_list)) #.buffer(self.dilation_factor, cap_style=3)
 
     def __calc_trajectory(self, curr_state:State, cmd:CarControlStamped):
         """

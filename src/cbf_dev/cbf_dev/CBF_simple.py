@@ -277,18 +277,22 @@ class CBF_algorithm():
 
             if j == i or dist > 3 * safety_radius: 
                 continue
-
-            Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
-            Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - x[1, j]) - np.sin(x[2, i]) * (x[0, i] - x[0, j]))
-            h = (x[0, i] - x[0, j]) * (x[0, i] - x[0, j]) + (x[1, i] - x[1, j]) * (x[1, i] - x[1, j]) - (
-                        safety_radius ** 2 + Kv * abs(x[3, i]))
+            
+            gradH = np.array([2 * (x[0, i] - x[0, j]), 
+                              2 * (x[1, i] - x[1, j]), 
+                              2 * (x[0, i] - x[0, j])*x[3,i]*(-np.sin(x[2,i]) - np.cos(x[2,i])*self.dxu[1,i])
+                              + 2 * (x[1, i] - x[1, j])*x[3,i]*(np.cos(x[2,i])-np.sin(x[2,i])*self.dxu[1,i]),
+                              2 * (x[0, i] - x[0, j])*(np.cos(x[2,i]) - x[3,i]*np.sin(x[2,i])*self.dxu[1,i]/Lr - np.sin(x[2,i])*self.dxu[1,i] - x[3,i]*np.cos(x[2,i])*self.dxu[1,i]**2/Lr)
+                              + 2 * (x[1, i] - x[1, j])*(np.sin(x[2,i]) + np.cos(x[2,i])*self.dxu[1,i])])
+            
+            Lf_h = np.dot(gradH.T, f)
+            Lg_h = np.dot(gradH.T, g)
+            h = (x[0, i] - x[0, j]) * (x[0, i] - x[0, j]) + (x[1, i] - x[1, j]) * (x[1, i] - x[1, j])
 
             H[count] = np.array([barrier_gain * np.power(h, 3) + Lf_h])
 
-            if x[3, i] >= 0:
-                G[count, :] = np.array([Kv, -Lg_h])
-            else:
-                G[count, :] = np.array([-Kv, -Lg_h])
+            H[count] = np.array([barrier_gain*np.power(h, 3) + Lf_h])
+            G[count,:] = -Lg_h
 
             count += 1
 
@@ -301,13 +305,13 @@ class CBF_algorithm():
         H[count] = np.array([-utils.delta_to_beta(-max_steer)])
         count += 1
 
-        G[count, :] = np.array([0, x[3,i]/Lr])
-        H[count] = np.array([np.deg2rad(50)])
-        count += 1
+        # G[count, :] = np.array([0, x[3,i]/Lr])
+        # H[count] = np.array([np.deg2rad(50)])
+        # count += 1
 
-        G[count, :] = np.array([0, x[3,i]/Lr])
-        H[count] = np.array([np.deg2rad(50)])
-        count += 1
+        # G[count, :] = np.array([0, x[3,i]/Lr])
+        # H[count] = np.array([np.deg2rad(50)])
+        # count += 1
 
         G[count, :] = np.array([1, 0])
         H[count] = np.array([max_acc])
@@ -523,7 +527,7 @@ def main1(args=None):
     v = initial_state['v']
 
     # Step 3: Create an array x with the initial values
-    x = np.array([[-5.0, 5.0], [0.0, 0.1], [-np.pi, 0.0], [0.0, 0.0], [0.0, 0.0]])
+    x = np.array([[-5.0, 5.0], [0.0, 0.001], [0.0,-np.pi], [0.0, 0.0], [0.0, 0.0]])
     u = np.array([[0, 0], [0, 0]])
     targets = [[5.0, 0.0], [-5.0, 0.0]]
 
@@ -711,6 +715,6 @@ def main_seed(args=None):
         plt.show()
 
 if __name__=='__main__':
-    # main_seed()
-    main1() 
+    main_seed()
+    # main1() 
         

@@ -4,8 +4,8 @@
             "max_steer": 0.785398,
             "max_acc": 100,
             "min_acc": -100,
-            "safety_radius": 1,
-            "barrier_gain": 0.1, 
+            "safety_radius": 1.5,
+            "barrier_gain": 0.001, 
             "arena_gain": 0.01,
             "Kv": 0.1
         },
@@ -87,8 +87,8 @@
             "max_steer": 0.785398,
             "WB": 0.7,
             "L_d": 1,
-            "max_acc": 2.0,
-            "min_acc": -2.0,
+            "max_acc": 5.0,
+            "min_acc": -5.0,
             "controller_type": "MPC",
             "cbf_type": "C3BF"
         },

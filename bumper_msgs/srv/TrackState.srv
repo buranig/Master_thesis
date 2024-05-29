@@ -1,2 +1,3 @@
 ---
 geometry_msgs/Pose2D track_state
+bool updated

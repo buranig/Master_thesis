@@ -185,7 +185,7 @@ class C3BF_algorithm():
                     #     print(f"Negative speed for robot {i}!")
                 x = self.check_collision(x, i)
 
-            utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
+            utils.plot_robot_and_arrows(i, x, (self.dxu[0, i], x[6, i]), self.targets, self.ax)
 
         if all(self.reached_goal):
             break_flag = True
@@ -223,7 +223,7 @@ class C3BF_algorithm():
             if all(self.reached_goal):
                 break_flag = True
 
-            utils.plot_robot_and_arrows(i, x, self.dxu, self.targets, self.ax)
+            utils.plot_robot_and_arrows(i, x, (self.dxu[0, i], x[6, i]), self.targets, self.ax)
             # print(f"Speed of robot {i}: {x[3, i]}")
 
         return x, break_flag
@@ -397,15 +397,15 @@ class C3BF_algorithm():
                                 (x[3,i]*np.sin(utils.delta_to_beta(x[6,i])) + x[4,i]*np.cos(utils.delta_to_beta(x[6,i])))*p_rel[0] + (-x[3,i]*np.cos(utils.delta_to_beta(x[6,i])) + x[4,i]*np.sin(utils.delta_to_beta(x[6,i])))*p_rel[1]])
             
             gradH_21 = -(1 + tan_Phi_sq) * np.linalg.norm(v_rel)/np.linalg.norm(p_rel) * cos_Phi * p_rel 
-            gradH_22 = -p_rel * np.linalg.norm(v_rel) * cos_Phi / np.linalg.norm(p_rel) 
-            gradH_212 = gradH_21 + gradH_22
-            gradH_23 = np.vstack([gradH_212.reshape(2,1), 
+            # gradH_22 = -p_rel * np.linalg.norm(v_rel) * cos_Phi / np.linalg.norm(p_rel) 
+            # gradH_212 = gradH_21 + gradH_22
+            gradH_23 = np.vstack([gradH_21.reshape(2,1), 
                                   0, 
-                                  -np.dot(v_rel, np.array([np.cos(utils.delta_to_beta(x[6,i])), np.sin(utils.delta_to_beta(x[6,i]))])), 
-                                  np.dot(v_rel, np.array([np.sin(utils.delta_to_beta(x[6,i])), -np.cos(utils.delta_to_beta(x[6,i]))])), 
+                                  -np.dot(v_rel, np.array([np.cos(utils.delta_to_beta(x[6,i])), np.sin(utils.delta_to_beta(x[6,i]))]))*np.linalg.norm(p_rel) * cos_Phi/np.linalg.norm(v_rel), 
+                                  np.dot(v_rel, np.array([np.sin(utils.delta_to_beta(x[6,i])), -np.cos(utils.delta_to_beta(x[6,i]))]))*np.linalg.norm(p_rel) * cos_Phi/np.linalg.norm(v_rel), 
                                   0, 
                                   np.dot(v_rel, np.array([x[4,i]*np.cos(utils.delta_to_beta(x[6,i])) + x[3,i]*np.sin(utils.delta_to_beta(x[6,i])), 
-                                                          x[4,i]*np.sin(utils.delta_to_beta(x[6,i])) - x[3,i]*np.cos(utils.delta_to_beta(x[6,i]))]))])
+                                                          x[4,i]*np.sin(utils.delta_to_beta(x[6,i])) - x[3,i]*np.cos(utils.delta_to_beta(x[6,i]))]))*np.linalg.norm(p_rel) * cos_Phi/np.linalg.norm(v_rel)])
             # gradH_22 = np.dot(np.array([x[3,i]*np.sin(x[2,i]), -x[3,i]*np.cos(x[2,i])]), v_rel) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
             # gradH_23 = - np.dot(v_rel, np.array([np.cos(x[2,i]), np.sin(x[2,i])])) * np.linalg.norm(p_rel)/(np.linalg.norm(v_rel) + 0.00001) * cos_Phi
 
@@ -483,12 +483,12 @@ class C3BF_algorithm():
         # H[count] = np.array([np.deg2rad(50)])
         # count += 1
 
-        G[count, :] = np.array([1, 0])
-        H[count] = np.array([max_acc])
-        count += 1
+        # G[count, :] = np.array([1, 0])
+        # H[count] = np.array([max_acc])
+        # count += 1
 
-        G[count, :] = np.array([-1, 0])
-        H[count] = np.array([-min_acc])
+        # G[count, :] = np.array([-1, 0])
+        # H[count] = np.array([-min_acc])
 
         start_solver = time.time()
         solver = DenseSolver()
@@ -580,9 +580,9 @@ def main1(args=None):
     # x = np.array([[5.0, 5.0], [-2.0, 2.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
     # u = np.array([[0, 0], [0, 0]])
     # targets = [[10, 2], [10, -2]]
-    x = np.array([[5.0, 5.0], [5.0, -5.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
+    x = np.array([[-5.0, 5.0], [0.0, 0.1], [0.0, -np.pi], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
     u = np.array([[0, 0], [0, 0]])
-    targets = [[20.0, -20.0], [20.0, 20.0]]
+    targets = [[10.0, 0.0], [-10.0, 0.0]]
     
     # Step 4: Create paths for each robot
     traj = data['trajectories']

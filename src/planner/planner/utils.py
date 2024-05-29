@@ -220,22 +220,23 @@ def nonlinear_model_numpy_stable(x, u, dt=dt):
         numpy.ndarray: The updated state of the system.
     """
     state = np.zeros((7,1))
-    delta_delta = u[1]
-    u[1] =+ x[6]
+    # delta_delta = u[1]
+    # u[1] += x[6]
     u[0] = np.clip(u[0], car_min_acc, car_max_acc)
     u[1] = np.clip(u[1], -max_steer, max_steer)
 
     kf = -Cf
     kr = -Cr
 
+    state[6] += u[1]
     state[0] = x[0] + x[3] * math.cos(x[2]) * dt - x[4] * math.sin(x[2]) * dt
     state[1] = x[1] + x[3] * math.sin(x[2]) * dt + x[4] * math.cos(x[2]) * dt
     state[2] = x[2] + x[5] * dt
     state[3] = x[3] + u[0] * dt
-    state[4] = (m*x[3]*x[4]+dt*(Lf*kf-Lr*kr)*x[5] - dt*kf*u[1]*x[3] - dt*m*x[3]**2*x[5])/(m*x[3] - dt*(kf+kr))
+    state[4] = (m*x[3]*x[4]+dt*(Lf*kf-Lr*kr)*x[5] - dt*kf*(state[6])*x[3] - dt*m*x[3]**2*x[5])/(m*x[3] - dt*(kf+kr))
     # Added sign(x[3]) to allow for reverse motion
-    state[5] = (Iz*x[3]*x[5]+ dt*(Lf*kf-Lr*kr)*x[4] - dt*Lf*kf*u[1]*x[3])/(Iz*x[3] - dt*(Lf**2*kf+Lr**2*kr))
-    state[6] += delta_delta
+    state[5] = (Iz*x[3]*x[5]+ dt*(Lf*kf-Lr*kr)*x[4] - dt*Lf*kf*(state[6])*x[3])/(Iz*x[3] - dt*(Lf**2*kf+Lr**2*kr))
+    
 
     x[0] = state[0]
     x[1] = state[1]
@@ -409,7 +410,7 @@ def plot_robot_and_arrows(i, x, u, targets, ax):
     """
     plot_robot(x[0, i], x[1, i], x[2, i], i)
     plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-    plot_arrow(x[0, i], x[1, i], x[2, i] + u[1, i], length=3, width=0.5)
+    plot_arrow(x[0, i], x[1, i], x[2, i] + u[1], length=3, width=0.5)
     plt.plot(targets[i][0], targets[i][1], "x", color = color_dict[i])
     if show_animation:
         ax.annotate(str(i), (float(x[0, i]), float(x[1, i])))

@@ -35,6 +35,8 @@ class CBF_algorithm(Controller):
         self.arena_gain = yaml_object["CBF"]["arena_gain"]
         self.Kv = yaml_object["CBF"]["Kv"] # interval [0.5-1]
 
+        # Instantiate border variables
+        self.__compute_track_constants()
         self.closest_point = (0.0, 0.0)
 
     ################# PUBLIC METHODS
@@ -59,6 +61,12 @@ class CBF_algorithm(Controller):
     def set_goal(self, goal: CarControlStamped) -> None:
         self.dxu[0] = np.interp(goal.throttle, [-1, 1], [self.car_model.min_acc, self.car_model.max_acc]) * self.car_model.acc_gain
         self.dxu[1] = np.interp(goal.steering, [-1, 1], [-self.car_model.max_steer, self.car_model.max_steer])
+
+    def offset_track(self, off:List[int]):
+        print("Corrected offset!")
+        super().offset_track(off)
+        self.__compute_track_constants()
+
         
     ################# PRIVATE METHODS
     def __delta_to_beta(self, delta):
@@ -127,8 +135,12 @@ class CBF_algorithm(Controller):
             arr = np.array([x[0, j] - x[0, i], x[1, j] - x[1,i]])
             dist = np.linalg.norm(arr)
 
-            if j == i or dist > 2 * self.safety_radius: 
+            if j == i: 
                 continue
+
+            # # # if j != i and dist > 2 * self.safety_radius: 
+            # # #     print("\n \n \n ERROR \n \n \n")
+            # # #     continue
             
             Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - x[0, j]) + np.sin(x[2, i]) * (x[1, i] - x[1, j]))
             Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - x[1, j]) - np.sin(x[2, i]) * (x[0, i] - x[0, j]))
@@ -155,9 +167,9 @@ class CBF_algorithm(Controller):
         H[count] = np.array([self.barrier_gain * np.power(h, 3) + Lf_h])
 
         if x[3, i] >= 0:
-            G[count, :] = np.array([self.Kv, -Lg_h])
+            G[count, :] = np.array([self.Kv, -Lg_h*0.0])
         else:
-            G[count, :] = np.array([-self.Kv, -Lg_h])
+            G[count, :] = np.array([-self.Kv, -Lg_h*0.0])
         count+=1
 
 
@@ -199,27 +211,63 @@ class CBF_algorithm(Controller):
             self.dxu[0] = (0 - x[3,i])/self.dt 
             self.solver_failure += 1
 
+        self.dxu = np.clip(self.dxu, [self.car_model.min_acc, -self.car_model.max_steer], [self.car_model.max_acc, self.car_model.max_steer])
+
         return self.dxu      
+    
+    def __compute_track_constants(self):
+        x1, y1 = self.boundary_points[0][0], self.boundary_points[0][1]
+        x2, y2 = self.boundary_points[1][0], self.boundary_points[1][1]
+        x3, y3 = self.boundary_points[2][0], self.boundary_points[2][1]
+        x4, y4 = self.boundary_points[3][0], self.boundary_points[3][1]
+
+        # a = y2-y1
+        self.a1 = y2 - y1
+        self.a2 = y3 - y2
+        self.a3 = y4 - y3
+        self.a4 = y1 - y4
+
+        # b = x1-x2
+        self.b1 = x1 - x2
+        self.b2 = x2 - x3
+        self.b3 = x3 - x4
+        self.b4 = x4 - x1
+
+        # c = y1*(x2-x1) - x1*(y2-y1)
+        self.c1 = y1 * (x2 - x1) - x1 * (y2 - y1)
+        self.c2 = y2 * (x3 - x2) - x2 * (y3 - y2)
+        self.c3 = y3 * (x4 - x3) - x3 * (y4 - y3)
+        self.c4 = y4 * (x1 - x4) - x4 * (y1 - y4)
 
     def __compute_closest_point(self, i, x):
-        dx = 0
-        dy = 0
+        x0 = x[0,i]
+        y0 = x[1,i]
 
-        if abs(x[0,i] - self.boundary_points[0]) < abs(x[0,i] - self.boundary_points[1]):
-            dx = self.boundary_points[0] - x[0,i]
-            cpx = self.boundary_points[0]
-        else:
-            dx = self.boundary_points[1] - x[0,i]
-            cpx = self.boundary_points[1]
-        
-        if abs(x[1,i] - self.boundary_points[2]) < abs(x[1,i] - self.boundary_points[3]):
-            dy = self.boundary_points[2] - x[1,i]
-            cpy = self.boundary_points[2]
-        else:
-            dy = self.boundary_points[3] - x[1,i]
-            cpy = self.boundary_points[3]
-            
-        if abs(dx) < abs(dy):
-            self.closest_point = np.array([cpx, x[1,i]])  
-        else:
-            self.closest_point = np.array([x[0,i], cpy])
+        dist_1 = abs(self.a1*x0 + self.b1*y0 + self.c1)/np.sqrt(self.a1**2 + self.b1**2)
+        dist_2 = abs(self.a2*x0 + self.b2*y0 + self.c2)/np.sqrt(self.a2**2 + self.b2**2)
+        dist_3 = abs(self.a3*x0 + self.b3*y0 + self.c3)/np.sqrt(self.a3**2 + self.b3**2)
+        dist_4 = abs(self.a4*x0 + self.b4*y0 + self.c4)/np.sqrt(self.a4**2 + self.b4**2)
+        min_dist = min(dist_1, dist_2, dist_3, dist_4)
+
+        if min_dist == dist_1:
+            denom = self.a1**2 + self.b1**2
+            num_x = self.b1*(self.b1*x0 - self.a1*y0) - self.a1*self.c1
+            num_y = self.a1*(-self.b1*x0 + self.a1*y0) - self.b1*self.c1
+            self.closest_point = np.array([num_x/denom, num_y/denom])
+        elif min_dist == dist_2:
+            denom = self.a2**2 + self.b2**2
+            num_x = self.b2*(self.b2*x0 - self.a2*y0) - self.a2*self.c2
+            num_y = self.a2*(-self.b2*x0 + self.a2*y0) - self.b2*self.c2
+            self.closest_point = np.array([num_x/denom, num_y/denom])
+        elif min_dist == dist_3:
+            denom = self.a3**2 + self.b3**2
+            num_x = self.b3*(self.b3*x0 - self.a3*y0) - self.a3*self.c3
+            num_y = self.a3*(-self.b3*x0 + self.a3*y0) - self.b3*self.c3
+            self.closest_point = np.array([num_x/denom, num_y/denom])
+        elif min_dist == dist_4:
+            denom = self.a4**2 + self.b4**2
+            num_x = self.b4*(self.b4*x0 - self.a4*y0) - self.a4*self.c4
+            num_y = self.a4*(-self.b4*x0 + self.a4*y0) - self.b4*self.c4
+            self.closest_point = np.array([num_x/denom, num_y/denom])
+        else:   
+            print("Error in computing closest point")

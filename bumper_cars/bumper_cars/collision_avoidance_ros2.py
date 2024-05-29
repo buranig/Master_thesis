@@ -62,7 +62,8 @@ class CollisionAvoidance(Node):
         self.car_str = '' if self.car_i == 0 else str(self.car_i + 1)
 
         # Init controller
-        self.algorithm = controller_map[self.car_alg.lower()](self.car_yaml,self.car_i)
+        self.alg = self.car_alg.lower() 
+        self.algorithm = controller_map[self.alg](self.car_yaml,self.car_i)
 
         # Generate trajectory (if needed)
         if self.gen_traj:
@@ -103,28 +104,30 @@ class CollisionAvoidance(Node):
         track_offset = [track_pos.x, track_pos.y, track_pos.theta]
         self.algorithm.offset_track(track_offset)
 
-
-        #Plot map in Rviz
-        hue = (self.car_i * 0.618033988749895) % 1  # Use golden ratio conjugate to distribute colors
-        self.rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)  # Convert HSV to RGB
-        
+        # Debug timer
         if self.debug_rviz:   
+            #Plot map in Rviz
+            hue = (self.car_i * 0.618033988749895) % 1  # Use golden ratio conjugate to distribute colors
+            self.rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)  # Convert HSV to RGB
+
+            self.timer_debug = self.create_timer(1.0, self.debug_callback)
+
             self.debug_publisher = self.create_publisher(Marker, '/debug_markers'+self.car_str, 10)
 
-            if self.car_i == 0:
-                print(self.algorithm.boundary_points)
-                self.publish_map(self.algorithm.boundary_points)
-                self.barrier_publisher([0.5,1.25])
-
-            self.alg = self.car_alg.lower() 
-            if self.alg == "cbf" or self.alg == "c3bf":
-                self.car_radius_publish(self.algorithm.safety_radius)
 
 
             
     def timer_callback(self):
         self.update_time = True
+
+    def debug_callback(self):
+        if self.car_i == 0:
+            self.publish_map(self.algorithm.boundary_points)
+
         
+        if self.alg == "cbf" or self.alg == "c3bf":
+            self.car_radius_publish(self.algorithm.safety_radius)
+
 
     def state_request(self):
         self.future = self.state_cli.call_async(self.state_req)

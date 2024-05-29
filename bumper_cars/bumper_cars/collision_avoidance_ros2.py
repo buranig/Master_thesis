@@ -9,7 +9,7 @@ from bumper_cars.utils import car_utils as utils
 
 # Plot goal in Rviz
 from visualization_msgs.msg import Marker
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, Pose2D
 from std_msgs.msg import Header, ColorRGBA
 import colorsys
 
@@ -30,7 +30,7 @@ controller_map = {
 
 
 from lar_msgs.msg import CarControlStamped
-from bumper_msgs.srv import EnvState, CarCommand, JoySafety
+from bumper_msgs.srv import EnvState, CarCommand, JoySafety, TrackState
 
 
 class CollisionAvoidance(Node):
@@ -72,6 +72,7 @@ class CollisionAvoidance(Node):
         self.state_cli = self.create_client(EnvState, 'env_state' + self.car_str)
         self.cmd_cli = self.create_client(CarCommand, 'car_cmd')
         self.joy_cli = self.create_client(JoySafety, 'joy_safety')
+        self.track_cli = self.create_client(TrackState, 'track_pose')
         while not self.state_cli.wait_for_service(timeout_sec=1.0) or not self.cmd_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
         
@@ -80,12 +81,12 @@ class CollisionAvoidance(Node):
         self.cmd_req = CarCommand.Request()
         self.cmd_req.car = self.car_i
         self.joy_req = JoySafety.Request()
+        self.track_req = TrackState.Request()
 
         if self.source == 'sim':
             self.publisher_ = self.create_publisher(CarControlStamped, '/sim/car'+self.car_str+'/set/control', 10)
         else:
             self.publisher_ = self.create_publisher(CarControlStamped, '/car'+self.car_str+'/set/control', 10)
-        self.goal_publisher_ = self.create_publisher(Marker, '/vis/trace', 10)
 
         # Update timer
         self.timer = self.create_timer(self.dt, self.timer_callback)
@@ -107,10 +108,6 @@ class CollisionAvoidance(Node):
 
 
             
-
-
-
-
     def timer_callback(self):
         self.update_time = True
         
@@ -132,8 +129,23 @@ class CollisionAvoidance(Node):
         rclpy.spin_until_future_complete(self, self.joy_future)
         return self.joy_future.result().ca_activated
 
+    def track_request(self):
+        self.track_future = self.track_cli.call_async(self.track_req)
+        rclpy.spin_until_future_complete(self, self.track_future)
+        return self.track_future.result().track_state
+
     def run(self):
         ca_active = True
+        
+        # Get track position
+        base = Pose2D()
+        track_pos = self.track_request()
+        while base == track_pos:
+            print("Getting track position")
+            track_pos = self.track_request()
+        track_offset = [track_pos.x, track_pos.y, track_pos.theta]
+        self.algorithm.offset_track(track_offset)
+
         while rclpy.ok():
             # Update the current state of the car (and do rcply spin to update timer)
             try:

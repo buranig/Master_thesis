@@ -50,8 +50,8 @@ class StateBuffer(Node):
         self.track_updated = False
 
     def _get_env_state(self, request, response):
-        if all(self.updated):
-            response.env_state = self.env_state
+        response.env_state = self.env_state
+        response.updated = all(self.updated)
         return response
     
     def _get_cmd_i(self, request, response):
@@ -62,6 +62,7 @@ class StateBuffer(Node):
         response.track_state.x = self.track_pos.x
         response.track_state.y = self.track_pos.y
         response.track_state.theta = self.track_pos.theta
+        response.updated = self.track_updated
         return response
 
     def _received_state(self, msg, car_i: int):

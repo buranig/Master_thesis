@@ -12,7 +12,7 @@ from typing import List
 import yaml
 import json
 
-from shapely.geometry import Point, LineString, mapping
+from shapely.geometry import Point, LineString, MultiLineString
 from shapely import distance, union
 import os
 
@@ -160,6 +160,10 @@ class DWA_algorithm(Controller):
 
         print("\nThe JSON data has been written to 'config/trajectories.json'")
 
+    def offset_track(self, off:List[int]):
+        print("Corrected offset!")
+        super().offset_track(off)
+        print(self.boundary_points)
 
     ################## PRIVATE METHODS
 
@@ -233,12 +237,13 @@ class DWA_algorithm(Controller):
         for i in range(len(self.boundary_points)):
             pos_x = self.boundary_points[i][0]
             pos_y = self.boundary_points[i][1]
-            new_x, new_y = utils.transform_point(pos_x,pos_y,ref_x,ref_y,ref_yaw)
+            new_x, new_y = utils.transform_point(pos_x,pos_y,ref_x,ref_y,-ref_yaw)
             x_list.append(new_x)
             y_list.append(new_y)
-            
+        
         x_list.append(x_list[0])
         y_list.append(y_list[0])
+
         self.borders = LineString(zip(x_list, y_list)) #.buffer(self.dilation_factor, cap_style=3)
 
     def __calc_trajectory(self, curr_state:State, cmd:CarControlStamped):
@@ -362,16 +367,18 @@ class DWA_algorithm(Controller):
             Returns:
                 tuple: Tuple containing the control inputs (throttle, delta) and the trajectory.
             """
-            min_cost = float("inf")
+            min_cost = np.inf
             best_u = [0.0, 0.0]
             best_trajectory = np.array([x])
 
             # Variables needed for faster computation
-            self.ob = self.borders
             obstacles = [self.dilated_traj[idx] for idx in range(len(self.dilated_traj)) if idx != self.robot_num]
-            for ob in obstacles:
-                self.ob = ob if self.ob is None else union(self.ob, ob)
+            obstacles.append(self.borders)
+            self.ob = MultiLineString(obstacles)
 
+            # for ob in obstacles:
+            #     self.ob = union(self.ob, ob)
+            # print(self.ob)
             
             dw = self.__calc_dynamic_window()
 
@@ -390,26 +397,28 @@ class DWA_algorithm(Controller):
                     if min_cost >= final_cost:
                         min_cost = final_cost
                         best_u = [a, float(delta)]
+                        u_traj = [[a, float(delta)] for _ in range(int(self.delta_resolution)+3)] #TODO: Check if this 3 has to remain here
 
             best_trajectory = self.trajs[str(nearest)][str(best_u[0])][str(best_u[1])]
-            u_traj = [[a, float(delta)] for _ in range(int(self.delta_resolution)+3)] #TODO: Check if this 3 has to remain here
 
-            # Check if previous trajectory was better
-            if len(self.u_hist) > self.emergency_brake_distance:  
-                self.u_hist.pop(0)
-                trajectory_buf = self.predicted_trajectory
-
-                to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(self.u_hist[0][0], self.u_hist[0][1])
-                ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(dilated=trajectory_buf)
+            # # Check if previous trajectory was better
+            # if len(self.u_hist) > self.emergency_brake_distance:  
+            #     _, self.u_hist = self.u_hist[0], self.u_hist[1:]
                 
-                final_cost = to_goal_cost + ob_cost 
+            #     trajectory_buf = self.predicted_trajectory
 
-                if min_cost >= final_cost:      
-                    min_cost = final_cost
-                    best_u = self.u_hist[0]
-                    best_trajectory = trajectory_buf
-                    u_traj = self.u_hist
-            elif min_cost == np.inf:
+            #     to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(self.u_hist[0][0], self.u_hist[0][1])
+            #     ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(dilated=trajectory_buf)
+                
+            #     final_cost = to_goal_cost + ob_cost 
+
+            #     if min_cost >= final_cost:      
+            #         min_cost = final_cost
+            #         best_u = self.u_hist[0]
+            #         best_trajectory = trajectory_buf
+            #         u_traj = self.u_hist
+            # el
+            if min_cost == np.inf:
                 # emergency stop
                 print(f"Emergency stop for vehicle {self.robot_num}")
                 best_u = [(0.0 - x[3])/self.dt, 0]
@@ -418,6 +427,7 @@ class DWA_algorithm(Controller):
                 best_trajectory = line#.buffer(self.dilation_factor, cap_style=3)
                 u_traj =  np.array([best_u]*int(self.ph/self.dt))
 
+            best_u = np.clip(best_u, [self.car_model.min_acc, -self.car_model.max_steer], [self.car_model.max_acc, self.car_model.max_steer])
             self.u_hist = u_traj
             self.predicted_trajectory = best_trajectory
             return best_u, best_trajectory

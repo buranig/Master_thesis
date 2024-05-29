@@ -394,7 +394,7 @@ class C3BF_algorithm():
         Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - closest_point[0]) + np.sin(x[2, i]) * (x[1, i] - closest_point[1]))
         Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - closest_point[1]) - np.sin(x[2, i]) * (x[0, i] - closest_point[0]))
         h = (x[0, i] - closest_point[0]) * (x[0, i] - closest_point[0]) + (x[1, i] - closest_point[1]) * (x[1, i] - closest_point[1]) - (
-                    safety_radius/1.5 ** 2 + Kv * abs(x[3, i]))
+                    safety_radius ** 2 + Kv * abs(x[3, i]))
 
         H[count] = np.array([barrier_gain * np.power(h, 3) + Lf_h])
 
@@ -410,7 +410,7 @@ class C3BF_algorithm():
         Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - closest_point2[0]) + np.sin(x[2, i]) * (x[1, i] - closest_point2[1]))
         Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - closest_point2[1]) - np.sin(x[2, i]) * (x[0, i] - closest_point2[0]))
         h = (x[0, i] - closest_point2[0]) * (x[0, i] - closest_point2[0]) + (x[1, i] - closest_point2[1]) * (x[1, i] - closest_point2[1]) - (
-                    safety_radius/1.5 ** 2 + Kv * abs(x[3, i]))
+                    safety_radius ** 2 + Kv * abs(x[3, i]))
 
         H[count] = np.array([barrier_gain * np.power(h, 3) + Lf_h])
 
@@ -426,7 +426,7 @@ class C3BF_algorithm():
         Lf_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[0, i] - closest_point3[0]) + np.sin(x[2, i]) * (x[1, i] - closest_point3[1]))
         Lg_h = 2 * x[3, i] * (np.cos(x[2, i]) * (x[1, i] - closest_point3[1]) - np.sin(x[2, i]) * (x[0, i] - closest_point3[0]))
         h = (x[0, i] - closest_point3[0]) * (x[0, i] - closest_point3[0]) + (x[1, i] - closest_point3[1]) * (x[1, i] - closest_point3[1]) - (
-                    safety_radius/1.5 ** 2 + Kv * abs(x[3, i]))
+                    safety_radius ** 2 + Kv * abs(x[3, i]))
 
         H[count] = np.array([barrier_gain * np.power(h, 3) + Lf_h])
 

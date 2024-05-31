@@ -83,11 +83,39 @@ def add_car(context, ld):
                     {'carNumber': car_i}
             ],
                 remappings=[('/sim/car'+car_str+'/set/control', '/sim/car'+car_str+'/desired_control'),
-                            ('/car'+car_str+'/set/control', '/car'+car_str+'/desired_control') ],
+                            ('/car'+car_str+'/set/control', '/car'+car_str+'/desired_control'),
+                            ('/joy', '/joy'+car_str) ],
             emulate_tty=True,
             output='both'
         )
         ld.add_action(node)
+
+
+        # State buffer
+        joy1Safety_node = Node(
+            package='bumper_cars',
+            executable='joy_safety',
+            name='joy'+car_str+'_safety_node',
+            remappings=[('/joy', '/joy'+car_str) ],
+            emulate_tty=True,
+            output='both'
+        )
+
+        # State buffer
+        joy1 = Node(
+            package='joy',
+            executable='joy_node',
+            name='joy'+car_str+'_node',
+            parameters=[
+                    {'device_id': car_num},
+            ],
+            remappings=[('/joy', '/joy'+car_str) ],
+            emulate_tty=True,
+            output='both'
+        )
+
+        ld.add_action(joy1Safety_node)
+        ld.add_action(joy1)
 
 
 
@@ -130,16 +158,7 @@ def generate_launch_description():
         default_value='True'
     )
 
-    # State buffer
-    joySafety_node = Node(
-        package='bumper_cars',
-        executable='joy_safety',
-        name='joy_safety_node',
-        emulate_tty=True,
-        output='both'
-    )
-
-    ld.add_action(joySafety_node)
+    
 
     ld.add_action(carNumber_arg)
     ld.add_action(carNumOffset_arg)

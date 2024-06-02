@@ -10,12 +10,44 @@ from bumper_cars.classes.State import State
 from bumper_cars.utils.car_utils import normalize_angle
 from lar_msgs.msg import CarControlStamped
 
-
 class CarModel:
+    """
+    Represents a car model with various attributes and methods for simulating the car's behavior.
+
+    Attributes:
+        state (State): The current state of the car.
+        max_steer (float): The maximum steering angle of the car in radians.
+        max_speed (float): The maximum speed of the car in meters per second.
+        min_speed (float): The minimum speed of the car in meters per second.
+        max_acc (float): The maximum acceleration of the car in meters per second squared.
+        min_acc (float): The minimum acceleration of the car in meters per second squared.
+        acc_gain (float): The acceleration gain of the car, ranging from 0.0 to 1.0.
+        width (float): The width of the vehicle's track in meters.
+        L (float): The wheel base of the vehicle in meters.
+        Lr (float): The distance from the rear axle to the center of mass in meters.
+        Cf (float): The cornering stiffness of the front tires in N/rad.
+        Cr (float): The cornering stiffness of the rear tires in N/rad.
+        Iz (float): The moment of inertia around the vertical axis in kg/m^2.
+        m (float): The mass of the car in kg.
+        c_a (float): The aerodynamic coefficient of the car.
+        c_r1 (float): The friction coefficient of the car.
+        next_state (function): The callback function for updating the car's state based on the model type.
+
+    Methods:
+        set_state(car_state: State): Sets the state of the car.
+        step(cmd: CarControlStamped, dt: float, curr_state: State = None) -> State: Performs a simulation step and returns the updated state of the car.
+    """
+
     # Init state of car
     state = State()
     
     def __init__(self, carModel_path = ''):
+        """
+        Initializes a CarModel object.
+
+        Args:
+            carModel_path (str): The path to the car model configuration file. If not provided, a default path will be used.
+        """
 
         # If path not provided, use known one
         dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -49,34 +81,48 @@ class CarModel:
         # Linear/nonlinear model
         model_type = yaml_object["model_type"]
         if model_type == 'kinematic':
-            self.next_state = self.__linear_model_callback
+            self.next_state = self.__kinematic_model_callback
         elif model_type == 'dynamic':
-            self.next_state = self.__nonlinear_model_callback
+            self.next_state = self.__dynamic_model_callback
         else:
             raise Exception("Wrong value for 'model_type'")
         
     def set_state(self, car_state : State):
-            self.state.x = car_state.x
-            self.state.y = car_state.y
-            self.state.v = car_state.v
-            self.state.yaw = car_state.yaw
-            self.state.omega = car_state.omega
+        """
+        Sets the state of the car.
+
+        Args:
+            car_state (State): The new state of the car.
+        """            
+        self.state.x = car_state.x
+        self.state.y = car_state.y
+        self.state.v = car_state.v
+        self.state.yaw = car_state.yaw
+        self.state.omega = car_state.omega
 
     def step(self, cmd: CarControlStamped, dt: float, curr_state: State = None)-> State:
+        """
+        Performs a simulation step and returns the updated state of the car.
+
+        Args:
+            cmd (CarControlStamped): The control command for the car.
+            dt (float): The time step for the simulation.
+            curr_state (State, optional): The current state of the car. If not provided, the internal state of the car will be used.
+
+        Returns:
+            State: The updated state of the car.
+        """
         return self.next_state(cmd, dt, curr_state)
 
 
-    def __linear_model_callback(self, cmd: CarControlStamped, dt: float, curr_state: State = None) -> State:
+    def __kinematic_model_callback(self, cmd: CarControlStamped, dt: float, curr_state: State = None) -> State:
         """
-        Update the car state using a non-linear kinematic model.
-
-        This function calculates the new state of the car based on the initial state, control inputs, and the time elapsed since the last update.
-        It returns the updated state and the current time.
+        The callback function for updating the car's state using a kinematic model.
 
         Args:
-            initial_state (FullState): The initial state of the car.
-            cmd (CarControlStamped): The control inputs for the car.
-            dt (float): Increment of time to simulate for.
+            cmd (CarControlStamped): The control command for the car.
+            dt (float): The time step for the simulation.
+            curr_state (State, optional): The current state of the car. If not provided, the internal state of the car will be used.
 
         Returns:
             State: The updated state of the car.
@@ -98,7 +144,7 @@ class CarModel:
         state.x = old_x + old_v * np.cos(old_yaw) * dt
         state.y = old_y + old_v * np.sin(old_yaw) * dt
 
-        state.yaw = old_yaw + old_v / self.L * np.tan(mapped_steering) * dt # TODO: Tan is approximation
+        state.yaw = old_yaw + old_v / self.L * np.tan(mapped_steering) * dt # WARN: tan is an approximation
         state.yaw = normalize_angle(state.yaw)
 
         state.v = old_v + mapped_throttle * dt
@@ -106,17 +152,14 @@ class CarModel:
 
         return state
     
-    def __nonlinear_model_callback(self, cmd:CarControlStamped, dt: float, curr_state: State = None) -> State:
+    def __dynamic_model_callback(self, cmd:CarControlStamped, dt: float, curr_state: State = None) -> State:
         """
-        Update the car state using a nonlinear dynamic model.
-
-        This function calculates the new state of the car based on the current state, control inputs, and the time elapsed since the last update.
-        It returns the updated state and the current time.
+        The callback function for updating the car's state using a dynamic model.
 
         Args:
-            state (FullState): The current state of the car.
-            cmd (ControlInputs): The control inputs for the car.
-            dt (float): Increment of time to simulate for.
+            cmd (CarControlStamped): The control command for the car.
+            dt (float): The time step for the simulation.
+            curr_state (State, optional): The current state of the car. If not provided, the internal state of the car will be used.
 
         Returns:
             State: The updated state of the car.

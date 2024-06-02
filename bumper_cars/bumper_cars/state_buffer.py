@@ -8,7 +8,26 @@ from rclpy.qos import qos_profile_sensor_data
 from geometry_msgs.msg import Pose2D
 
 class StateBufferNode(Node):
+    """
+    Node class for managing the state buffer for the bumper cars system.
+
+    This class provides methods for retrieving the environment
+    state, car commands, and track position.
+    """
+
     def __init__(self):
+        """
+        Initialize the StateBufferNode class.
+
+        This method initializes the necessary parameters, services, and subscriptions
+        for managing the state, car commands, and track position buffers.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         super().__init__('state_buffer')
 
         # Initialise car number
@@ -49,30 +68,30 @@ class StateBufferNode(Node):
         self.track_pos = Pose2D()
         self.track_updated = False
 
-    def _get_env_state(self, request, response):
+    def _get_env_state(self, request, response) -> EnvState.Response:
         response.env_state = self.env_state
         response.updated = all(self.updated)
         return response
     
-    def _get_cmd_i(self, request, response):
+    def _get_cmd_i(self, request, response) -> CarCommand.Response:
         response.cmd = self.cmd[request.car]
         return response
     
-    def _get_track_pos(self, request, response):
+    def _get_track_pos(self, request, response) -> TrackState.Response:
         response.track_state.x = self.track_pos.x
         response.track_state.y = self.track_pos.y
         response.track_state.theta = self.track_pos.theta
         response.updated = self.track_updated
         return response
 
-    def _received_state(self, msg, car_i: int):
+    def _received_state(self, msg, car_i: int) -> None:
         self.updated[car_i] = True
         self.env_state[car_i] = msg 
     
-    def _received_cmd(self, msg, car_i: int):
+    def _received_cmd(self, msg, car_i: int) -> None:
         self.cmd[car_i] = msg
 
-    def _received_track(self, msg):
+    def _received_track(self, msg) -> None:
         self.track_updated = True
         self.track_pos.x = msg.x
         self.track_pos.y = msg.y

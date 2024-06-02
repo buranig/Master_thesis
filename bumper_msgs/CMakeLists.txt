@@ -29,7 +29,6 @@ endif()
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/EnvState.srv"
   "srv/CarCommand.srv"
-  "srv/CarPredict.srv"
   "srv/JoySafety.srv"
   "srv/TrackState.srv"
   DEPENDENCIES std_msgs lar_msgs geometry_msgs

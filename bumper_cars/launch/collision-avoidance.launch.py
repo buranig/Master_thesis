@@ -97,7 +97,7 @@ def add_car(context, ld):
             executable='joy_safety',
             name='joy'+car_str+'_safety_node',
             parameters=[
-                    {'car_i': car_i},
+                    {'car_str': car_str},
             ],
             emulate_tty=True,
             output='both'

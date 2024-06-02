@@ -4,7 +4,6 @@ from typing import List
 import rclpy
 import yaml
 from rclpy.node import Node
-import numpy as np
 from bumper_cars.utils import car_utils as utils
 
 # Plot goal in Rviz
@@ -28,13 +27,48 @@ controller_map = {
     "mpc": MPC
 }
 
-
 from lar_msgs.msg import CarControlStamped
 from bumper_msgs.srv import EnvState, CarCommand, JoySafety, TrackState
 
 
 class CollisionAvoidance(Node):
+    """
+    This class represents the Collision Avoidance node in the bumper cars system.
+    It handles the collision avoidance algorithm and communication with other nodes.
+
+    Args:
+        None
+
+    Attributes:
+        car_i (int): The index of the car.
+        car_yaml (str): The path to the car's YAML file.
+        car_alg (str): The algorithm to be used for collision avoidance.
+        gen_traj (bool): Flag indicating whether to generate a trajectory.
+        source (str): The source of the car's control commands, can be 'sim' or 'real'.
+        debug_rviz (bool): Flag indicating whether to enable debug visualization in RViz.
+        dt (float): The time step for the simulation.
+        car_str (str): The string representation of the car's index.
+        algorithm (Controller): The collision avoidance algorithm instance.
+        state_cli (Client): The client for querying the environment state.
+        cmd_cli (Client): The client for querying the car's command.
+        joy_cli (Client): The client for querying the joystick safety status.
+        track_cli (Client): The client for querying the track state.
+        publisher_ (Publisher): The publisher for sending control commands to the car.
+        timer (Timer): The timer for updating the car's state.
+        update_time (bool): Flag indicating whether to update the car's state.
+        timer_debug (Timer): The timer for updating debug visualization in RViz.
+        debug_publisher (Publisher): The publisher for sending debug markers to RViz.
+    """
+
     def __init__(self):
+        """
+        Initialize the necessary configuration for CollisionAvoidance node.
+        Args:
+            None
+
+        Returns:
+            None
+        """
         super().__init__('ca')
         self.declare_parameter('car_i', rclpy.Parameter.Type.INTEGER)
         self.declare_parameter('gen_traj', rclpy.Parameter.Type.BOOL)
@@ -99,59 +133,106 @@ class CollisionAvoidance(Node):
             print("Getting track position")
             track_msg = self.track_request()
         track_pos = track_msg.track_state
-        print("Final track position: ", track_pos)
+
         # Set track boundaries offset
         track_offset = [track_pos.x, track_pos.y, track_pos.theta]
         self.algorithm.offset_track(track_offset)
 
-        # Debug timer
+        # Draw in Rviz
         if self.debug_rviz:   
-            #Plot map in Rviz
-            hue = (self.car_i * 0.618033988749895) % 1  # Use golden ratio conjugate to distribute colors
-            self.rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)  # Convert HSV to RGB
+            # Colormap for debug
+            hue = (self.car_i * 0.618033988749895) % 1
+            self.rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
 
             self.timer_debug = self.create_timer(1.0, self.debug_callback)
-
             self.debug_publisher = self.create_publisher(Marker, '/debug_markers'+self.car_str, 10)
 
-
-
             
-    def timer_callback(self):
+    def timer_callback(self) -> None:
+        """
+        Timer callback function.
+        Updates the flag to indicate that it's time to send another command to the car.
+        Args:
+            None
+        Returns:
+            None
+        """
         self.update_time = True
 
-    def debug_callback(self):
+    def debug_callback(self) -> None:
+        """
+        Debug callback function.
+        Publishes debug markers to RViz for visualization.
+        Args:
+            None
+        Returns:
+            None
+        """
         if self.car_i == 0:
             self.publish_map(self.algorithm.boundary_points)
 
-        
         if self.alg == "cbf" or self.alg == "c3bf":
             self.car_radius_publish(self.algorithm.safety_radius)
 
 
-    def state_request(self):
+    def state_request(self) -> EnvState.Response:
+        """
+        Sends a request to get the current environment state.
+        Args:
+            None
+        Returns:
+            EnvState.Response: The response from the environment state service.
+        """
         self.future = self.state_cli.call_async(self.state_req)
         rclpy.spin_until_future_complete(self, self.future)
         if not self.future.done():
             print("Timeout")
         return self.future.result()
         
-    def cmd_request(self):
+    def cmd_request(self) -> CarCommand.Response:
+        """
+        Sends a request to get the desired command for a car.
+        Args:
+            None
+        Returns:
+            CarCommand.Response: The response from the car command service.
+        """
         self.cmd_future = self.cmd_cli.call_async(self.cmd_req)
         rclpy.spin_until_future_complete(self, self.cmd_future)
         return self.cmd_future.result()
 
-    def joy_request(self):
+    def joy_request(self) -> bool:
+        """
+        Sends a request to the joystick safety service to see if Collision Avoidance should be enabled.
+        Args:
+            None
+        Returns:
+            bool: Whether CA should be active (True) or not (False).
+        """
         self.joy_future = self.joy_cli.call_async(self.joy_req)
         rclpy.spin_until_future_complete(self, self.joy_future)
         return self.joy_future.result().ca_activated
 
-    def track_request(self):
+    def track_request(self) -> TrackState.Response:
+        """
+        Sends a request to get the position of the track's center.
+        Args:
+            None
+        Returns:
+            TrackState.Response: The response from the track state service.
+        """
         self.track_future = self.track_cli.call_async(self.track_req)
         rclpy.spin_until_future_complete(self, self.track_future)
         return self.track_future.result()
 
-    def run(self):
+    def run(self) -> None:
+        """
+        Main function to run the CollisionAvoidance node.
+        Args:
+            None
+        Returns:
+            None
+        """
         ca_active = True
         
         while rclpy.ok():
@@ -189,7 +270,7 @@ class CollisionAvoidance(Node):
 
             # Draw debug info in Rviz
             if self.debug_rviz:
-                if self.alg == "dwa":
+                if self.alg == "dwa" or self.alg == "lbp":
                     self.publish_trajectory(self.algorithm.trajectory)
                 elif self.alg == "cbf" or self.alg == "c3bf":
                     self.barrier_publisher(self.algorithm.closest_point)
@@ -199,7 +280,14 @@ class CollisionAvoidance(Node):
             self.update_time = False
 
 
-    def publish_map(self, boundary_points: List[float]):
+    def publish_map(self, boundary_points: List[float]) -> None:
+        """
+        Publishes the boundary points of the track as a line strip marker in RViz.
+        Args:
+            boundary_points (List[float]): The boundary points of the track.
+        Returns:
+            None
+        """
         marker = Marker()
         marker.header = Header()
         marker.header.frame_id = "world"
@@ -234,6 +322,13 @@ class CollisionAvoidance(Node):
         self.debug_publisher.publish(marker)
 
     def car_radius_publish(self, radius: float):
+        """
+        Publishes the safety radius of the car as a sphere marker in RViz.
+        Args:
+            radius (float): The safety radius of the car.
+        Returns:
+            None
+        """
         marker = Marker()
         marker.header = Header()
         marker.header.frame_id = "body" + self.car_str
@@ -267,7 +362,16 @@ class CollisionAvoidance(Node):
 
         self.debug_publisher.publish(marker)
     
-    def barrier_publisher(self, point: List[float]):
+    def barrier_publisher(self, point: List[float]) -> None:
+        """
+        Publishes a marker on boundary of arena to visualize the active barrier function in RViz.
+
+        Args:
+            point (List[float]): The position of the active barrier in the world frame.
+
+        Returns:
+            None
+        """
         marker = Marker()
         marker.header = Header()
         marker.header.frame_id = "world"
@@ -284,7 +388,7 @@ class CollisionAvoidance(Node):
         marker.pose.orientation.y = 0.0
         marker.pose.orientation.z = 0.0
         marker.pose.orientation.w = 1.0
-        
+
         # Define the scale (diameter) of the sphere
         marker.scale.x = 0.1
         marker.scale.y = 0.1
@@ -295,12 +399,21 @@ class CollisionAvoidance(Node):
         color.r = self.rgb[0]
         color.g = self.rgb[1]
         color.b = self.rgb[2]
-        color.a = 0.5  
+        color.a = 0.5
         marker.color = color
 
         self.debug_publisher.publish(marker)
     
-    def publish_trajectory(self, trajectory: List[List[float]]):
+    def publish_trajectory(self, trajectory: List[List[float]]) -> None:
+        """
+        Publishes a trajectory as a line strip marker.
+
+        Args:
+            trajectory (List[List[float]]): The trajectory to be published. Each element in the list represents a point in the trajectory, specified as [x, y].
+
+        Returns:
+            None
+        """
         marker = Marker()
         marker.header = Header()
         marker.header.frame_id = "body" + self.car_str

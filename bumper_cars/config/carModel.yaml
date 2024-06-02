@@ -1,23 +1,23 @@
 
 ###############  State constraints  #############################################
-max_steer: 0.19199         # Maximal and (- minimal) steering angle [rad]
-max_speed: 2.0              # Maximal speed [m/s]       --- Not quite used yet
-min_speed: -2.0             # Minimal speed [m/s]       --- Not quite used yet
-max_acc: 0.45                # Max acceleration [m/ss]
-min_acc: -0.45               # Min acceleration [m/ss]
-acc_gain: 1.0               # Gain for acceleration control
+max_steer: 0.19199          # [rad] Maximal and (- minimal) steering angle 
+max_speed: 2.0              # [m/s] Maximal expected speed for trajectory generation        
+min_speed: -2.0             # [m/s] Minimal expected speed for trajectory generation
+max_acc: 0.45               # [m/ss] Max acceleration
+min_acc: -0.45              # [m/ss] Min acceleration
+acc_gain: 1.0               # [-] Gain for acceleration control
 
 ###############  Mechanical properties  #############################################
-width: 0.05                  # Width of the track of the vehicle [m]
-L: 0.098                      # Wheel base [m]
-Lr: 0.051                  # (m) Distance from rear axle to center of mass ------------- TO BE IDENTIFIED -------------
-Cf: 800.0                   # Front tire stiffness coefficient
-Cr: 800.0                   # Rear tire stiffness coefficient
-Iz: 0.00019863              # Vehicle moment of inertia     --- To be identified
-m: 0.144                    # Vehicle mass
+width: 0.05                 # [m] Width of the track of the vehicle
+L: 0.098                    # [m] Wheel base = distance between front and rear axle
+Lr: 0.051                   # [m] Distance from rear axle to center of mass
+Cf: 800.0                   # [-] Front tire stiffness coefficient
+Cr: 800.0                   # [-] Rear tire stiffness coefficient
+Iz: 0.00019863              # [kg*m*m] Vehicle moment of inertia
+m: 0.144                    # [kg] Vehicle mass
 
 
 ################  Friction coefficients  ############################################
-c_a: 0.8                   # Drag coefficient
-c_r1: 0.1                  # Friction coefficient
-model_type: 'kinematic'        # Function used for state prediction ('kinematic'/'dynamic')
+c_a: 0.8                        # [-] Drag coefficient
+c_r1: 0.1                       # [-] Friction coefficient
+model_type: 'kinematic'         # ['kinematic'/'dynamic'] Function used for state prediction 

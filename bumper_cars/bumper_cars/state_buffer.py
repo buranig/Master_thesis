@@ -7,7 +7,7 @@ from bumper_msgs.srv import EnvState, CarCommand, TrackState
 from rclpy.qos import qos_profile_sensor_data
 from geometry_msgs.msg import Pose2D
 
-class StateBuffer(Node):
+class StateBufferNode(Node):
     def __init__(self):
         super().__init__('state_buffer')
 
@@ -82,7 +82,7 @@ class StateBuffer(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = StateBuffer()
+    node = StateBufferNode()
 
     rclpy.spin(node)
     node.destroy_node()

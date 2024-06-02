@@ -75,7 +75,7 @@ def add_car(context, ld):
             name='main_control_node' + car_str,
             parameters=[
                     {'track_yaml': track_yaml},
-                    # {'static_throttle': 0.5},
+                    {'static_throttle': LaunchConfiguration('static_throttle')},
                     {'control_mode': 'pursuit'},    
                     {'state_source': LaunchConfiguration('source_target')},
                     {'control_target': LaunchConfiguration('source_target')},
@@ -92,17 +92,19 @@ def add_car(context, ld):
 
 
         # State buffer
-        joy1Safety_node = Node(
+        joySafety_node = Node(
             package='bumper_cars',
             executable='joy_safety',
             name='joy'+car_str+'_safety_node',
-            remappings=[('/joy', '/joy'+car_str) ],
+            parameters=[
+                    {'car_i': car_i},
+            ],
             emulate_tty=True,
             output='both'
         )
 
         # State buffer
-        joy1 = Node(
+        joy = Node(
             package='joy',
             executable='joy_node',
             name='joy'+car_str+'_node',
@@ -114,8 +116,8 @@ def add_car(context, ld):
             output='both'
         )
 
-        ld.add_action(joy1Safety_node)
-        ld.add_action(joy1)
+        ld.add_action(joySafety_node)
+        ld.add_action(joy)
 
 
 
@@ -126,6 +128,11 @@ def generate_launch_description():
         'carNumber',
         description='number of cars to be controlled, can be sim or real',
         default_value='1'
+    )
+    staticThrottle_arg = DeclareLaunchArgument(
+        'static_throttle',
+        description='number of cars to be controlled, can be sim or real',
+        default_value='0.1'
     )
 
     carNumOffset_arg = DeclareLaunchArgument(
@@ -161,6 +168,7 @@ def generate_launch_description():
     
 
     ld.add_action(carNumber_arg)
+    ld.add_action(staticThrottle_arg)
     ld.add_action(carNumOffset_arg)
     ld.add_action(source_target_arg)
     ld.add_action(car_alg)

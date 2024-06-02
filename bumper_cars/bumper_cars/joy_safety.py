@@ -6,14 +6,19 @@ from bumper_msgs.srv import JoySafety
 class JoySafetyNode(Node):
     def __init__(self):
         super().__init__('joy_safety_node')
+
+        # Initialise car number
+        self.declare_parameter('car_str', '')
+        self.car_str = self.get_parameter('car_str').value
+
         self.subscription = self.create_subscription(
             Joy,
-            '/joy',
+            '/joy'+car_str,
             self.joy_callback,
             10
         )
         # Establish publishing service
-        self.srv = self.create_service(JoySafety, 'joy_safety', self._get_env_state)
+        self.srv = self.create_service(JoySafety, 'joy_safety', self._get_joy_state)
 
         # Establish safety variables
         self.button_pressed = False
@@ -24,13 +29,13 @@ class JoySafetyNode(Node):
             self.button_pressed = True
             self.ca_activated = not self.ca_activated
             if self.ca_activated:
-                self.get_logger().info('[ CA MODE CHANGE ]: collision avoidance ACTIVATED')
+                self.get_logger().info('[ CA MODE CHANGE ]: collision avoidance for car'+self.car_str+' ACTIVATED')
             else:
-                self.get_logger().info('[ CA MODE CHANGE ]: collision avoidance DISABLED')
+                self.get_logger().info('[ CA MODE CHANGE ]: collision avoidance for car'+self.car_str+' DISABLED')
         elif msg.buttons[5] == 0:
             self.button_pressed = False
 
-    def _get_env_state(self, _, response):
+    def _get_joy_state(self, _, response):
         response.ca_activated = self.ca_activated
         return response
 

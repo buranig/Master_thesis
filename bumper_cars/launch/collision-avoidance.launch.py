@@ -41,7 +41,7 @@ def add_car(context, ld):
             name='state_buffer_node' + car_str,
             parameters=[
                     {'carNumber': int(carAmount_value)},
-                    {'source': LaunchConfiguration('source_target')}
+                    {'source': LaunchConfiguration('source')}
             ],
             remappings=[('/env_state', '/env_state' + car_str),
                         ('/car_cmd', '/car_cmd' + car_str)],
@@ -60,7 +60,7 @@ def add_car(context, ld):
                     {'alg': LaunchConfiguration('alg')},
                     {'car_i': car_i},
                     {'gen_traj': LaunchConfiguration('gen_traj')},
-                    {'source': LaunchConfiguration('source_target')},
+                    {'source': LaunchConfiguration('source')},
                     {'debug_rviz': LaunchConfiguration('debug_rviz')}
             ],
             emulate_tty=True,
@@ -77,8 +77,8 @@ def add_car(context, ld):
                     {'track_yaml': track_yaml},
                     {'static_throttle': LaunchConfiguration('static_throttle')},
                     {'control_mode': 'pursuit'},    
-                    {'state_source': LaunchConfiguration('source_target')},
-                    {'control_target': LaunchConfiguration('source_target')},
+                    {'state_source': LaunchConfiguration('source')},
+                    {'control_target': LaunchConfiguration('source')},
                     {'arm_mpc': False},
                     {'carNumber': car_i}
             ],
@@ -147,8 +147,8 @@ def generate_launch_description():
         default_value='dwa'
     )
 
-    source_target_arg = DeclareLaunchArgument(
-        'source_target',
+    source_arg = DeclareLaunchArgument(
+        'source',
         description='source of the information, can be sim or real',
         default_value='sim'
     )
@@ -170,7 +170,7 @@ def generate_launch_description():
     ld.add_action(carNumber_arg)
     ld.add_action(staticThrottle_arg)
     ld.add_action(carNumOffset_arg)
-    ld.add_action(source_target_arg)
+    ld.add_action(source_arg)
     ld.add_action(car_alg)
     ld.add_action(gen_traj)
     ld.add_action(debug_rviz)

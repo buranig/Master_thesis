@@ -91,8 +91,8 @@ def add_car(context, ld):
         ld.add_action(node)
 
 
-        # State buffer
-        joySafety_node = Node(
+        # Joy Safety Node
+        joy1Safety_node = Node(
             package='bumper_cars',
             executable='joy_safety',
             name='joy'+car_str+'_safety_node',
@@ -103,21 +103,46 @@ def add_car(context, ld):
             output='both'
         )
 
-        # State buffer
-        joy = Node(
+        # Joy Node
+        joy1 = Node(
             package='joy',
             executable='joy_node',
             name='joy'+car_str+'_node',
             parameters=[
                     {'device_id': car_num},
             ],
-            remappings=[('/joy', '/joy'+car_str) ],
+            remappings=[('/joy', '/joy'+str(car_i)) ],
             emulate_tty=True,
             output='both'
         )
 
-        ld.add_action(joySafety_node)
-        ld.add_action(joy)
+        joy_remap = Node(
+            package='bumper_cars',
+            executable='wheel_remap',
+            name='joy'+car_str+'_remap',
+            parameters=[
+                    {'car_i': car_i}       
+            ],
+            remappings=[('/joy', '/joy'+str(car_i)),
+                        ('/joy_remap', '/joy'+car_str) ],
+            emulate_tty=True,
+            output='both'
+        )
+
+        ld.add_action(joy1Safety_node)
+        ld.add_action(joy1)
+        ld.add_action(joy_remap)
+    
+    g29_ff = Node(
+        package="ros_g29_force_feedback",
+        executable="g29_force_feedback",
+        name="g29_force_feedback",
+        output="screen",
+        parameters=[
+            {'device_name': "/dev/input/event12"}
+        ],
+    )
+    ld.add_action(g29_ff)
 
 
 

@@ -28,8 +28,8 @@ controller_map = {
 }
 
 from lar_msgs.msg import CarControlStamped
-from bumper_msgs.srv import EnvState, CarCommand, JoySafety, TrackState
-
+from bumper_msgs.srv import EnvState, CarCommand, JoySafety, TrackState, WheelPosition, MainControl
+from ros_g29_force_feedback.msg import ForceFeedback
 
 class CollisionAvoidance(Node):
     """
@@ -108,7 +108,10 @@ class CollisionAvoidance(Node):
         self.cmd_cli = self.create_client(CarCommand, 'car_cmd')
         self.joy_cli = self.create_client(JoySafety, 'joy_safety')
         self.track_cli = self.create_client(TrackState, 'track_pose')
-        while not self.state_cli.wait_for_service(timeout_sec=1.0) or not self.cmd_cli.wait_for_service(timeout_sec=1.0):
+        self.wheel_cli = self.create_client(WheelPosition, 'wheel_buffer')
+        self.main_control_cli = self.create_client(MainControl, 'main_control')
+
+        while not self.state_cli.wait_for_service(timeout_sec=1.0) or not self.cmd_cli.wait_for_service(timeout_sec=1.0) or not self.wheel_cli.wait_for_service(timeout_sec=1.0) or not self.main_control_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
         
         # Initialize service messages
@@ -117,11 +120,16 @@ class CollisionAvoidance(Node):
         self.cmd_req.car = self.car_i
         self.joy_req = JoySafety.Request()
         self.track_req = TrackState.Request()
+        self.wheel_pos_req = WheelPosition.Request()
+        self.main_control_req = MainControl.Request()
 
         if self.source == 'sim':
             self.publisher_ = self.create_publisher(CarControlStamped, '/sim/car'+self.car_str+'/set/control', 10)
         else:
             self.publisher_ = self.create_publisher(CarControlStamped, '/car'+self.car_str+'/set/control', 10)
+        
+        if self.car_i == 0:
+            self.force_pub = self.create_publisher(ForceFeedback, '/ff_target', 10)
 
         # Update timer
         self.timer = self.create_timer(self.dt, self.timer_callback)
@@ -174,6 +182,19 @@ class CollisionAvoidance(Node):
         if self.alg == "cbf" or self.alg == "c3bf":
             self.car_radius_publish(self.algorithm.safety_radius)
 
+    def main_control_request(self):
+        self.main_control_future = self.main_control_cli.call_async(self.main_control_req)
+        rclpy.spin_until_future_complete(self, self.main_control_future)
+        if not self.main_control_future.done():
+            print("Timeout")
+        return self.main_control_future.result().main_control
+
+    def wheel_pos_request(self):
+        self.wheel_pos_future = self.wheel_cli.call_async(self.wheel_pos_req)
+        rclpy.spin_until_future_complete(self, self.wheel_pos_future)
+        if not self.wheel_pos_future.done():
+            print("Timeout")
+        return self.wheel_pos_future.result().wheel_position
 
     def state_request(self) -> EnvState.Response:
         """
@@ -234,6 +255,7 @@ class CollisionAvoidance(Node):
             None
         """
         ca_active = True
+        main_control = False
         
         while rclpy.ok():
             # Update the current state of the car (and do rcply spin to update timer)
@@ -255,6 +277,7 @@ class CollisionAvoidance(Node):
             # Check if CA is activated
             if self.car_i == 0: # Only move car 0
                 ca_active = self.joy_request()
+                main_control = self.main_control_request()
 
             if ca_active:
                 # Set desired action as a goal for the CA algorithm
@@ -274,11 +297,24 @@ class CollisionAvoidance(Node):
                     self.publish_trajectory(self.algorithm.trajectory)
                 elif self.alg == "cbf" or self.alg == "c3bf":
                     self.barrier_publisher(self.algorithm.closest_point)
+            
+            if self.car_i == 0 and (main_control or ca_active):
+                self.publish_ff(cmd_out.steering, 0.2)
+            elif self.car_i == 0 and (main_control==False or ca_active==False):
+                self.publish_ff(0.0, 0.0)
 
 
             # Wait for next period
             self.update_time = False
 
+    def publish_ff(self, steering, torque):
+        msg = ForceFeedback()
+        msg.header.stamp.sec = 0
+        msg.header.stamp.nanosec = 0
+        msg.header.frame_id = ''
+        msg.position = -steering
+        msg.torque = torque
+        self.force_pub.publish(msg)
 
     def publish_map(self, boundary_points: List[float]) -> None:
         """

@@ -31,6 +31,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/CarCommand.srv"
   "srv/JoySafety.srv"
   "srv/TrackState.srv"
+  "srv/WheelPosition.srv"
+  "srv/MainControl.srv"
   DEPENDENCIES std_msgs lar_msgs geometry_msgs
 )
 

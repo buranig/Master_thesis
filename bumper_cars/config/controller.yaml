@@ -14,15 +14,13 @@ DWA:                              ### Dynamic Window Approach
   to_goal_cost_gain: 1            # [-] Gain for the cost to the goal
   obstacle_cost_gain: 2           # [-] Gain for the cost to the obstacle
   dilation_factor: 2.0            # [-] Number of car's width to consider for collision
-# LBP:                            
-#   a_resolution: 0.05
-#   v_resolution: 0.05
-#   delta_resolution: 5
-#   to_goal_cost_gain: 20
-#   speed_cost_gain: 1
-#   obstacle_cost_gain: 30
-#   heading_cost_gain: 1
-#   dilation_factor: 0.35
+LBP:                            
+  a_resolution: 0.05
+  v_resolution: 0.05
+  delta_samples: 20
+  to_goal_cost_gain: 1            # [-] Gain for the cost to the goal
+  obstacle_cost_gain: 2           # [-] Gain for the cost to the obstacle
+  dilation_factor: 2.0            # [-] Number of car's width to consider for collision
 # MPC:
 #   max_steer: 0.785398
 #   max_speed: 2

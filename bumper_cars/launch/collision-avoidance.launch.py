@@ -133,16 +133,16 @@ def add_car(context, ld):
         ld.add_action(joy1)
         ld.add_action(joy_remap)
     
-    g29_ff = Node(
-        package="ros_g29_force_feedback",
-        executable="g29_force_feedback",
-        name="g29_force_feedback",
-        output="screen",
-        parameters=[
-            {'device_name': "/dev/input/event12"}
-        ],
-    )
-    ld.add_action(g29_ff)
+    # g29_ff = Node(
+    #     package="ros_g29_force_feedback",
+    #     executable="g29_force_feedback",
+    #     name="g29_force_feedback",
+    #     output="screen",
+    #     parameters=[
+    #         {'device_name': "/dev/input/event12"}
+    #     ],
+    # )
+    # ld.add_action(g29_ff)
 
 
 

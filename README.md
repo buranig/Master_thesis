@@ -81,8 +81,7 @@ where you can change the number of cars to listen to.
 
 Terminal 3:
 ```
-ros2 launch lar_utils visualize.launch.py source:=real
-carNumber:=2
+ros2 launch lar_utils visualize.launch.py source:=real carNumber:=2
 ```
 where you can verify that the car(s) and track are found correctly by the mocap setup.
 

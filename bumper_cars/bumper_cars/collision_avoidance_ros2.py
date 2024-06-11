@@ -29,7 +29,7 @@ controller_map = {
 
 from lar_msgs.msg import CarControlStamped
 from bumper_msgs.srv import EnvState, CarCommand, JoySafety, TrackState, WheelPosition, MainControl
-# from ros_g29_force_feedback.msg import ForceFeedback
+from ros_g29_force_feedback.msg import ForceFeedback
 
 class CollisionAvoidance(Node):
     """
@@ -128,8 +128,8 @@ class CollisionAvoidance(Node):
         else:
             self.publisher_ = self.create_publisher(CarControlStamped, '/car'+self.car_str+'/set/control', 10)
         
-        # if self.car_i == 0:
-        #     self.force_pub = self.create_publisher(ForceFeedback, '/ff_target', 10)
+        if self.car_i == 0:
+            self.force_pub = self.create_publisher(ForceFeedback, '/ff_target', 10)
 
         # Update timer
         self.timer = self.create_timer(self.dt, self.timer_callback)
@@ -298,10 +298,10 @@ class CollisionAvoidance(Node):
                 elif self.alg == "cbf" or self.alg == "c3bf":
                     self.barrier_publisher(self.algorithm.closest_point)
             
-            # if self.car_i == 0 and (main_control or ca_active):
-            #     self.publish_ff(cmd_out.steering, 0.2)
-            # elif self.car_i == 0 and (main_control==False or ca_active==False):
-            #     self.publish_ff(0.0, 0.0)
+            if self.car_i == 0 and (main_control or ca_active):
+                self.publish_ff(cmd_out.steering, 0.2)
+            elif self.car_i == 0 and (main_control==False or ca_active==False):
+                self.publish_ff(0.0, 0.0)
 
 
             # Wait for next period

@@ -180,8 +180,8 @@ class CarModel:
         vx = old_v * math.cos(beta)
         vy = old_v * math.sin(beta)
 
-        Ffy = -self.Cf * ((vy + self.Lf * old_omega) / (vx + 0.0001) - mapped_steering)
-        Fry = -self.Cr * (vy - self.Lr * old_omega) / (vx + 0.0001)
+        Ffy = -self.Cf * (math.atan2((vy + self.Lf * old_omega) / (vx + 0.0001)) - mapped_steering)
+        Fry = -self.Cr * math.atan2((vy - self.Lr * old_omega) / (vx + 0.0001))
         R_x = self.c_r1 * abs(vx)
         F_aero = self.c_a * vx ** 2 # 
         F_load = F_aero + R_x #

@@ -293,7 +293,7 @@ class CollisionAvoidance(Node):
 
             # Draw debug info in Rviz
             if self.debug_rviz:
-                if self.alg == "dwa" or self.alg == "lbp":
+                if self.alg == "dwa" or self.alg == "lbp" or self.alg == "mpc":
                     self.publish_trajectory(self.algorithm.trajectory)
                 elif self.alg == "cbf" or self.alg == "c3bf":
                     self.barrier_publisher(self.algorithm.closest_point)
@@ -452,7 +452,8 @@ class CollisionAvoidance(Node):
         """
         marker = Marker()
         marker.header = Header()
-        marker.header.frame_id = "body" + self.car_str
+        frame = "world" if self.alg == "mpc" else "body" + self.car_str
+        marker.header.frame_id = frame
         marker.header.stamp = self.get_clock().now().to_msg()
         marker.ns = "predicted_trajectory"
         marker.id = 100

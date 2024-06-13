@@ -76,7 +76,7 @@ def add_car(context, ld):
             parameters=[
                     {'track_yaml': track_yaml},
                     {'static_throttle': LaunchConfiguration('static_throttle')},
-                    {'control_mode': 'pursuit'},    
+                    {'control_mode': LaunchConfiguration('control_mode')},    
                     {'state_source': LaunchConfiguration('source')},
                     {'control_target': LaunchConfiguration('source')},
                     {'arm_mpc': False},
@@ -190,6 +190,12 @@ def generate_launch_description():
         default_value='True'
     )
 
+    control_mode = DeclareLaunchArgument(
+        'control_mode',
+        description='Main control algorithm',
+        default_value='pursuit'
+    )
+
     
 
     ld.add_action(carNumber_arg)
@@ -199,6 +205,7 @@ def generate_launch_description():
     ld.add_action(car_alg)
     ld.add_action(gen_traj)
     ld.add_action(debug_rviz)
+    ld.add_action(control_mode)
     ld.add_action(OpaqueFunction(function=add_car, args=[ld]))
 
     return ld

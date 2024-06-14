@@ -1,11 +1,15 @@
 
 ###############  State constraints  #############################################
 max_steer: 0.19199          # [rad] Maximal and (- minimal) steering angle 
-max_speed: 0.5              # [m/s] Maximal expected speed for trajectory generation        
-min_speed: -0.5             # [m/s] Minimal expected speed for trajectory generation
 max_acc: 0.45               # [m/ss] Max acceleration
 min_acc: -0.45              # [m/ss] Min acceleration
 acc_gain: 1.0               # [-] Gain for acceleration control
+
+###############  Trajectory generation  #############################################
+min_speed: -2.0             # [m/s] Minimal expected speed for trajectory generation
+max_speed: 2.0              # [m/s] Maximal expected speed for trajectory generation        
+min_omega: -6.0             # [rad/s] Minimal expected angular velocity for trajectory generation
+max_omega: 6.0              # [rad/s] Maximal expected angular velocity for trajectory generation
 
 ###############  Mechanical properties  #############################################
 width: 0.05                 # [m] Width of the track of the vehicle

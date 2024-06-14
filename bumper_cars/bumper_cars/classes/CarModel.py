@@ -61,6 +61,8 @@ class CarModel:
         self.max_steer = yaml_object["max_steer"] # [rad] max steering angle
         self.max_speed = yaml_object["max_speed"] # [m/s]
         self.min_speed = yaml_object["min_speed"] # [m/s]
+        self.max_omega = yaml_object["max_omega"] # [m/s]
+        self.min_omega = yaml_object["min_omega"] # [m/s]
         self.max_acc = yaml_object["max_acc"] # [m/ss]
         self.min_acc = yaml_object["min_acc"] # [m/ss]
         self.acc_gain = yaml_object["acc_gain"] # [0.0 - 1.0]

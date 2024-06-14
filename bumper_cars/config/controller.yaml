@@ -23,9 +23,9 @@ LBP:
   dilation_factor: 2.0            # [-] Number of car's width to consider for collision
 MPC:
   horizon: 8
-  safety_radius: 2
+  safety_radius: 0.2
 Controller:                       ### Controller parameters        
-  dt: 0.02                        # [s] Controller time step (both for control and traj_generation)
+  dt: 0.05                        # [s] Controller time step (both for control and traj_generation)
   ph: 0.5                         # [s] Prediction horizon
 Simulation:                       ### Simulation parameters
   width: 4.5                      # [m] Width of the driving area    

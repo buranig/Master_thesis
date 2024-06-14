@@ -18,13 +18,15 @@ from cbf_dev.CBF import CBF_algorithm as CBF
 from cbf_dev.C3BF import C3BF_algorithm as C3BF
 from lbp_dev.LBP import LBP_algorithm as LBP
 from mpc_dev.MPC import MPC_algorithm as MPC
+from mpc_dev.MPC_GPU import MPC_GPU_algorithm as MPC_GPU
 
 controller_map = {
     "dwa": DWA,
     "c3bf": C3BF,
     "cbf": CBF,
     "lbp": LBP,
-    "mpc": MPC
+    "mpc": MPC,
+    "mpc_gpu": MPC_GPU
 }
 
 from lar_msgs.msg import CarControlStamped
@@ -297,6 +299,8 @@ class CollisionAvoidance(Node):
                     self.publish_trajectory(self.algorithm.trajectory)
                 elif self.alg == "cbf" or self.alg == "c3bf":
                     self.barrier_publisher(self.algorithm.closest_point)
+                elif self.alg=="mpc_gpu":
+                    self.publish_trajectories(self.algorithm.trajectory, self.algorithm.best_i)
             
             if self.car_i == 0 and (main_control or ca_active):
                 self.publish_ff(cmd_out.steering, 0.2)
@@ -414,7 +418,7 @@ class CollisionAvoidance(Node):
         marker.header.stamp = self.get_clock().now().to_msg()
 
         marker.ns = "barrier"
-        marker.id = 101 + self.car_i
+        marker.id = 51 + self.car_i
         marker.type = Marker.SPHERE
         marker.action = Marker.ADD
 
@@ -475,6 +479,51 @@ class CollisionAvoidance(Node):
         color.a = 1.0
         marker.color = color
         self.debug_publisher.publish(marker)
+
+    def publish_trajectories(self, trajectory: List[List[List[float]]], best: int) -> None:
+        """
+        Publishes all trajectoreis as a line strip marker.
+
+        Args:
+            trajectory (List[List[float]]): The trajectory to be published. Each element in the list represents a point in the trajectory, specified as [x, y].
+            best (int): The index of the best trajectory.
+
+        Returns:
+            None
+        """
+
+        for i in range(len(trajectory)):
+            marker = Marker()
+            marker.header = Header()
+            frame = "world"
+            marker.header.frame_id = frame
+            marker.header.stamp = self.get_clock().now().to_msg()
+            marker.ns = "predicted_trajectory"
+            marker.type = Marker.LINE_STRIP
+            marker.action = Marker.ADD
+        
+            marker.id = 100 + i
+            # Define the points for the line strip
+            points = []
+            
+            for point in trajectory[i, :, :]:
+                p = Point(x=point[0].item(), y=point[1].item(), z=0.0)
+                points.append(p)
+            marker.points = points
+            # Define the color and scale of the line strip
+            marker.scale.x = 0.005  # Line width
+            color = ColorRGBA()
+            color.r = 1.0
+            color.g = 0.0
+            color.b = 0.0
+            color.a = 1.0
+            if i == best:
+                marker.scale.x = 0.01  # Line width
+                color.r = 0.0
+                color.g = 1.0
+                color.b = 0.0
+            marker.color = color
+            self.debug_publisher.publish(marker)
 
 
 def main(args=None):

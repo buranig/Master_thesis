@@ -1,4 +1,4 @@
 **/__pycache__/**
 dwa_dev/config/trajectories.json
 lbp_dev/config/LBP.json
-mpc_dev/models/*
+mpc_dev/models/*.pt

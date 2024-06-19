@@ -61,8 +61,8 @@ class CarModel:
         self.max_steer = yaml_object["max_steer"] # [rad] max steering angle
         self.max_speed = yaml_object["max_speed"] # [m/s]
         self.min_speed = yaml_object["min_speed"] # [m/s]
-        self.max_omega = yaml_object["max_omega"] # [m/s]
-        self.min_omega = yaml_object["min_omega"] # [m/s]
+        self.min_omega = yaml_object["min_omega"] # [rad/s]
+        self.max_omega = yaml_object["max_omega"] # [rad/s]
         self.max_acc = yaml_object["max_acc"] # [m/ss]
         self.min_acc = yaml_object["min_acc"] # [m/ss]
         self.acc_gain = yaml_object["acc_gain"] # [0.0 - 1.0]
@@ -75,6 +75,26 @@ class CarModel:
         self.Cr = yaml_object["Cr"]     # N/rad
         self.Iz = yaml_object["Iz"]     # kg/m2
         self.m = yaml_object["m"]       # kg
+
+
+        self.tireModel = yaml_object["tireModel"]
+        self.Bf = yaml_object["Bf"]     
+        self.Cf = yaml_object["Cf"]     
+        self.Df = yaml_object["Df"]     
+        
+        self.Br = yaml_object["Br"]     
+        self.Cr = yaml_object["Cr"]     
+        self.Dr = yaml_object["Dr"]      
+        
+
+        # # # Bf= 8.1777
+        # # # Cf= 1
+        # # # Df= 0.9333
+
+        # # # Br= 8.2414
+        # # # Cr= 1
+        # # # Dr= 0.8416
+
 
         # Aerodynamic and friction coefficients
         self.c_a = yaml_object["c_a"]
@@ -174,21 +194,48 @@ class CarModel:
         old_yaw = self.state.yaw if curr_state is None else curr_state.yaw
         old_omega = self.state.omega if curr_state is None else curr_state.omega
 
+
         # Ensure feasible inputs
         mapped_steering = np.interp(cmd.steering, [-1, 1], [-self.max_steer, self.max_steer])
         mapped_throttle = np.interp(cmd.throttle, [-1, 1], [self.min_acc, self.max_acc]) * self.acc_gain
 
-        beta = math.atan2((self.Lr * math.tan(mapped_steering) / self.L), 1.0)
+        beta = math.atan2((self.Lr * math.tan(mapped_steering)) , self.L)   
+        inverted = False # TODO: Temporary fix for thesis because backward motion is different
+        if old_v < 0:
+            inverted = True
+            old_v = -old_v
+            beta += math.pi
+
+        
         vx = old_v * math.cos(beta)
         vy = old_v * math.sin(beta)
 
-        Ffy = -self.Cf * (math.atan2((vy + self.Lf * old_omega) / (vx + 0.0001)) - mapped_steering)
-        Fry = -self.Cr * math.atan2((vy - self.Lr * old_omega) / (vx + 0.0001))
+        slip_angle_f = -math.atan((vy + self.Lf * old_omega)/ (vx + 0.001)) + mapped_steering
+        slip_angle_r = -math.atan((vy - self.Lr * old_omega)/ (vx + 0.001))
+
+
+        if self.tireModel == 'linear':
+            self.Cf = self.Df   # WARN!! This is used to keep pacejka formulation correct and not duplicate vars
+            self.Cr = self.Dr   # WARN!! This is used to keep pacejka formulation correct and not duplicate vars
+            Ffy = -self.Cf * (math.atan((vy + self.Lf * old_omega) / (vx + 0.001)) - mapped_steering)
+            Fry = -self.Cr * math.atan((vy - self.Lr * old_omega) / (vx + 0.001))
+        elif self.tireModel == 'pacejka':
+            Ffy = self.Df * math.sin(self.Cf * math.atan2(self.Bf * slip_angle_f, 1.0))
+            Fry = self.Dr * math.sin(self.Cr * math.atan2(self.Br * slip_angle_r, 1.0))
+        else:
+            raise Exception("Wrong value for 'tireModel'")
+        
         R_x = self.c_r1 * abs(vx)
         F_aero = self.c_a * vx ** 2 # 
         F_load = F_aero + R_x #
-        vx = vx + (mapped_throttle - Ffy * math.sin(mapped_steering) / self.m - F_load / self.m + vy * old_omega) * dt
-        vy = vy + (Fry / self.m + Ffy * math.cos(mapped_steering) / self.m - vx * old_omega) * dt
+
+
+        F_load = 0.0 #TODO: Temporary fix for thesis drawings
+
+        new_vx = vx + (mapped_throttle - Ffy * math.sin(mapped_steering) / self.m - F_load / self.m + vy * old_omega) * dt
+        new_vy = vy + (Fry / self.m + Ffy * math.cos(mapped_steering) / self.m - vx * old_omega) * dt
+        
+
 
         # State update
         state = State()
@@ -200,7 +247,13 @@ class CarModel:
         state.x = old_x + vx * math.cos(old_yaw) * dt - vy * math.sin(old_yaw) * dt
         state.y = old_y + vx * math.sin(old_yaw) * dt + vy * math.cos(old_yaw) * dt
 
-        state.v = math.sqrt(vx ** 2 + vy ** 2)
+        state.v = math.sqrt(new_vx ** 2 + new_vy ** 2)
         state.v = np.clip(state.v, self.min_speed, self.max_speed)
 
+        if inverted:
+            state.v = -state.v
+            # state.yaw = normalize_angle(state.yaw + math.pi)
+            # state.omega = -state.omega
+
         return state
+    

@@ -8,17 +8,29 @@ acc_gain: 1.0               # [-] Gain for acceleration control
 ###############  Trajectory generation  #############################################
 min_speed: -2.0             # [m/s] Minimal expected speed for trajectory generation
 max_speed: 2.0              # [m/s] Maximal expected speed for trajectory generation        
-min_omega: -6.0             # [rad/s] Minimal expected angular velocity for trajectory generation
-max_omega: 6.0              # [rad/s] Maximal expected angular velocity for trajectory generation
+min_omega: -2.0             # [rad/s] Minimal expected angular velocity for trajectory generation
+max_omega: 2.0              # [rad/s] Maximal expected angular velocity for trajectory generation
 
 ###############  Mechanical properties  #############################################
 width: 0.05                 # [m] Width of the track of the vehicle
 L: 0.098                    # [m] Wheel base = distance between front and rear axle
 Lr: 0.051                   # [m] Distance from rear axle to center of mass
-Cf: 800.0                   # [-] Front tire stiffness coefficient
-Cr: 800.0                   # [-] Rear tire stiffness coefficient
 Iz: 0.00019863              # [kg*m*m] Vehicle moment of inertia
 m: 0.144                    # [kg] Vehicle mass
+
+
+###############  Tire properties  #############################################
+tireModel: 'linear'        # ['pacejka'/'linear'] Type of tire model
+
+##WARNING: In case of linear model, what is Cf in the thesis takes the value of Df
+
+Bf: 8.1777                  # [N/rad] Stiffness of the front tire, determines slope at origin
+Cf: 10                     # [N/rad] Shape factor of the front tire, determines curvature
+Df: 0.9333                  # [N/(rad*m)] Peak value of the front tire, determines curvature
+
+Br: 8.2414
+Cr: 10
+Dr: 0.8416
 
 
 ################  Friction coefficients  ############################################

@@ -61,7 +61,6 @@ class DWA_algorithm(Controller):
         self.to_goal_cost_gain = yaml_object["DWA"]["to_goal_cost_gain"]
         self.obstacle_cost_gain = yaml_object["DWA"]["obstacle_cost_gain"]
         self.dilation_factor = yaml_object["DWA"]["dilation_factor"]
-        self.emergency_brake_distance = yaml_object["DWA"]["emergency_brake_distance"]
 
         # Empty obstacle set
         self.ob = None

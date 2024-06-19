@@ -16,11 +16,11 @@ def plot_all_trajectories(json_file_path):
         for traj_key, traj_data in trajectories.items():
             x = traj_data['x']
             y = traj_data['y']
-            plt.plot(x, y)
+            plt.plot(x, y, 'b')
 
     # Add labels and legend
-    plt.xlabel('X position')
-    plt.ylabel('Y position')
+    plt.xlabel('X position [m]')
+    plt.ylabel('Y position [m]')
     plt.title('Accumulated Trajectories')
     # plt.legend(loc='upper right')
     plt.grid(True)

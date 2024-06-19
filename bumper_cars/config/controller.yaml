@@ -9,21 +9,30 @@ C3BF:                             ### Collision Cone Control Barrier Functions
 DWA:                              ### Dynamic Window Approach             
   a_resolution: 0.05              # [m/s^2] Resolution for the sampled acceleration
   v_resolution: 0.05              # [m/s] Resolution for the sampled velocity
-  delta_samples: 20               # [-] Number of samples for the steering angle
+  delta_samples: 20               # [-] 0.5*Number of samples for the steering angle (later mirrored)
   emergency_brake_distance: 5     # [-] Number of old trajectory left to trigger emergency brake
   to_goal_cost_gain: 1            # [-] Gain for the cost to the goal
   obstacle_cost_gain: 2           # [-] Gain for the cost to the obstacle
   dilation_factor: 2.0            # [-] Number of car's width to consider for collision
-LBP:                            
-  a_resolution: 0.05
-  v_resolution: 0.05
-  delta_samples: 20
+LBP:                              ### Lattice Based Planning
+  a_resolution: 0.05              # [m/s^2] Resolution for the sampled acceleration
+  v_resolution: 0.05              # [m/s] Resolution for the sampled velocity 
+  delta_samples: 20               # [-] 0.5*Number of samples for the steering angle (later mirrored)
   to_goal_cost_gain: 1            # [-] Gain for the cost to the goal
   obstacle_cost_gain: 2           # [-] Gain for the cost to the obstacle
   dilation_factor: 2.0            # [-] Number of car's width to consider for collision
-MPC:
-  horizon: 8
-  safety_radius: 0.2
+MPC:                              ### Model Predictive Control        
+  safety_radius: 0.2              # [m] Safety radius for the collision avoidance
+MPPI:                             ### Model Predictive Path Integral control
+  num_samples: 50                 # [-] Number of trajectories to be sampled for control
+  safety_radius: 0.2              # [m] Safety radius for the collision avoidance
+  std_a: 0.2                      # [m/s^2] Standard deviation of the acceleration randomness
+  std_delta: 0.2                  # [rad] Standard deviation of the steering angle randomness
+  sample_size: 100000             # [-] Number of samples for training the NN
+  epochs: 1000                   # [-] Number of epochs for training the NN
+  batch_size: 100                 # [-] Batch size for training the NN
+  learning_rate: 0.0001           # [-] Learning rate for training the NN
+
 Controller:                       ### Controller parameters        
   dt: 0.05                        # [s] Controller time step (both for control and traj_generation)
   ph: 0.5                         # [s] Prediction horizon

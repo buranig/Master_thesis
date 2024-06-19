@@ -127,10 +127,16 @@ class LBP_algorithm(Controller):
                 i +=1
             
             
-            target = [[0.1, 0.1, np.deg2rad(90.0)],
-                      [0.1, -0.1, np.deg2rad(-90.0)],
-                      [0.2, 0.1, np.deg2rad(90.0)],
-                      [0.2, -0.1, np.deg2rad(-90.0)]]
+            target = [[0.1, 0.5, np.deg2rad(90.0)],
+                      [0.1, -0.5, np.deg2rad(-90.0)],
+                      [0.3, 0.5, np.deg2rad(90.0)],
+                      [0.3, -0.5, np.deg2rad(-90.0)],
+                      [0.5, 0.5, np.deg2rad(90.0)],
+                      [0.5, -0.5, np.deg2rad(-90.0)],
+                      [0.7, 0.5, np.deg2rad(90.0)],
+                      [0.7, -0.5, np.deg2rad(-90.0)],
+                      [0.9, 0.5, np.deg2rad(90.0)],
+                      [0.9, -0.5, np.deg2rad(-90.0)]]
             result = self.__generate_path(target, k0, v)
             i = 0
             for table in result:

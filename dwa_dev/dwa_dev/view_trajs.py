@@ -84,7 +84,12 @@ def main():
                 geom = LineString(zip(geom[:, 0], geom[:, 1]))
                 newgeom = LineString(zip(newgeom[:, 0], newgeom[:, 1]))
                 plot_line(geom, ax=ax, add_points=False, linewidth=3)
-    plt.axis('equal')
+
+    # Add labels and legend
+    plt.xlabel('X position [m]')
+    plt.ylabel('Y position [m]')
+
+    # plt.axis('equal')
     plt.show()
 
 if __name__ == '__main__':

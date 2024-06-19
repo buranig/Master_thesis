@@ -68,22 +68,27 @@ class MPC_GPU_algorithm(Controller):
             # Reading from yaml file
             yaml_object = yaml.safe_load(openfile)
 
-        self.safety_radius = yaml_object["MPC"]["safety_radius"]
+        self.safety_radius = yaml_object["MPPI"]["safety_radius"]
 
         self.input_size = 5  # Number of input features
         self.hidden_size = 128  # Number of hidden units
         self.output_size = 4  # Number of output features
 
+        self.learning_rate = yaml_object["MPPI"]["learning_rate"]
+        self.epochs = yaml_object["MPPI"]["epochs"]
+        self.batch_size = yaml_object["MPPI"]["batch_size"]
+        self.sample_size = yaml_object["MPPI"]["sample_size"]
+        
+
         self.nn_path = os.path.dirname(os.path.realpath(__file__)) + "/../models/statePred.pt"
 
+        self.best_i = 0
         self.prev_a = 0.0
         self.prev_delta = 0.0
-        self.std_a = 0.2
-        self.std_delta = 0.2
-        self.sampleNum = 50
-        # self.pred_hor = int(self.ph/self.dt)
-        self.pred_hor = 50
-        self.best_i = 0
+        self.std_a = yaml_object["MPPI"]["std_a"]
+        self.std_delta = yaml_object["MPPI"]["std_delta"]
+        self.sampleNum = yaml_object["MPPI"]["num_samples"]
+        self.pred_hor = int(self.ph/self.dt)
 
         try:
             self.__load_model()
@@ -112,8 +117,10 @@ class MPC_GPU_algorithm(Controller):
         self.curr_state = np.transpose(utils.carStateStamped_to_array(car_list))
 
         # Compute control
+        pre = time.time()
         u, traj = self.__MPC_GPU(self.car_i, self.curr_state)
-
+        print("Time: ", time.time()-pre)
+        
         # Project it to range [-1, 1]
         car_cmd.throttle = np.interp(u[0].cpu(), [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
         car_cmd.steering = np.interp(u[1].cpu(), [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
@@ -143,10 +150,8 @@ class MPC_GPU_algorithm(Controller):
 
         self.goal_tensor = torch.tensor([self.goal.throttle, self.goal.steering], dtype=torch.float32, device=self.device)
 
-        # # # next_state = self.__simulate_input(self.goal_input)
-        # # # self.goal = next_state
-        self.prev_a = goal.throttle
-        self.prev_delta = goal.steering
+        # self.prev_a = goal.throttle
+        # self.prev_delta = goal.steering
 
     def offset_track(self, off:List[int]) -> None:
         """
@@ -372,24 +377,24 @@ class MPC_GPU_algorithm(Controller):
             cost_dist = self.__eval_distances(states)
 
             cost = cost_input + cost_dist + cost_others
-
+            
             min_cost, min_index = torch.min(cost, 0)
             self.best_i = min_index
             control = input[min_index,:2]        
-            # self.prev_a = control[0].item()
-            # self.prev_delta = control[1].item()
+            self.prev_a = control[0].item()
+            self.prev_delta = control[1].item()
 
             if min_cost.item() == np.inf:
                 print("Emergency stop!")
                 control[0] =  (0.0 - x[3,car_i])/self.dt
                 self.prev_a = 0.0
                 
-            return control.detach().clone(), states.detach().clone()
+            return control.detach().clone(), states[min_index].detach().clone()
             
 
     def __gen_model(self):
 
-        N = 100000  # Sample size
+        N = self.sample_size  # Sample size
 
         gen_u = torch.FloatTensor(N, 1).uniform_(self.car_model.min_acc, self.car_model.max_acc).to(self.device)
         gen_delta = torch.FloatTensor(N, 1).uniform_(-self.car_model.max_steer, self.car_model.max_steer).to(self.device)
@@ -422,8 +427,8 @@ class MPC_GPU_algorithm(Controller):
         model = SimpleNN(self.input_size, self.hidden_size, self.output_size).to(self.device)
 
         # training parameters
-        n_epochs = 1000   # number of epochs to run
-        batch_size = 100  # size of each batch
+        n_epochs = self.epochs   # number of epochs to run
+        batch_size = self.batch_size  # size of each batch
         batch_start = torch.arange(0, len(X_train), batch_size)
 
         # Hold the best model
@@ -433,7 +438,7 @@ class MPC_GPU_algorithm(Controller):
         
         # loss function and optimizer
         loss_fn = nn.MSELoss()  # mean square error
-        optimizer = optim.Adam(model.parameters(), lr=0.0001)
+        optimizer = optim.Adam(model.parameters(), lr=self.learning_rate)
 
         # training loop
         for epoch in range(n_epochs):
@@ -475,12 +480,11 @@ class MPC_GPU_algorithm(Controller):
 
     def __test_model(self):
 
+        N = self.sample_size
+
         self.model = SimpleNN(self.input_size, self.hidden_size, self.output_size).to(self.device)
         self.model.load_state_dict(torch.load(self.nn_path))
         self.model.eval()
-
-
-        N = 100000
 
         gen_u = torch.FloatTensor(N, 1).uniform_(self.car_model.min_acc, self.car_model.max_acc).to(self.device)
         gen_delta = torch.FloatTensor(N, 1).uniform_(-self.car_model.max_steer, self.car_model.max_steer).to(self.device)

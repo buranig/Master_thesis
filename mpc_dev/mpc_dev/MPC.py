@@ -53,7 +53,6 @@ class MPC_algorithm(Controller):
             yaml_object = yaml.safe_load(openfile)
 
         self.safety_radius = yaml_object["MPC"]["safety_radius"]
-        self.safety_radius = yaml_object["MPC"]["safety_radius"]
 
         # Instantiate border variables
         self.__compute_track_constants()
@@ -84,7 +83,10 @@ class MPC_algorithm(Controller):
         self.curr_state = np.transpose(utils.carStateStamped_to_array(car_list))
 
         # Compute control
+        pre = time.time()
         u = self.__MPC(self.car_i, self.curr_state)
+        post = time.time()
+        print(f"Total iteration time: {post - pre:.4f}s")
 
         # Project it to range [-1, 1]
         car_cmd.throttle = np.interp(u[0][0], [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
@@ -179,10 +181,10 @@ class MPC_algorithm(Controller):
         self.c4 = y4 * (x1 - x4) - x4 * (y1 - y4)
 
         # Precompute denominators for distance calculation
-        self.denom1 = np.sqrt(self.a1**2 + self.b1**2)
+        self.denom1 = -np.sqrt(self.a1**2 + self.b1**2)
         self.denom2 = np.sqrt(self.a2**2 + self.b2**2)
         self.denom3 = np.sqrt(self.a3**2 + self.b3**2)
-        self.denom4 = np.sqrt(self.a4**2 + self.b4**2)
+        self.denom4 = -np.sqrt(self.a4**2 + self.b4**2)
 
 
     def __compute_closest_point(self, i, x) -> None:
@@ -222,6 +224,7 @@ class MPC_algorithm(Controller):
                 self.dist_2,
                 self.dist_3,
                 self.dist_4])
+        print(x0[4:])
         
         self.mpc.x0 = x0
 
@@ -329,7 +332,8 @@ class MPC_algorithm(Controller):
             # Use MA27 linear solver in ipopt for faster calculations:
             'nlpsol_opts': {
                 # 'ipopt.print_level': 0,  # Suppress solver output
-                # 'ipopt.linear_solver': 'MA27'
+                'ipopt.hsllib': '/home/jaume/dev_tools/ThirdParty-HSL/.libs/libcoinhsl.so',
+                'ipopt.linear_solver': 'MA27'
             }
         }
 

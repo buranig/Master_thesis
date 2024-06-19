@@ -153,7 +153,7 @@ class DWA_algorithm(Controller):
             cmd = CarControlStamped()
             # Iterate for each expected acceleration
             for a in np.arange(dw[0], dw[1]+self.a_resolution, self.a_resolution):
-                cmd.throttle = np.interp(a, [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
+                cmd.throttle = np.interp(a, [self.car_model.min_acc, self.car_model.max_acc], [-1, 1])
                 # Iterate for each sampled steering angle
                 for delta in delta_list:
                     # Calc traj for angle
@@ -181,8 +181,7 @@ class DWA_algorithm(Controller):
 
 
     ################## PRIVATE METHODS
-
-
+    
     def __update_others(self) -> None:
         """
         Update the states of other cars and the borders.
@@ -435,30 +434,12 @@ class DWA_algorithm(Controller):
 
         best_trajectory = self.trajs[str(nearest)][str(best_u[0])][str(best_u[1])]
 
-        # # Check if previous trajectory was better
-        # if len(self.u_hist) > self.emergency_brake_distance:  
-        #     _, self.u_hist = self.u_hist[0], self.u_hist[1:]
-
-        #     trajectory_buf = self.predicted_trajectory
-
-        #     to_goal_cost = self.to_goal_cost_gain * self.__calc_to_goal_cost(self.u_hist[0][0], self.u_hist[0][1])
-        #     ob_cost = self.obstacle_cost_gain * self.__calc_obstacle_cost(dilated=trajectory_buf)
-
-        #     final_cost = to_goal_cost + ob_cost 
-
-        #     if min_cost >= final_cost:      
-        #         min_cost = final_cost
-        #         best_u = self.u_hist[0]
-        #         best_trajectory = trajectory_buf
-        #         u_traj = self.u_hist
-        # el
         if min_cost == np.inf:
             # emergency stop
             print(f"Emergency stop for vehicle {self.car_i}")
             best_u = [(0.0 - x[3])/self.dt, 0]
             trajectory = np.array([x[0:3], x[0:3]] * int(self.ph/self.dt)) 
-            line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
-            best_trajectory = line#.buffer(self.dilation_factor, cap_style=3)
+            best_trajectory = LineString(zip(trajectory[:, 0], trajectory[:, 1]))            
             u_traj =  np.array([best_u]*int(self.ph/self.dt))
 
         best_u = np.clip(best_u, [self.car_model.min_acc, -self.car_model.max_steer], [self.car_model.max_acc, self.car_model.max_steer])

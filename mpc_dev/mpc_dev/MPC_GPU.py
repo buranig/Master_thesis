@@ -389,7 +389,7 @@ class MPC_GPU_algorithm(Controller):
                 control[0] =  (0.0 - x[3,car_i])/self.dt
                 self.prev_a = 0.0
                 
-            return control.detach().clone(), states[min_index].detach().clone()
+            return control.detach().clone(), states.detach().clone()
             
 
     def __gen_model(self):

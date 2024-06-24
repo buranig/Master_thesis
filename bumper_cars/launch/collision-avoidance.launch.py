@@ -61,7 +61,8 @@ def add_car(context, ld):
                     {'car_i': car_i},
                     {'gen_traj': LaunchConfiguration('gen_traj')},
                     {'source': LaunchConfiguration('source')},
-                    {'debug_rviz': LaunchConfiguration('debug_rviz')}
+                    {'debug_rviz': LaunchConfiguration('debug_rviz')},
+                    {'write_csv': LaunchConfiguration('write_csv')}
             ],
             emulate_tty=True,
             output='both'
@@ -190,6 +191,12 @@ def generate_launch_description():
         default_value='True'
     )
 
+    write_csv = DeclareLaunchArgument(
+        'write_csv',
+        description='boolean to select whether to save simulation info on a csv file',
+        default_value='False'
+    )
+
     control_mode = DeclareLaunchArgument(
         'control_mode',
         description='Main control algorithm',
@@ -205,6 +212,7 @@ def generate_launch_description():
     ld.add_action(car_alg)
     ld.add_action(gen_traj)
     ld.add_action(debug_rviz)
+    ld.add_action(write_csv)
     ld.add_action(control_mode)
     ld.add_action(OpaqueFunction(function=add_car, args=[ld]))
 

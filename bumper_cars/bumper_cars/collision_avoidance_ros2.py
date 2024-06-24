@@ -12,6 +12,10 @@ from geometry_msgs.msg import Point, Pose2D
 from std_msgs.msg import Header, ColorRGBA
 import colorsys
 
+# Data storing
+import time
+import os
+
 # import control models
 from dwa_dev.DWA import DWA_algorithm as DWA
 from cbf_dev.CBF import CBF_algorithm as CBF
@@ -78,6 +82,7 @@ class CollisionAvoidance(Node):
         self.declare_parameter('car_yaml', rclpy.Parameter.Type.STRING)
         self.declare_parameter('alg', rclpy.Parameter.Type.STRING)
         self.declare_parameter('debug_rviz', rclpy.Parameter.Type.BOOL)
+        self.declare_parameter('write_csv', rclpy.Parameter.Type.BOOL)
         
         ### Global variables
 
@@ -88,6 +93,7 @@ class CollisionAvoidance(Node):
         self.gen_traj = self.get_parameter('gen_traj').value
         self.source = self.get_parameter('source').value
         self.debug_rviz = self.get_parameter('debug_rviz').value
+        self.write_data = self.get_parameter('write_csv').value
 
         with open(self.car_yaml, 'r') as openfile:
             yaml_object = yaml.safe_load(openfile)
@@ -96,6 +102,12 @@ class CollisionAvoidance(Node):
         self.dt = yaml_object["Controller"]["dt"]
 
         self.car_str = '' if self.car_i == 0 else str(self.car_i + 1)
+
+        # Save car's info
+        csv_file = os.path.dirname(os.path.realpath(__file__))
+        csv_file += "/csv/data_"+str(self.car_i)+".csv" 
+        if self.write_data:
+            self.data_file = open(csv_file, mode='a', newline='')
 
         # Init controller
         self.alg = self.car_alg.lower() 
@@ -260,60 +272,80 @@ class CollisionAvoidance(Node):
         """
         ca_active = True
         main_control = False
-        
+        self.start_time = time.time()
+        # Lap counting
+        self.prev_lap = -1
+        self.lap_number = 0
+        self.just_changed = True
+
         while rclpy.ok():
-            # Update the current state of the car (and do rcply spin to update timer)
-            curr_state = self.state_request()
-            if curr_state.updated == False:
-                continue
+            try:
+                # Update the current state of the car (and do rcply spin to update timer)
+                curr_state = self.state_request()
+                if curr_state.updated == False:
+                    continue
 
-            curr_car = curr_state.env_state[self.car_i] # Select desired car
-            updated_state = utils.carStateStamped_to_State(curr_car)
-            self.algorithm.set_state(updated_state)
-            
-            # Skip rest if no update
-            if self.update_time == False:
-                continue
+                curr_car = curr_state.env_state[self.car_i] # Select desired car
+                updated_state = utils.carStateStamped_to_State(curr_car)
+                self.algorithm.set_state(updated_state)
 
-            # Check desired action
-            des_action = self.cmd_request()
+                self.__update_lap(curr_car)
+                
+                # Skip rest if no update
+                if self.update_time == False:
+                    continue
 
-            # Check if CA is activated
-            if self.car_i == 0: # Only move car 0
-                ca_active = self.joy_request()
-                main_control = self.main_control_request()
+                # Check desired action
+                des_action = self.cmd_request()
 
-            if ca_active:
-                # Set desired action as a goal for the CA algorithm
-                self.algorithm.set_goal(des_action.cmd)
+                # Check if CA is activated
+                if self.car_i == 0: # Only move car 0
+                    ca_active = self.joy_request()
+                    main_control = self.main_control_request()
 
-                # Compute safe control input
-                cmd_out = self.algorithm.compute_cmd(curr_state.env_state)
-            else:
-                cmd_out = des_action.cmd
+                if ca_active:
+                    # Set desired action as a goal for the CA algorithm
+                    self.algorithm.set_goal(des_action.cmd)
 
-            # Send command to car
-            self.publisher_.publish(cmd_out)
+                    # Compute safe control input
+                    pre = time.time()
+                    cmd_out = self.algorithm.compute_cmd(curr_state.env_state)
+                    it_time = time.time() - pre
+                else:
+                    cmd_out = des_action.cmd
+                    it_time = 0.0
 
-            # Draw debug info in Rviz
-            if self.debug_rviz:
-                self.markers=MarkerArray()
-                if self.alg == "dwa" or self.alg == "lbp" or self.alg == "mpc":
-                    self.publish_trajectory(self.algorithm.trajectory)
-                elif self.alg == "cbf" or self.alg == "c3bf":
-                    self.barrier_publisher(self.algorithm.closest_point)
-                elif self.alg=="mpc_gpu":
-                    self.publish_trajectories(self.algorithm.trajectory, self.algorithm.best_i)
-                self.debug_publisher.publish(self.markers)
-            
-            if self.car_i == 0 and (main_control or ca_active):
-                self.publish_ff(cmd_out.steering, 0.2)
-            elif self.car_i == 0 and (main_control==False or ca_active==False):
-                self.publish_ff(0.0, 0.0)
+                # Send command to car
+                self.publisher_.publish(cmd_out)
+
+                # Draw debug info in Rviz
+                if self.debug_rviz:
+                    self.markers=MarkerArray()
+                    if self.alg == "dwa" or self.alg == "lbp" or self.alg == "mpc":
+                        self.publish_trajectory(self.algorithm.trajectory)
+                    elif self.alg == "cbf" or self.alg == "c3bf":
+                        self.barrier_publisher(self.algorithm.closest_point)
+                    elif self.alg=="mpc_gpu":
+                        self.publish_trajectories(self.algorithm.trajectory, self.algorithm.best_i)
+                    self.debug_publisher.publish(self.markers)
+
+                # Add info to csv
+                if self.write_data:
+                    self.write_csv(des_action.cmd, cmd_out, it_time)
+                
+                if self.car_i == 0 and (main_control or ca_active):
+                    self.publish_ff(cmd_out.steering, 0.2)
+                elif self.car_i == 0 and (main_control==False or ca_active==False):
+                    self.publish_ff(0.0, 0.0)
 
 
-            # Wait for next period
-            self.update_time = False
+                # Wait for next period
+                self.update_time = False
+            except KeyboardInterrupt:
+                if self.write_data:
+                    self.data_file.close()
+                    print("\033[92m  Successfully closed csv file \033[00m")
+                break
 
     def publish_ff(self, steering, torque):
         msg = ForceFeedback()
@@ -365,7 +397,6 @@ class CollisionAvoidance(Node):
 
         self.markers.markers.append(marker)
         
-
     def car_radius_publish(self, radius: float):
         """
         Publishes the safety radius of the car as a sphere marker in RViz.
@@ -531,6 +562,28 @@ class CollisionAvoidance(Node):
             marker.color = color
             self.markers.markers.append(marker)
 
+    def __update_lap(self, car_state):
+        if car_state.pos_x>0.0 and car_state.pos_y > -0.8 and car_state.pos_y < 0.0:
+            if not self.just_changed:
+                self.just_changed = True
+                self.lap_number +=1
+        else:
+            self.just_changed = False
+
+        # if car_state.turn_angle % (2*3.14) > 0.5:
+        #     self.just_changed = False
+        # elif car_state.turn_angle % (2*3.14) <= 0.5 and not self.just_changed:
+        #     self.lap_number +=1
+        #     self.just_changed = True
+    
+
+    def write_csv(self, des_action, cmd_out, it_time):
+        if self.prev_lap != self.lap_number:
+            self.prev_lap = self.lap_number
+            self.start_time = time.time()
+        cum_time = time.time()-self.start_time
+        isd = (des_action.steering - cmd_out.steering)**2 + (des_action.throttle - cmd_out.throttle)**2
+        self.data_file.write(str(cum_time) + "\t," + str(self.lap_number) + "\t," + str(it_time) + "\t," + str(isd) +  "\n")
 
 def main(args=None):
     rclpy.init(args=args)

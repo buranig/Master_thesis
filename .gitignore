@@ -2,3 +2,4 @@
 dwa_dev/config/trajectories.json
 lbp_dev/config/LBP.json
 mpc_dev/models/*.pt
+bumper_cars/bumper_cars/csv/*

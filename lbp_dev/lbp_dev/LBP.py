@@ -213,6 +213,7 @@ class LBP_algorithm(Controller):
         # saving the complete trajectories to a csv file
         with open(self.dir_path + '/../config/LBP.json', 'w') as file:
             json.dump(temp, file, indent=4)
+        print("\033[92m Finished path generation \033[00m")
 
     ################## PRIVATE METHODS
 
@@ -605,8 +606,6 @@ class LBP_algorithm(Controller):
                 # print("find good path")
                 result.append(
                     [x[-1], y[-1], yaw[-1], float(p[0, 0]), float(p[1, 0]), float(p[2, 0])])
-
-        # print("finish path generation")
         return result
     
     def __generate_trajectory(self, s, km, kf, k0, v):

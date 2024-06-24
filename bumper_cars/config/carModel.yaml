@@ -36,4 +36,4 @@ Dr: 0.8416
 ################  Friction coefficients  ############################################
 c_a: 0.8                        # [-] Drag coefficient
 c_r1: 0.1                       # [-] Friction coefficient
-model_type: 'kinematic'         # ['kinematic'/'dynamic'] Function used for state prediction 
+model_type: dwa

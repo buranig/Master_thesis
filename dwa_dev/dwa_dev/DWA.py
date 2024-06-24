@@ -85,7 +85,9 @@ class DWA_algorithm(Controller):
         # Update current state of all cars
         self.curr_state = utils.carStateStamped_to_array(car_list)
         if self.dilated_traj == []:
+            print("\033[93mLoading trajectories . . . \033[0m")
             self.__initialize_paths_targets_dilated_traj()
+            print("\033[93mDone loading!\033[0m")
 
         # Update expected state of other cars (no input)
         self.__update_others()
@@ -176,7 +178,7 @@ class DWA_algorithm(Controller):
         with open(self.dir_path + '/../config/trajectories.json', 'w') as file:
             json.dump(complete_trajectories, file, indent=4)
 
-        print("\nThe JSON data has been written to 'config/trajectories.json'")
+        print("\n \033[92m The JSON data has been written to 'config/trajectories.json' \033[00m")
 
 
     ################## PRIVATE METHODS

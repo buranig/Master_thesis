@@ -60,9 +60,6 @@ class MPC_GPU_algorithm(Controller):
         ## Init Controller class
         super().__init__(controller_path, car_i)
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Using device: {self.device}")
-
         # Opening YAML file
         with open(controller_path, 'r') as openfile:
             # Reading from yaml file
@@ -91,6 +88,7 @@ class MPC_GPU_algorithm(Controller):
         self.pred_hor = int(self.ph/self.dt)
 
         try:
+            self.device = "cpu"
             self.__load_model()
         except:
             print("Trained model not found. Run this with option gen_traj:=True")
@@ -168,7 +166,9 @@ class MPC_GPU_algorithm(Controller):
 
     def compute_traj(self):
         # Generate data for NN
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.__gen_model()
+        self.device = "cpu"
         self.__load_model()
         # Load model and evaluate with new data
         # self.__test_model()

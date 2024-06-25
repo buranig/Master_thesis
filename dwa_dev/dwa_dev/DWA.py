@@ -129,6 +129,8 @@ class DWA_algorithm(Controller):
             None
 
         """
+        print("\033[93mGenerating trajectories . . . \033[0m")
+        
         # Initialize trajectory storing variables
         dw = self.__calc_dynamic_window()
         complete_trajectories = {}
@@ -177,8 +179,8 @@ class DWA_algorithm(Controller):
         # saving the complete trajectories to a json file
         with open(self.dir_path + '/../config/trajectories.json', 'w') as file:
             json.dump(complete_trajectories, file, indent=4)
-
-        print("\n \033[92m The JSON data has been written to 'config/trajectories.json' \033[00m")
+        print("\033[93mDone generating!\033[0m")
+        print("\033[92mTrajectories were written to 'dwa_dev/config/trajectories.json' \033[00m")
 
 
     ################## PRIVATE METHODS

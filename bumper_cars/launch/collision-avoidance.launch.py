@@ -93,7 +93,7 @@ def add_car(context, ld):
 
 
         # Joy Safety Node
-        joy1Safety_node = Node(
+        joySafety_node = Node(
             package='bumper_cars',
             executable='joy_safety',
             name='joy'+car_str+'_safety_node',
@@ -105,7 +105,7 @@ def add_car(context, ld):
         )
 
         # Joy Node
-        joy1 = Node(
+        joy = Node(
             package='joy',
             executable='joy_node',
             name='joy'+car_str+'_node',
@@ -130,8 +130,8 @@ def add_car(context, ld):
             output='both'
         )
 
-        ld.add_action(joy1Safety_node)
-        ld.add_action(joy1)
+        ld.add_action(joySafety_node)
+        ld.add_action(joy)
         ld.add_action(joy_remap)
     
     g29_ff = Node(

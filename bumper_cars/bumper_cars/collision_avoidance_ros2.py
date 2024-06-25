@@ -105,9 +105,9 @@ class CollisionAvoidance(Node):
 
         # Save car's info
         csv_file = os.path.dirname(os.path.realpath(__file__))
-        csv_file += "/csv/data_"+str(self.car_i)+".csv" 
+        csv_file += "/../csv/data_"+str(self.car_i)+".csv" 
         if self.write_data:
-            self.data_file = open(csv_file, mode='a', newline='')
+            self.data_file = open(csv_file, mode='w', newline='')
 
         # Init controller
         self.alg = self.car_alg.lower() 
@@ -273,6 +273,8 @@ class CollisionAvoidance(Node):
         ca_active = True
         main_control = False
         self.start_time = time.time()
+        self.lap_time = time.time()
+
         # Lap counting
         self.prev_lap = -1
         self.lap_number = 0
@@ -563,7 +565,7 @@ class CollisionAvoidance(Node):
             self.markers.markers.append(marker)
 
     def __update_lap(self, car_state):
-        if car_state.pos_x>0.0 and car_state.pos_y > -0.8 and car_state.pos_y < 0.0:
+        if car_state.pos_x>-0.05 and car_state.pos_x<0.05 and car_state.pos_y > -0.8 and car_state.pos_y < 0.0:
             if not self.just_changed:
                 self.just_changed = True
                 self.lap_number +=1
@@ -578,12 +580,30 @@ class CollisionAvoidance(Node):
     
 
     def write_csv(self, des_action, cmd_out, it_time):
+        """
+        Writes data to a CSV file.
+
+        Args:
+            des_action (DesiredAction): The desired action.
+            cmd_out (CommandOutput): The command output.
+            it_time (float): The iteration time.
+
+        Returns:
+            None
+        """
         if self.prev_lap != self.lap_number:
             self.prev_lap = self.lap_number
-            self.start_time = time.time()
-        cum_time = time.time()-self.start_time
+            self.lap_time = time.time()
+
+        # Skip first lap
+        if self.lap_number == 0:
+            return
+
+        cum_time = time.time() - self.start_time
+        lap_time = time.time() - self.lap_time
         isd = (des_action.steering - cmd_out.steering)**2 + (des_action.throttle - cmd_out.throttle)**2
-        self.data_file.write(str(cum_time) + "\t," + str(self.lap_number) + "\t," + str(it_time) + "\t," + str(isd) +  "\n")
+
+        self.data_file.write(str(self.car_i) + "," +str(cum_time) + "," + str(lap_time) + "," + str(self.lap_number) + "," + str(it_time) + "," + str(isd) +  "\n")
 
 def main(args=None):
     rclpy.init(args=args)

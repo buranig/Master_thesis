@@ -20,7 +20,8 @@ m: 0.144                    # [kg] Vehicle mass
 
 
 ###############  Tire properties  #############################################
-tireModel: 'linear'        # ['pacejka'/'linear'] Type of tire model
+# ['pacejka'/'linear'] Type of tire model
+tireModel: 'pacejka'
 
 ##WARNING: In case of linear model, what is Cf in the thesis takes the value of Df
 
@@ -36,4 +37,6 @@ Dr: 0.8416
 ################  Friction coefficients  ############################################
 c_a: 0.8                        # [-] Drag coefficient
 c_r1: 0.1                       # [-] Friction coefficient
-model_type: dwa
+
+# ['kinematic'/'dynamic'] Function used for state prediction 
+model_type: 'kinematic'

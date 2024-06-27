@@ -50,9 +50,9 @@ class PotentialFieldController:
         self.goal = goal
         self.obstacles = obstacles
 
-        self.k_rep = 100 # Repulsive force gain
-        self.k_att = 7 # Attractive force gain
-        self.k_arena = 150
+        self.k_rep = 1000 # Repulsive force gain
+        self.k_att = 70 # Attractive force gain
+        self.k_arena = 10000
 
         self.n = 2
 
@@ -64,14 +64,14 @@ class PotentialFieldController:
         self.height = 15
         self.m = m
 
-    def attractive_potential(self, position):
+    def attractive_potential(self, position, i):
         # Calculate attractive potential towards the goal
-        attractive_potential = 0.5 * self.k_att*np.linalg.norm([position[0]- self.goal[0], position[1]- self.goal[1]])**2
+        attractive_potential = 0.5 * self.k_att*np.linalg.norm([position[0]- self.goal[i][0], position[1]- self.goal[i][1]])**2
         return attractive_potential
 
-    def attractive_force(self, position):
+    def attractive_force(self, position, i):
         # Calculate attractive force towards the goal
-        attractive_force = [-self.k_att*(position[0]- self.goal[0]), -self.k_att*(position[1]- self.goal[1])]
+        attractive_force = [-self.k_att*(position[0]- self.goal[i][0]), -self.k_att*(position[1]- self.goal[i][1])]
         return attractive_force
     
     def repulsive_potential(self, position):
@@ -97,10 +97,10 @@ class PotentialFieldController:
             repulsive_potential += self.k_rep*np.exp(-(position[0] - obstacle[0])**2/(self.sigmax**2) - (position[1] - obstacle[1])**2/(self.sigmay**2))
         return repulsive_potential
     
-    def repulsive_gaussian_potential_imp(self, position):
+    def repulsive_gaussian_potential_imp(self, position, i):
         # Calculate repulsive potential from obstacles
         repulsive_potential = 0.0
-        goal_distance = self.euclidean_distance(position, self.goal)
+        goal_distance = self.euclidean_distance(position, self.goal[i])
 
         for obstacle in self.obstacles:
             repulsive_potential += self.k_rep*np.exp(-(position[0] - obstacle[0])**2/(self.sigmax**2) - (position[1] - obstacle[1])**2/(self.sigmay**2))*goal_distance
@@ -114,16 +114,16 @@ class PotentialFieldController:
             repulsive_force[1] += 2*(position[1] - obstacle[1])/(self.sigmay**2)*self.k_rep*np.exp(-(position[0] - obstacle[0])**2/(self.sigmax**2) - (position[1] - obstacle[1])**2/(self.sigmay**2))
         return repulsive_force
 
-    def repulsive_gaussian_force_imp(self, position):
+    def repulsive_gaussian_force_imp(self, position, i):
         # Calculate repulsive force from obstacles
-        goal_distance = self.euclidean_distance(position, self.goal)
+        goal_distance = self.euclidean_distance(position, self.goal[i])
         if goal_distance == 0.0:
             goal_distance += 0.0001
         repulsive_force = [0.0, 0.0]
         for obstacle in self.obstacles:
             potential = self.k_rep*np.exp(-(position[0] - obstacle[0])**2/(self.sigmax**2) - (position[1] - obstacle[1])**2/(self.sigmay**2))
-            repulsive_force[0] += -potential*goal_distance*(-2*(position[0] - obstacle[0])/(self.sigmax**2))-potential*(position[0]-self.goal[0])/goal_distance
-            repulsive_force[1] += -potential*goal_distance*(-2*(position[1] - obstacle[1])/(self.sigmay**2))-potential*(position[1]-self.goal[1])/goal_distance
+            repulsive_force[0] += -potential*goal_distance*(-2*(position[0] - obstacle[0])/(self.sigmax**2))-potential*(position[0]-self.goal[i][0])/goal_distance
+            repulsive_force[1] += -potential*goal_distance*(-2*(position[1] - obstacle[1])/(self.sigmay**2))-potential*(position[1]-self.goal[i][1])/goal_distance
         return repulsive_force
     
     def repulsive_arena_potential(self, position):
@@ -198,19 +198,19 @@ class PotentialFieldController:
         total_potential = attractive_potential + repulsive_potential
         return total_potential
     
-    def calculate_total_gaussian_potential(self, position):
+    def calculate_total_gaussian_potential(self, position, i):
         # # Calculate the total potential acting on the robot
-        attractive_potential = self.attractive_potential(position)
-        repulsive_potential = self.repulsive_gaussian_potential_imp(position)
+        attractive_potential = self.attractive_potential(position, i)
+        repulsive_potential = self.repulsive_gaussian_potential_imp(position, i)
         arena_potential = self.repulsive_arena_potential(position)
         total_potential = arena_potential + repulsive_potential + attractive_potential
         return total_potential
     
-    def calculate_total_gaussian_force(self, position):
+    def calculate_total_gaussian_force(self, position, i):
         # # Calculate the total force acting on the robot
         total_force = [0.0, 0.0]
-        attractive_force = self.attractive_force(position)
-        repulsive_force = self.repulsive_gaussian_force_imp(position)
+        attractive_force = self.attractive_force(position, i)
+        repulsive_force = self.repulsive_gaussian_force_imp(position, i)
         arena_force = self.repulsive_arena_force(position)
         total_force[0] = repulsive_force[0] + attractive_force[0] + arena_force[0]
         total_force[1] = repulsive_force[1] + attractive_force[1] + arena_force[1]
@@ -220,10 +220,10 @@ class PotentialFieldController:
         # Convert the force to robot's acceleration and steering angle
         ax = (force[0]*np.cos(position[2]) + force[1]*np.sin(position[2]))/self.m
         ay = (-force_pred[0]*np.sin(position[2]) + force_pred[1]*np.cos(position[2]))/self.m 
-        steering = 3*ay*(L**2*2*Cf*Cr + self.m*position[3]**2*(Lf*Cf-Lr*Cr))/(2*Cf*Cr*L*(position[3]+0.001)**2)
+        steering = ay*(L**2*2*Cf*Cr + self.m*position[3]**2*(Lf*Cf-Lr*Cr))/(2*Cf*Cr*L*(position[3]+0.001)**2)
 
         # ax = np.linalg.norm(force)
-        # steering = np.arctan2(force[1], force[0]) - position[2]
+        # steering = np.arctan2(force_pred[1], force_pred[0]) - position[2]
         steering = np.clip(steering, -max_steer, max_steer)
         
         # print(f'Yaw angle: {np.rad2deg(position[2])}, Force field angle: {np.rad2deg(np.arctan2(force[1], force[0]))}')
@@ -248,7 +248,7 @@ class PotentialFieldController:
                 # print(position_)
                 # total_force = self.calculate_total_force(position_)
                 # total_force = self.calculate_total_potential(position_)
-                total_potential = self.calculate_total_gaussian_potential(position_)
+                total_potential = self.calculate_total_gaussian_potential(position_, 0)
                 total_force = self.calculate_total_gaussian_force(position_)
                 # total_force_buf[i, j] = np.linalg.norm(total_force)
                 total_force_angle[i, j] = np.arctan2(total_force[1], total_force[0])
@@ -291,6 +291,8 @@ class PotentialFieldController:
             utils.plot_arrow(position[0], position[1], position[2], length=1, width=0.5)
             utils.plot_arrow(position[0], position[1], position[2]+steering, length=3, width=0.5)
 
+            plt.plot(x_pred[0], x_pred[1], 'ro', label='Predicted Robot')
+
             for obstacle in self.obstacles:
                 circle = plt.Circle(obstacle[0:2], obstacle[2], color='r', fill=False)
                 ax.add_patch(circle)
@@ -307,11 +309,13 @@ class PotentialFieldController:
                 break
 
             total_force = self.calculate_total_gaussian_force(position)
+            position_copy = position.copy()
+            x_pred = utils.nonlinear_model_numpy_stable(position_copy, [throttle, steering], dt=0.2)
             # x_pred = utils.nonlinear_model_numpy_stable(position, [0, 0])
-            # total_force_pred = self.calculate_total_force(x_pred[0:2])
-            throttle, steering = self.force_to_input(position, total_force, total_force)
+            total_force_pred = self.calculate_total_gaussian_force(x_pred[0:2])
+            throttle, steering = self.force_to_input(position, total_force, total_force_pred)
 
-            print('Throttle:', throttle, 'Steering:', steering)
+            # print('Throttle:', throttle, 'Steering:', steering)
 
         for elem in position_buf:
             plt.plot(elem[0], elem[1], 'ro', label='Robot')
@@ -324,7 +328,9 @@ class PotentialFieldController:
         fig = plt.figure(1, dpi=90, figsize=(10,10))
         ax = fig.add_subplot(111)
 
-        self.obstacles = [[position[0], position[1], 2]]
+        robot_num = position.shape[0]
+        dxu = np.zeros((robot_num, 2))
+        # self.obstacles = [[position[0], position[1], 2], [position3[0], position3[1], 2]]
 
         x = np.linspace(-self.width, self.width, self.definition)
         y = np.linspace(-self.height, self.height, self.definition)
@@ -335,18 +341,8 @@ class PotentialFieldController:
         for i in range(len(x)):
             for j in range(len(y)):
                 position_ = [X[i, j], Y[i, j]]
-                # print(position_)
-                # total_force = self.calculate_total_force(position_)
-                # total_force = self.calculate_total_potential(position_)
-                total_potential = self.calculate_total_gaussian_potential(position_)
-                total_force = self.calculate_total_gaussian_force(position_)
-                # total_force_buf[i, j] = np.linalg.norm(total_force)
-                total_force_angle[i, j] = np.arctan2(total_force[1], total_force[0])
-
-                Z[i, j] = np.linalg.norm(total_force)
-                # Z[i, j] = min(Z[i, j], 80)
-                Z[i, j] = max(Z[i, j], 0.0)
-
+                total_potential = self.calculate_total_gaussian_potential(position_, 0)
+                
                 P[i, j] = np.linalg.norm(total_potential)
 
         dy, dx = np.gradient(P)
@@ -354,42 +350,62 @@ class PotentialFieldController:
 
         plt.contourf(X, Y, P, levels=20, cmap='jet')
         plt.quiver(X, Y, dx, dy, pivot='mid', scale=2000)
-       
-        # Move the robot based on the calculated force
-        total_force = self.calculate_total_gaussian_force(position)
-        x_pred = [position[0] + dt*np.cos(position[2])*position[3], position[1] + dt*np.sin(position[2])*position[3]]
-        total_force_pred = self.calculate_total_gaussian_force(x_pred)
-        throttle, steering = self.force_to_input(position, total_force, total_force_pred)
 
-        position_buf = [[position[0], position[1]]]
 
-        while self.euclidean_distance(position, self.goal) > 2:
+        # position_buf = [[position[0], position[1]]]
+
+        while self.euclidean_distance(position[0], self.goal[0]) > 2:
             plt.cla()
             plt.gcf().canvas.mpl_connect(
                 'key_release_event',
                 lambda event: [exit(0) if event.key == 'escape' else None])
             
-            # Car Model
-            x1 = utils.array_to_state(position)
-            throttle, steering = utils.pure_pursuit_steer_control(self.goal, x1)
+            for i in range(robot_num):
+                # if i != 60:
 
-            position = utils.nonlinear_model_numpy_stable(position, [throttle, steering])
-            self.obstacles = [[position[0], position[1], 2]]
-            position_buf.append([position[0], position[1]])
+                self.obstacles = []
+                for z in range(robot_num):
+                    if z == i:
+                        continue
+                    else:
+                        self.obstacles.append([position[z, 0], position[z, 1], 2])
+                position_copy = position[i].copy()
+                x_pred = utils.nonlinear_model_numpy_stable(position_copy, dxu[i], dt=0.5)
+                plt.plot(x_pred[0], x_pred[1], 'ko', label='Predicted Robot')
+                total_force = self.calculate_total_gaussian_force(position[i], i)
+                total_force_pred = self.calculate_total_gaussian_force(x_pred, i)
+                dxu[i, 0], dxu[i, 1] = self.force_to_input(position[i], total_force, total_force_pred)
+                position[i] = utils.nonlinear_model_numpy_stable(position[i], dxu[i])
 
-            # Plot the robot's position
-            for i in range(len(x)):
-                for j in range(len(y)):
-                    position_ = [X[i, j], Y[i, j]]
-                    total_potential = self.calculate_total_gaussian_potential(position_)
+                if i == 0:
+                    # Plot the robot's position
+                    for i_ in range(len(x)):
+                        for j in range(len(y)):
+                            position_ = [X[i_, j], Y[i_, j]]
+                            total_potential = self.calculate_total_gaussian_potential(position_, 0)
 
-                    P[i, j] = np.linalg.norm(total_potential)
+                            P[i_, j] = np.linalg.norm(total_potential)
 
-            plt.contourf(X, Y, P, levels=20, cmap='jet')
+                    plt.contourf(X, Y, P, levels=20, cmap='jet')
+                    force_angle = np.arctan2(total_force[1], total_force[0])    
+                    utils.plot_arrow(position[i, 0], position[i, 1], force_angle, length=5, width=0.5)
+                
+                # else:
+                #     x_ = utils.array_to_state(position[i])
+                #     dxu[i, 0], dxu[i, 1] = utils.pure_pursuit_steer_control(self.goal[i], x_)
+                #     position[i] = utils.nonlinear_model_numpy_stable(position[i], dxu[i])
+                
+                utils.plot_robot(position[i, 0], position[i, 1], position[i, 2], 0)
+                utils.plot_arrow(position[i, 0], position[i, 1], position[i, 2], length=1, width=0.5)
+                utils.plot_arrow(position[i, 0], position[i, 1], position[i, 2]+ dxu[i, 1], length=3, width=0.5)
 
-            utils.plot_robot(position[0], position[1], position[2], 0)
-            utils.plot_arrow(position[0], position[1], position[2], length=1, width=0.5)
-            utils.plot_arrow(position[0], position[1], position[2]+steering, length=3, width=0.5)
+
+                plt.plot(self.goal[i][0], self.goal[i][1], 'rx') 
+
+            # position_buf.append([position[0], position[1]])
+            # position_buf2.append([position2[0], position2[1]])  
+            # position_buf3.append([position3[0], position3[1]])
+
 
             plt.xlabel('X')
             plt.ylabel('Y')
@@ -397,12 +413,14 @@ class PotentialFieldController:
             plt.pause(0.01)
 
             # Break if the robot reaches the goal
-            if self.euclidean_distance(position, self.goal) < 2:
+            if self.euclidean_distance(position[0], self.goal[0]) < 2:
                 print('Goal Reached')
                 break
 
-        for elem in position_buf:
-            plt.plot(elem[0], elem[1], 'ro', label='Robot')
+        # for elem in position_buf:
+        #     plt.plot(elem[0], elem[1], 'ro', label='Robot')
+        # for elem in position_buf2:
+        #     plt.plot(elem[0], elem[1], 'go', label='Robot2')
         plt.pause(0.0001)
         plt.show()
         # print(position_buf)
@@ -474,10 +492,15 @@ class PotentialFieldController:
         plt.show()
 
 # Example usage
-goal = [10, 10]
-obstacles = [[5, 5, 2], [8, 8, 2], [0, -10, 2], [-10, 0, 2], [10, -5, 2], [10, 0, 2]]  # [x, y, radius]
+goal = [[10, 10], [-15.0, -10.0], [-15.0, 0.0]]
+obstacles = []  # [x, y, radius]
 controller = PotentialFieldController(goal, obstacles)
-robot_position = [-15.0, -10.0, 0.0, 0.0, 0.0]
+
+x = np.array([[-15.0, -10.0, 0.0, 0.0, 0.0], 
+              [10.0, 10.0, -3*np.pi/4, 0.0, 0.0], 
+              [15.0, 0.0, -np.pi, 0.0, 0.0]])
+obstacles = [[x[1, 0], x[1,1], 2], [x[2, 0], x[2, 1], 2]]
+controller = PotentialFieldController(goal, obstacles)
 # controller.plot_field()
 # controller.move_robot(robot_position)
-controller.plot_moving_field(robot_position)
+controller.plot_moving_field(x)

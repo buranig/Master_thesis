@@ -799,3 +799,22 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
     # Print New Line on Complete
     if iteration == total: 
         print()
+
+
+def check_goal_reached(x, targets, i, distance=0.5):
+    """
+    Check if the robot has reached the goal.
+
+    Parameters:
+    x (numpy.ndarray): Robot's current position.
+    targets (list): List of target positions.
+    i (int): Index of the current target.
+
+    Returns:
+    bool: True if the robot has reached the goal, False otherwise.
+    """
+    dist_to_goal = math.hypot(x[0, i] - targets[i][0], x[1, i] - targets[i][1])
+    if dist_to_goal <= distance:
+        print(f"Vehicle {i} reached goal!")
+        return True
+    return False

@@ -39,25 +39,27 @@ m = json_object["Car_model"]["m"]  # kg
 c_a = json_object["Car_model"]["c_a"]
 c_r1 = json_object["Car_model"]["c_r1"]
 WB = json_object["Controller"]["WB"]
+boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_init/2])
+check_collision_bool = False
 predict_time = json_object["LBP"]["predict_time"] # [s]
 show_animation = json_object["show_animation"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_8.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_9.json', 'r') as file:
     data = json.load(file)
 
 class PotentialFieldController:
-    def __init__(self, goal, robot_num, paths):
+    def __init__(self, goal, robot_num, paths, ax):
         self.goal = goal
         self.obstacles = []
         self.dxu = np.zeros((2, robot_num))
         self.robot_num = robot_num
         self.paths = paths
 
-        self.k_rep = 3000 # Repulsive force gain
-        self.k_att = 100 # Attractive force gain
-        self.k_arena = 0 #7000
+        self.k_rep = 100 # Repulsive force gain
+        self.k_att = 10 # Attractive force gain
+        self.k_arena = 1000 #7000
 
         self.n = 2
 
@@ -70,6 +72,7 @@ class PotentialFieldController:
         self.m = m
 
         self.reached_goal = [False]*robot_num
+        self.ax = ax
 
     def attractive_potential(self, position, i):
         # Calculate attractive potential towards the goal
@@ -349,11 +352,47 @@ class PotentialFieldController:
         x_copy = x[:, i].copy()
         x_pred = utils.nonlinear_model_numpy_stable(x_copy, self.dxu[:, i], dt=0.5)
         plt.plot(x_pred[0], x_pred[1], 'ko', label='Predicted Robot')
+
         total_force = self.calculate_total_gaussian_force(x[:, i], i)
         total_force_pred = self.calculate_total_gaussian_force(x_pred, i)
+        
         self.dxu[0, i], self.dxu[1, i] = self.force_to_input(x[:, i], total_force, total_force_pred)
         x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i])
 
+        return x
+    
+    def check_collision(self, x, i):
+        """
+        Checks for collision between the robot at index i and other robots.
+
+        Args:
+            x (numpy.ndarray): State vector of shape (4, N), where N is the number of time steps.
+            i (int): Index of the robot to check collision for.
+
+        Raises:
+            Exception: If collision is detected.
+
+        """
+        if x[0,i]>=boundary_points[1]-WB/2 or x[0,i]<=boundary_points[0]+WB/2 or x[1,i]>=boundary_points[3]-WB/2 or x[1,i]<=boundary_points[2]+WB/2:
+            if check_collision_bool:
+                raise Exception('Collision')
+            else:
+                print("Collision detected")
+                self.reached_goal[i] = True
+                self.dxu[:, i] = 0
+                x[3,i] = 0.0
+
+        for idx in range(self.robot_num):
+            if idx == i:
+                continue
+            if utils.dist([x[0,i], x[1,i]], [x[0, idx], x[1, idx]]) <= WB/2:
+                if check_collision_bool:
+                    raise Exception('Collision')
+                else:
+                    print("Collision detected")
+                    self.reached_goal[i] = True
+                    self.dxu[:, i] = 0.0
+                    x[3,i] = 0.0
         return x
 
     def run_apf(self, x, break_flag):
@@ -373,6 +412,7 @@ class PotentialFieldController:
                         self.goal[i] = (self.paths[i][0].x, self.paths[i][0].y)
                 else:
                     x = self.step(x, i) 
+                    x = self.check_collision(x, i)
 
             if i == 0:
                 self.obstacles = []
@@ -387,11 +427,39 @@ class PotentialFieldController:
                 # force_angle = np.arctan2(total_force[1], total_force[0])    
                 # utils.plot_arrow(x[0, i], x[1, i], force_angle, length=5, width=0.5)
             
-            utils.plot_robot(x[0, i], x[1, i], x[2, i], i)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i], length=1, width=0.5)
-            utils.plot_arrow(x[0, i], x[1, i], x[2, i]+ self.dxu[1, i], length=3, width=0.5)
+            utils.plot_robot_and_arrows(i, x, self.dxu, self.goal, self.ax)
+
+        if all(self.reached_goal):
+            break_flag = True
+        return x, break_flag
+    
+    def go_to_goal(self, x, break_flag):
+        for i in range(self.robot_num):
+            if not self.reached_goal[i]:
+                # Step 9: Check if the distance between the current position and the target is less than 5
+                if utils.check_goal_reached(x, self.goal, i, distance=2.0):
+                    print(f"Path complete for vehicle {i}!")
+                    self.dxu[:, i] = np.zeros(2)
+                    x[3, i] = 0
+                    self.reached_goal[i] = True
+                else:
+                    x = self.step(x, i) 
+                    x = self.check_collision(x, i)
+
+            if i == 0:
+                self.obstacles = []
+                for z in range(self.robot_num):
+                    if z == i:
+                        continue
+                    else:
+                        self.obstacles.append([x[0, z], x[1, z], 2])
+                P, dx, dy, X, Y = self.calculate_map_potential()
+
+                plt.contourf(X, Y, P, levels=20, cmap='jet')
+                # force_angle = np.arctan2(total_force[1], total_force[0])    
+                # utils.plot_arrow(x[0, i], x[1, i], force_angle, length=5, width=0.5)
             
-            plt.plot(self.goal[i][0], self.goal[i][1], 'rx') 
+            utils.plot_robot_and_arrows(i, x, self.dxu, self.goal, self.ax)
 
         if all(self.reached_goal):
             break_flag = True
@@ -490,7 +558,7 @@ def main_seed(args=None):
     # Step 5: Extract the target coordinates from the paths
     targets = [[path[0].x, path[0].y] for path in paths]
 
-    apf = PotentialFieldController(goal=targets, robot_num=robot_num, paths=paths)
+    apf = PotentialFieldController(goal=targets, robot_num=robot_num, paths=paths, ax=ax)
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
         plt.cla()
@@ -498,7 +566,8 @@ def main_seed(args=None):
             'key_release_event',
             lambda event: [exit(0) if event.key == 'escape' else None])
         
-        x, break_flag = apf.run_apf(x, break_flag) 
+        # x, break_flag = apf.run_apf(x, break_flag) 
+        x, break_flag = apf.go_to_goal(x, break_flag)
 
         trajectory = np.dstack([trajectory, np.concatenate((x, apf.dxu))])
         

@@ -441,7 +441,7 @@ class DWA_algorithm(Controller):
             # emergency stop
             print(f"Emergency stop for vehicle {self.car_i}")
             best_u = [(0.0 - x[3])/self.dt, 0]
-            trajectory = np.array([x[0:3], x[0:3]] * int(self.ph/self.dt)) 
+            trajectory = np.array([[0.0,0.0,0.0]] * int(self.ph/self.dt)) 
             best_trajectory = LineString(zip(trajectory[:, 0], trajectory[:, 1]))            
             u_traj =  np.array([best_u]*int(self.ph/self.dt))
 

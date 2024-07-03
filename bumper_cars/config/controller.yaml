@@ -12,7 +12,7 @@ DWA:                              ### Dynamic Window Approach
   delta_samples: 20               # [-] 0.5*Number of samples for the steering angle (later mirrored)
   to_goal_cost_gain: 1            # [-] Gain for the cost to the goal
   obstacle_cost_gain: 2           # [-] Gain for the cost to the obstacle
-  dilation_factor: 2.0            # [-] Number of car's width to consider for collision
+  dilation_factor: 1.5            # [-] Number of car's width to consider for collision
 LBP:                              ### Lattice Based Planning
   a_resolution: 0.01              # [m/s^2] Resolution for the sampled acceleration
   v_resolution: 0.05              # [m/s] Resolution for the sampled velocity 

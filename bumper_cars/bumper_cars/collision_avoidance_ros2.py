@@ -12,6 +12,8 @@ from geometry_msgs.msg import Point, Pose2D
 from std_msgs.msg import Header, ColorRGBA
 import colorsys
 
+import numpy as np
+
 # Data storing
 import time
 import os
@@ -158,8 +160,11 @@ class CollisionAvoidance(Node):
 
         # Set track boundaries offset
         track_offset = [track_pos.x, track_pos.y, track_pos.theta]
+        self.algorithm.boundary_points[1][0] = self.algorithm.boundary_points[1][0]*2.0/5.0
+        self.algorithm.boundary_points[2][0] = self.algorithm.boundary_points[2][0]*2.0/5.0
         self.algorithm.offset_track(track_offset)
-
+        
+        self.send_once = False
         # Draw in Rviz
         if self.debug_rviz:   
             # Colormap for debug
@@ -318,7 +323,24 @@ class CollisionAvoidance(Node):
                     it_time = 0.0
 
                 # Send command to car
-                self.publisher_.publish(cmd_out)
+                v_long = curr_state.env_state[self.car_i].vel_x*np.cos(curr_state.env_state[self.car_i].turn_angle) + curr_state.env_state[self.car_i].vel_y*np.sin(curr_state.env_state[self.car_i].turn_angle)
+                
+                if cmd_out.throttle<=-0.01 and v_long>0.001:
+                    cmd_out.throttle = 0.0
+                    self.publisher_.publish(cmd_out)
+                    self.send_once = False
+                elif cmd_out.throttle<=-0.01 and v_long<0.001 and v_long>-0.001:
+                    # self.publisher_.publish(cmd_out)
+                    if not self.send_once:
+                        throttle_buf = cmd_out.throttle
+                        cmd_out.throttle = 0.0
+                        self.publisher_.publish(cmd_out)
+                        self.send_once = True
+                    cmd_out.throttle = throttle_buf
+                    self.publisher_.publish(cmd_out)
+                else:
+                    self.publisher_.publish(cmd_out)
+                    self.send_once = False
 
                 # Draw debug info in Rviz
                 if self.debug_rviz:

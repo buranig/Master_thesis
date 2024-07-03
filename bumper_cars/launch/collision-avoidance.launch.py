@@ -14,6 +14,7 @@ def add_car(context, ld):
     """
     carAmount_value = LaunchConfiguration('carNumber').perform(context)
     offset_value = LaunchConfiguration('carNumOffset').perform(context)
+    joy_control = LaunchConfiguration('joy_control').perform(context)
 
     car_yaml = os.path.join(
         get_package_share_directory('bumper_cars'),
@@ -134,17 +135,17 @@ def add_car(context, ld):
         ld.add_action(joy)
         ld.add_action(joy_remap)
     
-    g29_ff = Node(
-        package="ros_g29_force_feedback",
-        executable="g29_force_feedback",
-        name="g29_force_feedback",
-        output="screen",
-        parameters=[
-            {'device_name': "/dev/input/event12"}
-        ],
-    )
-    ld.add_action(g29_ff)
-
+    if not eval(joy_control):
+        g29_ff = Node(
+            package="ros_g29_force_feedback",
+            executable="g29_force_feedback",
+            name="g29_force_feedback",
+            output="screen",
+            parameters=[
+                {'device_name': "/dev/input/event13"}
+            ],
+        )
+        ld.add_action(g29_ff)
 
 
 def generate_launch_description():
@@ -203,6 +204,11 @@ def generate_launch_description():
         default_value='pursuit'
     )
 
+    joystick_bool = DeclareLaunchArgument(
+        'joy_control',
+        description='Ego car controlled with Joystick or Steering Wheel',
+        default_value='True'
+    )
     
 
     ld.add_action(carNumber_arg)
@@ -214,6 +220,8 @@ def generate_launch_description():
     ld.add_action(debug_rviz)
     ld.add_action(write_csv)
     ld.add_action(control_mode)
+    ld.add_action(joystick_bool)
+
     ld.add_action(OpaqueFunction(function=add_car, args=[ld]))
 
     return ld

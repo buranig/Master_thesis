@@ -115,9 +115,7 @@ class MPC_GPU_algorithm(Controller):
         self.curr_state = np.transpose(utils.carStateStamped_to_array(car_list))
 
         # Compute control
-        pre = time.time()
         u, traj = self.__MPC_GPU(self.car_i, self.curr_state)
-        print("Time: ", time.time()-pre)
         
         # Project it to range [-1, 1]
         car_cmd.throttle = np.interp(u[0].cpu(), [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
@@ -148,8 +146,8 @@ class MPC_GPU_algorithm(Controller):
 
         self.goal_tensor = torch.tensor([self.goal.throttle, self.goal.steering], dtype=torch.float32, device=self.device)
 
-        # self.prev_a = goal.throttle
-        # self.prev_delta = goal.steering
+        # self.prev_a = self.goal.throttle
+        # self.prev_delta = self.goal.steering
 
     def offset_track(self, off:List[int]) -> None:
         """
@@ -270,10 +268,10 @@ class MPC_GPU_algorithm(Controller):
 
         # Compute the distances
         distance = torch.abs(self.a * x + self.b * y + self.c)/self.denom
-        # cost = torch.where(distance < 2.0*self.safety_radius, 1/distance, torch.zeros_like(distance))
-        cost = torch.where(distance < self.safety_radius, np.inf, torch.zeros_like(distance))
-        cost = torch.sum(cost, dim=2)
-        cost = torch.sum(cost, dim=0)
+        cost = torch.where(distance < 2.0*self.safety_radius, 1/distance, torch.zeros_like(distance))
+        # cost = torch.where(distance < self.safety_radius, np.inf, torch.zeros_like(distance))
+        cost = torch.sum(cost.squeeze(), dim=2)
+        cost = torch.sum(cost.squeeze(), dim=0)
         return cost
         
     def __eval_other_cars(self, states: torch.Tensor, others: torch.Tensor) -> torch.Tensor:
@@ -293,10 +291,10 @@ class MPC_GPU_algorithm(Controller):
         # Take the square root to get the Euclidean distance
         distance = torch.sqrt(sum_squared_difference)
 
-        # cost = torch.where(distance < 2.0*self.safety_radius, 1/distance, torch.zeros_like(distance))
-        cost = torch.where(distance < self.safety_radius, np.inf, torch.zeros_like(distance))
-        cost = torch.sum(cost, dim=2)
-        cost = torch.sum(cost, dim=1)
+        cost = torch.where(distance < self.safety_radius, 1/distance, torch.zeros_like(distance))
+        # cost = torch.where(distance < self.safety_radius, np.inf, torch.zeros_like(distance))
+        # cost = torch.sum(cost, dim=2)
+        cost = torch.sum(cost.squeeze(), dim=1)
         return cost
 
 
@@ -372,11 +370,23 @@ class MPC_GPU_algorithm(Controller):
                     other_i += 1
                 
                 cost_others = self.__eval_other_cars(states, other_states)
+                cost_others2 = torch.log((cost_others - torch.min(cost_others))/torch.max(cost_others) + 1)
+                cost_others2[torch.isnan(cost_others2)] = 0.0
 
             cost_input = self.__eval_input(input)
             cost_dist = self.__eval_distances(states)
+            
+            cost_input2 = torch.log((cost_input - torch.min(cost_input))/torch.max(cost_input) + 1)
+            cost_dist2 = torch.log((cost_dist - torch.min(cost_dist))/torch.max(cost_dist) + 1)
+            
+            cost_input2[torch.isnan(cost_input2)] = 0.0
+            cost_dist2[torch.isnan(cost_dist2)] = 0.0
 
-            cost = cost_input + cost_dist + cost_others
+            # if self.car_i == 0:
+            #     print(cost_input2, cost_dist2, cost_others2)
+
+
+            cost = 100*cost_dist2 + 100*cost_others2 + 2*cost_input2 
             
             min_cost, min_index = torch.min(cost, 0)
             self.best_i = min_index

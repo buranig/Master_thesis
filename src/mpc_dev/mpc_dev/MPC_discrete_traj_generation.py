@@ -32,6 +32,10 @@ arena_gain = json_object["CBF_simple"]["arena_gain"]
 Kv = json_object["CBF_simple"]["Kv"] # interval [0.5-1]
 Lr = L / 2.0  # [m]
 Lf = L - Lr
+Cf = json_object["Car_model"]["Cf"]  # N/rad
+Cr = json_object["Car_model"]["Cr"] # N/rad
+Iz = json_object["Car_model"]["Iz"]  # kg/m2
+m = json_object["Car_model"]["m"]  # kg
 WB = json_object["Controller"]["WB"]
 
 robot_num = 12 #json_object["robot_num"]
@@ -47,27 +51,11 @@ noise_scale_param = json_object["noise_scale_param"]
 show_animation = json_object["show_animation"]
 predict_time = json_object["LBP"]["predict_time"] # [s]
 dilation_factor = json_object["LBP"]["dilation_factor"]
+linear_model = True #json_object["linear_model"]
 
 debug = True
 
-color_dict = {
-    0: "r",
-    1: "b",
-    2: "g",
-    3: "y",
-    4: "m",
-    5: "c",
-    6: "k",
-    7: "tab:orange",
-    8: "tab:brown",
-    9: "tab:gray",
-    10: "tab:olive",
-    11: "tab:pink",
-    12: "tab:purple",
-    13: "tab:red",
-    14: "tab:blue",
-    15: "tab:green",
-}
+color_dict = {0: "r", 1: "b", 2: "g", 3: "y", 4: "m", 5: "c", 6: "k", 7: "tab:orange", 8: "tab:brown", 9: "tab:gray", 10: "tab:olive", 11: "tab:pink", 12: "tab:purple", 13: "tab:red", 14: "tab:blue", 15: "tab:green"}
 
 def uniform_sampling(d, a_max, a_min, nxy):
     """
@@ -131,7 +119,7 @@ class KinMPCPathFollower(Controller):
         A_DOT_MAX=1.5,
         DF_DOT_MIN=-0.5,  # min/max front steer angle rate constraint (rad/s)
         DF_DOT_MAX=0.5,
-        Q=[4.0, 4.0, 10.0, 4.0],  # weights on x, y, psi, and v.
+        Q=[4.0, 4.0, 10.0, 4.0, 0.0],  # weights on x, y, psi, and v.
         R=[0.0, 0.0],
     ):  # weights on jerk and slew rate (steering angle derivative)
         for key in list(locals()):
@@ -153,18 +141,27 @@ class KinMPCPathFollower(Controller):
         self.u_prev = self.opti.parameter(
             2
         )  # previous input: [u_{acc, -1}, u_{df, -1}]
-        self.z_curr = self.opti.parameter(4)  # current state:  [x_0, y_0, psi_0, v_0]
+        
+        if linear_model:
+            self.z_curr = self.opti.parameter(4)  # current state:  [x_0, y_0, psi_0, v_0]
+        else:
+            self.z_curr = self.opti.parameter(5)
 
         # Reference trajectory we would like to follow.
         # First index corresponds to our desired state at timestep k+1:
         #   i.e. z_ref[0,:] = z_{desired, 1}.
         # Second index selects the state element from [x_k, y_k, psi_k, v_k].
-        self.z_ref = self.opti.parameter(self.N, 4)
+        if linear_model:
+            self.z_ref = self.opti.parameter(self.N, 4)
+        else:
+            self.z_ref = self.opti.parameter(self.N, 5)
 
         self.x_ref = self.z_ref[:, 0]
         self.y_ref = self.z_ref[:, 1]
         self.psi_ref = self.z_ref[:, 2]
         self.v_ref = self.z_ref[:, 3]
+        if not linear_model:
+            self.omega_ref = self.z_ref[:, 4]
 
         """
 		(2) Decision Variables
@@ -173,7 +170,10 @@ class KinMPCPathFollower(Controller):
         # First index is the timestep k, i.e. self.z_dv[0,:] is z_0.
         # It has self.N+1 timesteps since we go from z_0, ..., z_self.N.
         # Second index is the state element, as detailed below.
-        self.z_dv = self.opti.variable(self.N + 1, 4)
+        if linear_model:
+            self.z_dv = self.opti.variable(self.N + 1, 4)
+        else:
+            self.z_dv = self.opti.variable(self.N + 1, 5)
 
         # self.x_dv = self.z_dv[:, 0]
         # self.y_dv = self.z_dv[:, 1]
@@ -226,34 +226,82 @@ class KinMPCPathFollower(Controller):
         self.opti.subject_to(self.z_dv[0,1] == self.z_curr[1])
         self.opti.subject_to(self.z_dv[0,2] == self.z_curr[2])
         self.opti.subject_to(self.z_dv[0,3] == self.z_curr[3])
+        if not linear_model:
+            self.opti.subject_to(self.z_dv[0,4] == self.z_curr[4])        
 
         # State Dynamics Constraints
-        for i in range(self.N):
-            beta = casadi.atan(
-                self.L_R / (self.L_F + self.L_R) * casadi.tan(self.df_dv[i])
-            )
+        # Kinematic model:
+        if linear_model:
+            for i in range(self.N):
+                beta = casadi.atan(
+                    self.L_R / (self.L_F + self.L_R) * casadi.tan(self.df_dv[i])
+                )
 
-            self.opti.subject_to(
-                self.z_dv[i + 1, 0]
-                == self.z_dv[i, 0]
-                + self.DT * (self.z_dv[i, 3] * casadi.cos(self.z_dv[i, 2] + beta))
-            )
+                self.opti.subject_to(
+                    self.z_dv[i + 1, 0]
+                    == self.z_dv[i, 0]
+                    + self.DT * (self.z_dv[i, 3] * casadi.cos(self.z_dv[i, 2] + beta))
+                )
 
-            self.opti.subject_to(
-                self.z_dv[i + 1, 1]
-                == self.z_dv[i, 1]
-                + self.DT * (self.z_dv[i, 3] * casadi.sin(self.z_dv[i, 2] + beta))
-            )
+                self.opti.subject_to(
+                    self.z_dv[i + 1, 1]
+                    == self.z_dv[i, 1]
+                    + self.DT * (self.z_dv[i, 3] * casadi.sin(self.z_dv[i, 2] + beta))
+                )
 
-            self.opti.subject_to(
-                self.z_dv[i + 1, 2]
-                == self.z_dv[i, 2]
-                + self.DT * (self.z_dv[i, 3] / self.L_R * casadi.sin(beta))
-            )
+                self.opti.subject_to(
+                    self.z_dv[i + 1, 2]
+                    == self.z_dv[i, 2]
+                    + self.DT * (self.z_dv[i, 3] / self.L_R * casadi.sin(beta))
+                )
 
-            self.opti.subject_to(
-                self.z_dv[i + 1, 3] == self.z_dv[i, 3] + self.DT * (self.acc_dv[i])
-            )
+                self.opti.subject_to(
+                    self.z_dv[i + 1, 3] == self.z_dv[i, 3] + self.DT * (self.acc_dv[i])
+                )
+        # Dynamic Model
+        else:
+            for i in range(self.N):
+                beta = casadi.atan(
+                    self.L_R / (self.L_F + self.L_R) * casadi.tan(self.df_dv[i])
+                )
+                kf = -Cf
+                kr = -Cr
+
+                self.opti.subject_to(
+                    self.z_dv[i+1, 0] 
+                    ==  self.z_dv[i, 0] 
+                    + self.z_dv[i, 3] * casadi.cos(beta) * casadi.cos(self.z_dv[i, 2]) * self.DT - self.z_dv[i, 3] * casadi.sin(beta) * casadi.sin(self.z_dv[i, 2]) * self.DT
+                    )
+                
+                self.opti.subject_to(
+                    self.z_dv[i+1, 1]
+                    ==  self.z_dv[i, 1]
+                    + self.z_dv[i, 3] * casadi.cos(beta) * casadi.sin(self.z_dv[i, 2]) * self.DT + self.z_dv[i, 3] * casadi.sin(beta) * casadi.cos(self.z_dv[i, 2]) * self.DT
+                    )
+
+                self.opti.subject_to(
+                    self.z_dv[i+1, 2]
+                    ==  self.z_dv[i, 2]
+                    + self.z_dv[i, 4] * self.DT
+                    )
+                
+                self.opti.subject_to(
+                    self.z_dv[i+1, 3]
+                    == self.z_dv[i, 3]
+                    + casadi.sqrt(
+                        (self.acc_dv[i] * self.DT)**2 
+                        + ((m * self.z_dv[i, 3]*casadi.cos(beta)*self.z_dv[i, 3]*casadi.sin(beta) + 
+                            (self.L_F*kf-self.L_R*kr)*self.z_dv[i, 4] 
+                            - self.DT*kf*self.df_dv[i]*self.z_dv[i, 3]*casadi.cos(beta) 
+                            - self.DT*m*self.z_dv[i, 3]*casadi.cos(beta)**2*self.z_dv[i, 4])
+                            /(m*self.z_dv[i, 3]*casadi.cos(beta) - self.DT*(kf+kr)))**2
+                    )
+                    )
+                
+                self.opti.subject_to(
+                    self.z_dv[i+1, 4]
+                    ==  (Iz*self.z_dv[i, 4]*self.z_dv[i, 3]*casadi.cos(beta) + self.DT*(self.L_F*kf-self.L_R*kr)*self.z_dv[i, 4] - self.DT*self.L_F*kf*self.df_dv[i]*self.z_dv[i, 3]*casadi.cos(beta))/(Iz*self.z_dv[i, 3]*casadi.cos(beta) - self.DT*(self.L_F**2*kf+self.L_R**2*kr))
+                    )
 
         # Input Bound Constraints
         self.opti.subject_to(self.opti.bounded(self.A_MIN, self.acc_dv, self.A_MAX))
@@ -373,160 +421,22 @@ class KinMPCPathFollower(Controller):
             self.opti.set_initial(self.u_dv, update_dict["warm_start"]["u_ws"])
             self.opti.set_initial(self.sl_dv, update_dict["warm_start"]["sl_ws"])
 
-    def _update_initial_condition(self, x0, y0, psi0, vel0):
-        self.opti.set_value(self.z_curr, [x0, y0, psi0, vel0])
+    def _update_initial_condition(self, x0, y0, psi0, vel0, omega0=0.0):
+        if linear_model:
+            self.opti.set_value(self.z_curr, [x0, y0, psi0, vel0])
+        else:
+            self.opti.set_value(self.z_curr, [x0, y0, psi0, vel0, omega0])
 
-    def _update_reference(self, x_ref, y_ref, psi_ref, v_ref):
+    def _update_reference(self, x_ref, y_ref, psi_ref, v_ref, omega_ref=0.0):
         self.opti.set_value(self.x_ref, x_ref)
         self.opti.set_value(self.y_ref, y_ref)
         self.opti.set_value(self.psi_ref, psi_ref)
         self.opti.set_value(self.v_ref, v_ref)
+        if not linear_model:
+            self.opti.set_value(self.omega_ref, omega_ref)
 
     def _update_previous_input(self, acc_prev, df_prev):
         self.opti.set_value(self.u_prev, [acc_prev, df_prev])
-
-
-def motion(kmpc, x, u, dt):
-    beta = casadi.atan(kmpc.L_R / (kmpc.L_F + kmpc.L_R) * casadi.tan(u[1]))
-    x[0] = x[0] + kmpc.DT * (x[3] * casadi.cos(x[2] + beta))
-    x[1] = x[1] + kmpc.DT * (x[3] * casadi.sin(x[2] + beta))
-    x[2] = x[2] + kmpc.DT * (x[3] / kmpc.L_R * casadi.sin(beta))
-    x[3] = x[3] + u[0] * kmpc.DT
-
-    return x
-
-
-def plot_robot(kmpc, x, y, yaw, i):
-    """
-    Plot the robot.
-
-    Args:
-        x (float): X-coordinate of the robot.
-        y (float): Y-coordinate of the robot.
-        yaw (float): Yaw angle of the robot.
-        i (int): Index of the robot.
-    """
-    L = kmpc.L_F + kmpc.L_R
-    WB = L / 2
-    outline = np.array(
-        [
-            [-L / 2, L / 2, (L / 2), -L / 2, -L / 2],
-            [WB / 2, WB / 2, -WB / 2, -WB / 2, WB / 2],
-        ]
-    )
-    Rot1 = np.array([[math.cos(yaw), math.sin(yaw)], [-math.sin(yaw), math.cos(yaw)]])
-    outline = (outline.T.dot(Rot1)).T
-    outline[0, :] += x
-    outline[1, :] += y
-    plt.plot(
-        np.array(outline[0, :]).flatten(),
-        np.array(outline[1, :]).flatten(),
-        color_dict[i],
-        label="Robot " + str(i),
-    )
-
-def main():
-    cx, cy, cyaw, ck = get_switch_back_course(3)
-    # plt.plot(cx, cy, 'r--')
-    # plt.show()
-    idx = 1
-    u_idx = 0
-    acc_prev = 0.0
-    df_prev = 0.0
-    x = np.array([0.0, 2.000, 0.0, 0.0])
-
-    kmpc = KinMPCPathFollower(None, None)
-    # kmpc.opti.set_value(kmpc.z_curr, [x[0], x[1], x[2], x[3]])
-    # kmpc.opti.subject_to()
-    # kmpc._add_constraints()
-    kmpc._update_initial_condition(x[0], x[1], x[2], x[3])
-    kmpc._update_reference([cx[idx]] * kmpc.N, [cy[idx]] * kmpc.N, [cyaw[idx]] * kmpc.N, [0] * kmpc.N)
-    kmpc._update_previous_input(acc_prev, df_prev)
-
-    # kmpc._add_constraints()
-    sol_dict = kmpc.solve()
-    print("x: ", x)
-    print(f"goal: {sol_dict['z_mpc'][0, :]}")
-
-    fig, ax = plt.subplots()
-
-    for z in range(1000):
-        plt.cla()
-        plt.gcf().canvas.mpl_connect(
-            "key_release_event",
-            lambda event: [exit(0) if event.key == "escape" else None],
-        )
-
-        if u_idx == kmpc.N - 1 or np.linalg.norm([x[0] - cx[idx], x[1] - cy[idx]]) < 2:
-            print("Switching to next reference point.")
-            idx += 1
-            print("idx: ", idx)
-
-            kmpc = KinMPCPathFollower(None, None)
-            kmpc._update_initial_condition(x[0], x[1], x[2], x[3])
-            kmpc._update_reference(
-                [cx[idx]] * kmpc.N,
-                [cy[idx]] * kmpc.N,
-                [cyaw[idx]] * kmpc.N,
-                [0] * kmpc.N,
-            )
-            kmpc._update_previous_input(acc_prev, df_prev)
-
-            sol_dict = kmpc.solve()
-            u_idx = 0
-            # for key in sol_dict:
-            #     print(key, sol_dict[key])
-            # print("\n")
-            print("x: ", x)
-            print(f"goal: {sol_dict['z_mpc'][0, :]}")
-            print(f"ref: {sol_dict['z_ref'][-1, :]}")
-            print('\n')
-        else:
-            u = sol_dict["u_mpc"][u_idx, :]
-            x = motion(kmpc, x, u, kmpc.DT).reshape(-1)
-            u_idx += 1
-            acc_prev = u[0]
-            df_prev = u[1]
-
-        plot_robot(kmpc, x[0], x[1], x[2], 0)
-        plt.plot(sol_dict["z_mpc"][:, 0], sol_dict["z_mpc"][:, 1], "b--")
-        utils.plot_arrow(x[0], x[1], x[2] + u[1], length=3, width=0.5)
-        utils.plot_arrow(x[0], x[1], x[2], length=1, width=0.5)
-        plt.scatter(
-            sol_dict["z_ref"][-1, 0],
-            sol_dict["z_ref"][-1, 1],
-            marker="x",
-            color=color_dict[0],
-            s=200,
-        )
-        plt.plot(cx, cy, "r--")
-        if kmpc.obsx is not None:
-            for obs in range(len(kmpc.obsx)):
-                ax.add_patch(plt.Circle((kmpc.obsx[obs], kmpc.obsy[obs]), kmpc.L_R, color='r', alpha=0.5))
-        plt.axis("equal")
-        plt.grid(True)
-        plt.pause(0.1)
-
-    # sol_dict = kmpc.solve()
-
-    # for key in sol_dict:
-    # 	print(key, sol_dict[key])
-
-    # fig, ax = plt.subplots()
-
-    # # Plot simulation
-    # for z in range(kmpc.N):
-    # 	plt.cla()
-    # 	utils.plot_robot(sol_dict['z_mpc'][z,0], sol_dict['z_mpc'][z,1], sol_dict['z_mpc'][z,2], 0)
-    # 	plt.plot(sol_dict['z_mpc'][:,0], sol_dict['z_mpc'][:,1], 'b--')
-    # 	utils.plot_arrow(sol_dict['z_mpc'][z,0], sol_dict['z_mpc'][z,1], sol_dict['z_mpc'][z,2] + sol_dict['u_mpc'][z,1] , length=3, width=0.5)
-    # 	utils.plot_arrow(sol_dict['z_mpc'][z,0], sol_dict['z_mpc'][z,1], sol_dict['z_mpc'][z,2], length=1, width=0.5)
-    # 	plt.scatter(sol_dict['z_ref'][-1,0], sol_dict['z_ref'][-1,1], marker="x", color=color_dict[0], s=200)
-    # 	ax.add_patch(plt.Circle((kmpc.obsx, kmpc.obsy), 0.5, color='r', alpha=0.5))
-    # 	plt.axis("equal")
-    # 	plt.grid(True)
-    # 	plt.pause(0.2)
-    # plt.show()
 
 def main2():
     kmpc = KinMPCPathFollower(None, None)
@@ -575,9 +485,9 @@ def main2():
                 lambda event: [exit(0) if event.key == "escape" else None],
             )
             for i, state in enumerate(states):
-                kmpc._update_initial_condition(0.0, 0.0, 0.0, v0)
+                kmpc._update_initial_condition(0.0, 0.0, 0.0, v0, 0.0)
                 kmpc._update_reference(
-                    [state[0]] * kmpc.N, [state[1]] * kmpc.N, [state[2]] * kmpc.N, [v] * kmpc.N)
+                    [state[0]] * kmpc.N, [state[1]] * kmpc.N, [state[2]] * kmpc.N, [v] * kmpc.N, [0.0]*kmpc.N)
                 sol_dict = kmpc.solve()
 
                 # Saving the trajectory in a dictionary

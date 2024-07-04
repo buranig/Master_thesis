@@ -1,5 +1,6 @@
 import numpy as np
 
+from piqp import DenseSolver, PIQP_SOLVED
 from cvxopt import matrix, solvers
 from cvxopt import matrix
 from planner import utils as utils
@@ -249,7 +250,7 @@ class CBF_algorithm():
         """
         N = x.shape[1]
         M = self.dxu.shape[0]
-        self.dxu[1,:] = utils.delta_to_beta_array(self.dxu[1,:])
+        self.dxu[1,i] = utils.delta_to_beta(self.dxu[1,i])
 
         count = 0
         G = np.zeros([N - 1 + 10, M])
@@ -330,6 +331,7 @@ class CBF_algorithm():
         H[count] = np.array([arena_gain * h ** 3 + Lf_h])
         # G = np.vstack([G, -Lg_h])
         # H = np.vstack([H, np.array([arena_gain * h ** 3 + Lf_h])])
+        count += 1
 
         # Neg Y
         h = ((x[1, i] - boundary_points[2]) ** 2 - safety_radius ** 2 - Kv * abs(x[3, i]))
@@ -341,6 +343,9 @@ class CBF_algorithm():
         Lg_h = np.dot(gradH.T, g)
         G[count, :] = np.array([-Lg_h])
         H[count] = np.array([arena_gain * h ** 3 + Lf_h])
+        # G = np.vstack([G, -Lg_h])
+        # H = np.vstack([H, np.array([arena_gain * h ** 3 + Lf_h])])
+        count += 1
 
         # Pos X
         h = ((x[0, i] - boundary_points[1]) ** 2 - safety_radius ** 2 - Kv * abs(x[3, i]))
@@ -352,6 +357,9 @@ class CBF_algorithm():
         Lg_h = np.dot(gradH.T, g)
         G[count, :] = np.array([-Lg_h])
         H[count] = np.array([arena_gain * h ** 3 + Lf_h])
+        # G = np.vstack([G, -Lg_h])
+        # H = np.vstack([H, np.array([arena_gain * h ** 3 + Lf_h])])
+        count += 1
 
         # Neg X
         h = ((x[0, i] - boundary_points[0]) ** 2 - safety_radius ** 2 - Kv * abs(x[3, i]))
@@ -363,15 +371,18 @@ class CBF_algorithm():
         Lg_h = np.dot(gradH.T, g)
         G[count, :] = np.array([-Lg_h])
         H[count] = np.array([arena_gain * h ** 3 + Lf_h])
+        # G = np.vstack([G, -Lg_h])
+        # H = np.vstack([H, np.array([arena_gain * h ** 3 + Lf_h])])
+        count += 1
 
-        solvers.options['show_progress'] = False
-        try:
-            sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(H))
-            self.dxu[:,i] = np.reshape(np.array(sol['x']), (M,))
-            # if show_animation:
-            #     circle2 = plt.Circle((x[0,i], x[1,i]), safety_radius+ Kv * abs(x[3, i]), color='b', fill=False)
-            #     self.ax.add_patch(circle2)
-        except:
+        start_solver = time.time()
+        solver = DenseSolver()
+        solver.settings.verbose = False
+        solver.setup(P, q, np.empty((0, P.shape[0])), np.empty((0,)), G, H)
+        status = solver.solve()
+        if status == PIQP_SOLVED:
+            self.dxu[:,i] = np.reshape(solver.result.x, (M,))
+        else:
             print(f"QP solver failed for robot {i}! Emergency stop.") 
             self.dxu[0,i] = (0 - x[3,i])/dt 
             self.solver_failure += 1

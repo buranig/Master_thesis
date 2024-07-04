@@ -51,8 +51,9 @@ height_init = json_object["height"]
 N=3
 save_flag = True
 show_animation = True
-plot_flag = True
+plot_flag = False
 timer_freq = json_object["timer_freq"]
+kinematic = False
 
 class RobotType(Enum):
     circle = 0
@@ -60,25 +61,6 @@ class RobotType(Enum):
 
 robot_type = RobotType.rectangle
 robot_radius = 1.0
-
-def motion(x, u, dt):
-    """
-    motion model
-    initial state [x(m), y(m), yaw(rad), v(m/s), omega(rad/s)]
-    """
-    delta = u[1]
-    delta = np.clip(delta, -max_steer, max_steer)
-    throttle = u[0]
-
-    x[0] = x[0] + x[3] * math.cos(x[2]) * dt
-    x[1] = x[1] + x[3] * math.sin(x[2]) * dt
-    x[2] = x[2] + x[3] / L * math.tan(delta) * dt
-    x[3] = x[3] + throttle * dt
-    x[2] = utils.normalize_angle(x[2])
-    x[3] = np.clip(x[3], min_speed, max_speed)
-
-    return x
-
 
 def calc_trajectory(x_init, u, dt):
     """
@@ -88,7 +70,10 @@ def calc_trajectory(x_init, u, dt):
     traj = np.array(x)
     time = 0.0
     while time <= predict_time:
-        x = motion(x, u, dt)
+        if kinematic:
+            x = utils.motion(x, u, dt)
+        else:
+            x = utils.nonlinear_model_numpy_stable(x, u, dt)
         traj = np.vstack((traj, x))
         time += dt
         if x[3]>max_speed or x[3]<min_speed:
@@ -103,23 +88,13 @@ def calc_dynamic_window():
     """
     # Dynamic window from robot specification
     Vs = [min_acc, max_acc,
-          -max_steer, max_steer]
-    
-    
-    # Dynamic window from motion model
-    # Vd = [x[3] - config.max_acc*0.1,
-    #       x[3] + config.max_acc*0.1,
-    #       -max_steer,
-    #       max_steer]
-    
-    # #  [min_throttle, max_throttle, min_steer, max_steer]
-    # dw = [min(Vs[0], Vd[0]), min(Vs[1], Vd[1]), min(Vs[2], Vd[2]), min(Vs[3], Vd[3])]
+          -max_steer, max_steer]  # [m/s^2, m/s^2, rad/s, rad/s]
 
     dw = [Vs[0], Vs[1], Vs[2], Vs[3]]
     
     return dw
 
-def generate_trajectories(x_init):
+def generate_trajectories_normal(x_init):
     """
     Generate trajectories
     """
@@ -145,6 +120,22 @@ def generate_trajectories(x_init):
 
     return traj, u_total
 
+def generate_trajectories(x_init):
+    """
+    Generate trajectories
+    """
+    dw = calc_dynamic_window()
+    traj = []
+    u_total = []
+    for a in np.arange(dw[0], dw[1]+a_resolution, a_resolution):
+    
+        for delta in np.arange(dw[2], dw[3]+delta_resolution, delta_resolution):
+            u = np.array([a, delta])
+            traj.append(calc_trajectory(x_init, u, dt))
+            u_total.append(u)
+
+    return traj, u_total
+
 def find_nearest(array, value):
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
@@ -163,11 +154,15 @@ def main():
         # initial state [x(m), y(m), yaw(rad), v(m/s)]
         for v in np.arange(min_speed, max_speed+v_resolution, v_resolution):
             print(v)
-            x_init = np.array([0.0, 0.0, np.radians(90.0), v])
-            # x_init = np.array([0.0, 0.0, np.radians(0.0), v])
+
+            if kinematic:
+                x_init = np.array([0.0, 0.0, np.radians(90.0), v])
+            else:
+                x_init = np.array([0.0, 0.0, np.radians(90.0), v, 0.0])
 
             traj, u_total = generate_trajectories(x_init)
-
+            # traj, u_total = generate_trajectories_normal(x_init)
+            
             if plot_flag:
                 plt.plot(x_init[0], x_init[1], "xr")
                 for trajectory in traj:
@@ -214,16 +209,25 @@ def main():
             plt.show()
         # print(complete_trajectories)
         
-        # # saving the complete trajectories to a csv file
-        # with open('src/dwa_dev/trajectories.json', 'w') as file:
-        #     json.dump(complete_trajectories, file, indent=4)
-
-        print("\nThe JSON data has been written to 'data.json'")
+        # saving the complete trajectories to a csv file
+        if kinematic:
+            with open('src/dwa_dev/trajectories.json', 'w') as file:
+                json.dump(complete_trajectories, file, indent=4)
+            print("\nThe JSON data has been written to 'src/dwa_dev/trajectories.json'")
+            
+        else:
+            with open('src/dwa_dev/dynamic_trajectories.json', 'w') as file:
+                json.dump(complete_trajectories, file, indent=4)
+            print("\nThe JSON data has been written to 'src/dwa_dev/dynamic_trajectories.json'")
 
 
     # reading the first element of data.jason, rotating and traslating the geometry to and arbitrary position and plotting it
-    with open('src/dwa_dev/trajectories.json', 'r') as file:
-        data = json.load(file)
+    if kinematic:
+        with open('src/dwa_dev/trajectories.json', 'r') as file:
+            data = json.load(file)
+    else:
+        with open('src/dwa_dev/dynamic_trajectories.json', 'r') as file:
+            data = json.load(file)
 
     fig = plt.figure(1, dpi=90)
     ax = fig.add_subplot(111)
@@ -231,7 +235,8 @@ def main():
         x_init = np.array([0.0, 0.0, np.radians(90.0), v])
         dw = calc_dynamic_window()
         for a in np.arange(dw[0], dw[1]+a_resolution, a_resolution):
-            for delta in np.arange(dw[2], dw[3]+delta_resolution, delta_resolution):
+            delta_keys = list(data[str(v)][str(a)].keys())
+            for delta in delta_keys:
                 # print(v, a, delta)
                 geom = data[str(v)][str(a)][str(delta)]
                 geom = np.array(geom)

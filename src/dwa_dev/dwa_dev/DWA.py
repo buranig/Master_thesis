@@ -126,6 +126,22 @@ def predict_trajectory(x_init, a, delta):
         time += dt
     return trajectory
 
+def calc_reference_input_cost(input, goal_input, i):
+    """
+    Calculate the reference input cost.
+
+    Args:
+        input (list): Input [throttle, delta].
+
+    Returns:
+        float: Reference input cost.
+    """
+    da = input[0]-goal_input[0,i]
+    ddelta = input[1]-goal_input[1,i]
+
+    cost = np.hypot(da, ddelta)
+    return cost
+
 def calc_obstacle_cost(trajectory, ob):
     """
     Calculate the obstacle cost.
@@ -295,6 +311,7 @@ class DWA_algorithm():
         self.reached_goal = [False]*robot_num
         self.computational_time = []
         self.solver_failure = 0
+        self.goal_input = np.zeros((2, robot_num))
         self.time_bkp = time.time()
 
     def run_dwa(self, x, u, break_flag):
@@ -432,9 +449,12 @@ class DWA_algorithm():
         if add_noise:
             noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(1, 2), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=1)
             noisy_pos = x1 + noise[0]
+
+            self.goal_input[0, i], self.goal_input[1,i] = utils.pure_pursuit_steer_control(self.targets[i], utils.array_to_state(noisy_pos))
             u1, predicted_trajectory1, u_history = self.dwa_control(noisy_pos, ob, i)
             plt.plot(noisy_pos[0], noisy_pos[1], "x", color=color_dict[i], markersize=10)
         else:
+            self.goal_input[0, i], self.goal_input[1,i] = utils.pure_pursuit_steer_control(self.targets[i], utils.array_to_state(x1))
             u1, predicted_trajectory1, u_history = self.dwa_control(x1, ob, i)
         self.dilated_traj[i] = LineString(zip(predicted_trajectory1[:, 0], predicted_trajectory1[:, 1])).buffer(dilation_factor, cap_style=3)
 
@@ -513,16 +533,18 @@ class DWA_algorithm():
                     trajectory = geom
                     # calc cost
 
-                    to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory, goal)
-                    speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
-                    if trajectory[-1, 3] <= 0.0:
-                        speed_cost = 10
-                    else:
-                        speed_cost = 0.0
+                    # to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory, goal)
+                    reference_input_cost = 100*calc_reference_input_cost([a, delta], self.goal_input, i)
+                    # speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
+                    # if trajectory[-1, 3] <= 0.0:
+                    #     speed_cost = 10
+                    # else:
+                    #     speed_cost = 0.0
                     ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory, ob)
-                    # heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory, goal)
-                    final_cost = to_goal_cost + ob_cost + speed_cost # + heading_cost #+ speed_cost 
-                    
+                    # # heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory, goal)
+                    # final_cost = to_goal_cost + ob_cost + speed_cost # + heading_cost #+ speed_cost 
+                    final_cost = reference_input_cost + ob_cost
+
                     # search minimum trajectory
                     if min_cost >= final_cost:
                         min_cost = final_cost
@@ -540,12 +562,14 @@ class DWA_algorithm():
                 trajectory_buf[:,0:2] = (trajectory_buf[:,0:2]) @ utils.rotateMatrix(utils.normalize_angle(-x[2]+trajectory_buf[0,2]))
                 trajectory_buf[:,0:2] += x[0:2]
                 trajectory_buf[:,2] += utils.normalize_angle(x[2]-trajectory_buf[0,2])
-
-                to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
-                # speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
+                
+                reference_input_cost = 100* calc_reference_input_cost([a, delta], self.goal_input, i)
+                # to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
+                # # speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
                 ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory_buf, ob)
-                heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory_buf, goal)
-                final_cost = to_goal_cost + ob_cost + heading_cost #+ speed_cost 
+                # heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory_buf, goal)
+                # final_cost = to_goal_cost + ob_cost + heading_cost #+ speed_cost 
+                final_cost = reference_input_cost + ob_cost
 
                 if min_cost >= final_cost:
                     min_cost = final_cost

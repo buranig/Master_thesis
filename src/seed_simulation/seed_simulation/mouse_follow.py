@@ -16,6 +16,8 @@ from cbf_dev import C3BF as C3BF
 from cbf_dev import CBF_simple as CBF
 from test_ps4_controller import PS4Controller
 from custom_message.msg import ControlInputs, MultiControl, Coordinate
+from shapely.geometry import Point, LineString
+
 # for debugging
 from numpy import cos, sin
 
@@ -166,6 +168,9 @@ def main_dwa(seed, robot_num):
     print(__file__ + " start!!")
     iterations = 3000
     break_flag = False
+
+    ps4 = PS4Controller()
+    ps4.init()
     
     x0, y, yaw, v, omega, model_type = utils.samplegrid(width_init, height_init, robot_num)
     
@@ -210,14 +215,25 @@ def main_dwa(seed, robot_num):
                 # Perform some action when the condition is met
                 dwa.paths[i] = utils.update_path(paths[i])
                 dwa.targets[i] = (paths[i][0].x, paths[i][0].y)
+            
+            ob = [dwa.dilated_traj[idx] for idx in range(len(dwa.dilated_traj)) if idx != i]
 
-            x, u = dwa.update_robot_state(x, u, dt, i)
+            if i != 0:
+                dwa.goal_input[0,i], dwa.goal_input[1,i] = utils.pure_pursuit_steer_control(dwa.targets[i], utils.array_to_state(x[:, i]))
+            else:
+                dwa.goal_input[0,i], dwa.goal_input[1,i] = ps4.control_input()
+                utils.plot_arrow(x[0, i], x[1, i], x[2, i] + dwa.goal_input[1,i], length=3, width=0.5, color='b')
+            
+            u[:, i], dwa.predicted_trajectory[i], dwa.u_hist[i] = dwa.dwa_control(x[:, i], ob, i)
+            dwa.dilated_traj[i] = LineString(zip(dwa.predicted_trajectory[i][:, 0], dwa.predicted_trajectory[i][:, 1])).buffer(dilation_factor, cap_style=3)
+            
+            u, x = dwa.check_collision(x,u,i)
+            # x, u = dwa.update_robot_state(x, u, dt, i)
+            x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], u[:, i], dt)
 
-            if dwa.check_goal_reached(x, i):
-                break_flag = True
 
             if show_animation:
-                utils.plot_robot_trajectory(x, u, dwa.predicted_trajectory, dilated_traj, targets, ax, i)
+                utils.plot_robot_trajectory(x, u, dwa.predicted_trajectory, dwa.dilated_traj, dwa.targets, dwa.ax, i)
 
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")
@@ -233,6 +249,7 @@ def main_dwa(seed, robot_num):
             plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-r")
         plt.pause(0.0001)
         plt.show()
+
 def main_mpc(seed, robot_num):
     """
     Main function for controlling multiple robots using Model Predictive Control (MPC).
@@ -415,10 +432,10 @@ def main_c3bf(seed, robot_num):
                 c3bf.C3BF(i, x)
             
             else:
-                c3bf.dxu[0, i], c3bf.dxu[1, i], collision_avoidance = ps4.control_input()
-                if collision_avoidance:
-                    c3bf.C3BF(i, x)
+                c3bf.dxu[0, i], c3bf.dxu[1, i] = ps4.control_input()
+                utils.plot_arrow(x[0, i], x[1, i], x[2, i] + c3bf.dxu[1, i], length=3, width=0.5, color='b')
 
+            c3bf.C3BF(i, x)
             x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], c3bf.dxu[:, i])
             utils.plot_robot_and_arrows(i, x, c3bf.dxu, c3bf.targets, c3bf.ax)
 

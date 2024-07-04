@@ -53,9 +53,6 @@ emergency_brake_distance = json_object["DWA"]["emergency_brake_distance"]
 update_dist = 2
 # N=3
 
-robot_num = json_object["robot_num"]
-timer_freq = json_object["timer_freq"]
-
 show_animation = json_object["show_animation"]
 boundary_points = np.array([-width_init/2, width_init/2, -height_init/2, height_init/2])
 check_collision_bool = False
@@ -298,6 +295,7 @@ class DWA_algorithm():
         self.reached_goal = [False]*robot_num
         self.computational_time = []
         self.solver_failure = 0
+        self.time_bkp = time.time()
 
     def run_dwa(self, x, u, break_flag):
         """
@@ -372,6 +370,39 @@ class DWA_algorithm():
             # If we want the robot to disappear when it reaches the goal, indent one more time
             if show_animation:
                 utils.plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
+        if all(self.reached_goal):
+                break_flag = True
+        return x, u, break_flag
+    
+    def random_harem(self, x, u, break_flag):
+        """
+        Runs the DWA algorithm.
+
+        Args:
+            x (numpy.ndarray): Current state of the robots.
+            u (numpy.ndarray): Control input for the robots.
+            break_flag (bool): Flag indicating if the algorithm should stop.
+
+        Returns:
+            tuple: Updated state, control input, and break flag.
+
+        """
+        for i in range(self.robot_num):
+            if not self.reached_goal[i]:
+                # Step 9: Check if the distance between the current position and the target is less than 5
+                if time.time()-self.time_bkp > 100:
+                    self.targets = utils.update_targets(x, self.targets)
+                    self.time_bkp = time.time()
+
+                else:
+                    self.targets[i] = [x[0, self.targets[i][2]], x[1, self.targets[i][2]], self.targets[i][2]]
+                    t_prev = time.time()
+                    x, u = self.update_robot_state(x, u, dt, i)
+                    self.computational_time.append(time.time()-t_prev)
+
+            if show_animation:
+                utils.plot_robot_trajectory(x, u, self.predicted_trajectory, self.dilated_traj, self.targets, self.ax, i)
+        
         if all(self.reached_goal):
                 break_flag = True
         return x, u, break_flag
@@ -594,6 +625,92 @@ class DWA_algorithm():
             return True
         return False
 
+def random_harem():
+    """
+    Main function that controls the execution of the program.
+
+    Steps:
+    1. Initialize the necessary variables and arrays.
+    2. Generate initial robot states and trajectories.
+    3. Initialize paths, targets, and dilated trajectories.
+    4. Start the main loop for a specified number of iterations.
+    5. Update targets and robot states for each robot.
+    6. Calculate the right input using the Dynamic Window Approach method.
+    7. Predict the future trajectory using the calculated input.
+    8. Check if the goal is reached for each robot.
+    9. Plot the robot trajectories and the map.
+    11. Break the loop if the goal is reached for any robot.
+    12. Print "Done" when the loop is finished.
+    13. Plot the final trajectories if animation is enabled.
+    """
+    
+    print(__file__ + " start!!")
+    iterations = 3000
+    break_flag = False
+    
+    # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
+    initial_state = seed['initial_position']
+    x0 = initial_state['x']
+    y = initial_state['y']
+    yaw = initial_state['yaw']
+    v = initial_state['v']
+    omega = [0.0]*len(initial_state['x'])
+
+    # Step 3: Create an array x with the initial values
+    x = np.array([x0, y, yaw, v, omega])
+    u = np.zeros((2, robot_num))
+
+    trajectory = np.zeros((x.shape[0], robot_num, 1))
+    trajectory[:, :, 0] = x
+
+    predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 4]))
+    for i in range(robot_num):
+        predicted_trajectory[i] = np.full((int(predict_time/dt), 4), x[0:4,i])
+
+    # Step 4: Create paths for each robot
+    traj = seed['trajectories']
+    paths = [[Coordinate(x=traj[str(idx)][i][0], y=traj[str(idx)][i][1]) for i in range(len(traj[str(idx)]))] for idx in range(robot_num)]
+
+    # Step 5: Extract the target coordinates from the paths
+    targets = [[x[0,0], x[1, 0], 0] for path in paths]
+    targets = utils.update_targets(x, targets)
+
+    # Step 6: Create dilated trajectories for each robot
+    dilated_traj = []
+    for i in range(robot_num):
+        dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
+    
+    u_hist = dict.fromkeys(range(robot_num),[[0,0] for _ in range(int(predict_time/dt))])
+    fig = plt.figure(1, dpi=90, figsize=(10,10))
+    ax = fig.add_subplot(111)
+    
+    # Step 7: Create an instance of the DWA_algorithm class
+    dwa = DWA_algorithm(robot_num, paths, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist)
+
+    for z in range(iterations):
+        plt.cla()
+        plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
+        
+        x, u, break_flag = dwa.random_harem(x, u, break_flag)
+        # x, u, break_flag = dwa.go_to_goal(x, u, break_flag)
+        trajectory = np.dstack([trajectory, x])
+            
+        utils.plot_map(width=width_init, height=height_init)
+        plt.axis("equal")
+        plt.grid(True)
+        plt.pause(0.0001)
+
+        if break_flag:
+            break
+
+    print("Done")
+    if show_animation:
+        for i in range(robot_num):
+            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
+        plt.pause(0.0001)
+        plt.show()
+
+
 def main_seed():
     """
     Main function that controls the execution of the program.
@@ -679,5 +796,6 @@ def main_seed():
         plt.show()
        
 if __name__ == '__main__':
-    main_seed()
+    # main_seed()
+    random_harem()
     # main()

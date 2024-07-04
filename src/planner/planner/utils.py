@@ -818,3 +818,17 @@ def check_goal_reached(x, targets, i, distance=0.5):
         print(f"Vehicle {i} reached goal!")
         return True
     return False
+
+def update_targets(x, targets):
+    """
+    Updates the target waypoints for each robot.
+
+    Selects random targets for each robot, excluding it
+    """
+    for i in range(len(x[0])):
+        idx = random.choice([idx for idx in range(0, len(x[0])) if idx not in [i]])
+        targets[i] = [x[0, idx], x[1, idx], idx]
+        print(f"New targets for vechicle {i}: Robot {idx}")
+    print('\n')
+
+    return targets

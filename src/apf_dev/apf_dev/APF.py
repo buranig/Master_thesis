@@ -46,7 +46,7 @@ show_animation = json_object["show_animation"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/seed_9.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_8.json', 'r') as file:
     data = json.load(file)
 
 class PotentialFieldController:
@@ -59,7 +59,7 @@ class PotentialFieldController:
 
         self.k_rep = 100 # Repulsive force gain
         self.k_att = 10 # Attractive force gain
-        self.k_arena = 1000 #7000
+        self.k_arena = 0 #7000
 
         self.n = 2
 
@@ -213,7 +213,7 @@ class PotentialFieldController:
         attractive_potential = self.attractive_potential(position, i)
         repulsive_potential = self.repulsive_gaussian_potential_imp(position, i)
         arena_potential = self.repulsive_arena_potential(position)
-        total_potential = arena_potential + repulsive_potential + attractive_potential
+        total_potential = arena_potential + repulsive_potential + attractive_potential #
         return total_potential
     
     def calculate_total_gaussian_force(self, position, i):
@@ -469,9 +469,15 @@ class PotentialFieldController:
     def remap(self, x, in_min, in_max, out_min, out_max):
         return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
-    def plot_field(self):
+    def plot_field(self, x):
         # Plot the potential field
-        
+        self.obstacles = []
+        i = 0 # Plot the field for the i-th robot
+        for z in range(self.robot_num):
+            if z == i:
+                continue
+            else:
+                self.obstacles.append([x[0, z], x[1, z], 2])
         P, Z, dx, dy, X, Y = self.calculate_complete_field()
 
         # plt.figure(1)
@@ -499,7 +505,7 @@ class PotentialFieldController:
         # plt.show()
 
 
-        fig = plt.figure(figsize =(14, 9))
+        fig = plt.figure(2, figsize =(14, 9))
         ax = plt.axes(projection='3d')
         # Plot the surface.
         surf = ax.plot_surface(X, Y, Z, linewidth=0, antialiased=False)
@@ -559,6 +565,9 @@ def main_seed(args=None):
     targets = [[path[0].x, path[0].y] for path in paths]
 
     apf = PotentialFieldController(goal=targets, robot_num=robot_num, paths=paths, ax=ax)
+
+    apf.plot_field(x)
+
     # Step 8: Perform the simulation for the specified number of iterations
     for z in range(iterations):
         plt.cla()
@@ -602,6 +611,6 @@ if __name__ == '__main__':
     #               [15.0, 0.0, -np.pi, 0.0, 0.0]])
     # obstacles = [[x[1, 0], x[1,1], 2], [x[2, 0], x[2, 1], 2]]
     # controller = PotentialFieldController(goal, robot_num=3)
-    # # controller.plot_field()
-    # # controller.move_robot(x[0,:])
+    # controller.plot_field()
+    # controller.move_robot(x[0,:])
     # controller.run_apf(x)

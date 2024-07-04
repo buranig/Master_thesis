@@ -128,16 +128,19 @@ void G29ForceFeedback::loop() {
         }
     }
 
-    if (m_is_brake_range || m_auto_centering) {
-        calcCenteringForce(m_torque, m_target, m_position);
-        m_attack_length = 0.0;
+    // if (m_is_brake_range || m_auto_centering) {
+    //     calcCenteringForce(m_torque, m_target, m_position);
+    //     m_attack_length = 0.0;
 
-    } else {
-        calcRotateForce(m_torque, m_attack_length, m_target, m_position);
-        m_is_target_updated = false;
-    }
+    // } else {
+    //     calcRotateForce(m_torque, m_attack_length, m_target, m_position);
+    //     m_is_target_updated = false;
+    // }
 
+    calcRotateForce(m_torque, m_attack_length, m_target, m_position);
+    m_is_target_updated = false;
     uploadForce(m_target.position, m_torque, m_attack_length);
+    // uploadForce(m_target.position, m_target.torque, m_attack_length);
 }
 
 
@@ -148,20 +151,28 @@ void G29ForceFeedback::calcRotateForce(double &torque,
 
     double diff = target.position - current_position;
     double direction = (diff > 0.0) ? 1.0 : -1.0;
+    
+    torque = target.torque * direction;
+    torque = std::max(-m_max_torque, std::min(torque, m_max_torque));
+    // if (direction > 0.0){
+    //     torque = m
+    // }
+    attack_length = m_loop_rate;
+    // std::cout << "Position Difference: " << diff << ", Torque: " << torque << std::endl;
 
-    if (fabs(diff) < m_eps) {
-        torque = 0.0;
-        attack_length = 0.0;
+    // if (fabs(diff) < m_eps) {
+    //     torque = 0.0;
+    //     attack_length = 0.0;
 
-    } else if (fabs(diff) < m_brake_position) {
-        m_is_brake_range = true;
-        torque = target.torque * m_brake_torque * -direction;
-        attack_length = m_loop_rate;
+    // } else if (fabs(diff) < m_brake_position) {
+    //     m_is_brake_range = true;
+    //     torque = target.torque * m_brake_torque * -direction;
+    //     attack_length = m_loop_rate;
 
-    } else {
-        torque = target.torque * direction;
-        attack_length = m_loop_rate;
-    }
+    // } else {
+    //     torque = target.torque * direction;
+    //     attack_length = m_loop_rate;
+    // }
 }
 
 

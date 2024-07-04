@@ -151,6 +151,9 @@ class CollisionAvoidance(Node):
         self.timer = self.create_timer(self.dt, self.timer_callback)
         self.update_time = False
 
+        # Initializing wheel controller
+        self.PID = utils.PID_controller(-self.wheel_pos_request(), 0.0)
+
         # Get track position
         track_msg = self.track_request()
         while track_msg.updated == False:
@@ -160,8 +163,8 @@ class CollisionAvoidance(Node):
 
         # Set track boundaries offset
         track_offset = [track_pos.x, track_pos.y, track_pos.theta]
-        self.algorithm.boundary_points[1][0] = self.algorithm.boundary_points[1][0]*2.0/5.0
-        self.algorithm.boundary_points[2][0] = self.algorithm.boundary_points[2][0]*2.0/5.0
+        # self.algorithm.boundary_points[1][0] = self.algorithm.boundary_points[1][0]*2.0/5.0
+        # self.algorithm.boundary_points[2][0] = self.algorithm.boundary_points[2][0]*2.0/5.0
         self.algorithm.offset_track(track_offset)
         
         self.send_once = False
@@ -357,10 +360,17 @@ class CollisionAvoidance(Node):
                 if self.write_data:
                     self.write_csv(des_action.cmd, cmd_out, it_time)
                 
+                wheel_pos = -self.wheel_pos_request()
                 if self.car_i == 0 and (main_control or ca_active):
-                    self.publish_ff(cmd_out.steering, 0.2)
-                elif self.car_i == 0 and (main_control==False or ca_active==False):
-                    self.publish_ff(0.0, 0.0)
+                    self.PID.update_target(-cmd_out.steering)
+                    self.PID.compute_input(wheel_pos)
+                    self.PID.update_state(wheel_pos)
+                    self.publish_ff(-cmd_out.steering, self.PID.signal)
+                elif self.car_i == 0 and (not main_control or not ca_active):
+                    self.PID.update_target(0.0)
+                    self.PID.compute_input(wheel_pos)
+                    self.PID.update_state(wheel_pos)
+                    self.publish_ff(0.0, self.PID.signal)
 
 
                 # Wait for next period
@@ -376,7 +386,7 @@ class CollisionAvoidance(Node):
         msg.header.stamp.sec = 0
         msg.header.stamp.nanosec = 0
         msg.header.frame_id = ''
-        msg.position = -steering
+        msg.position = steering
         msg.torque = torque
         self.force_pub.publish(msg)
 

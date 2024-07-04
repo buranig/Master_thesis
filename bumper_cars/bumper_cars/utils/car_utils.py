@@ -221,3 +221,32 @@ def transform_point(x, y, ref_x, ref_y, ref_yaw):
     rel_y = np.sin(ref_yaw) * dx + np.cos(ref_yaw) * dy
 
     return rel_x, rel_y
+
+class PID_controller():
+    def __init__(self, initial_pos, target, kp = 0.5, ki = 0.0, kd = 0.04):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+
+        self.target = target
+        self.signal = 0
+        self.accumulator = 0
+        self.last_reading = initial_pos
+        
+        self.time_bkp = time.time()
+
+        self.sample_rate = 0.1
+    
+    def compute_input(self, feedback_value):
+        error = abs(self.target - feedback_value)
+
+        self.accumulator += error
+
+        self.signal = self.kp * error + self.ki * self.accumulator - self.kd * ( feedback_value - self.last_reading)/(time.time()-self.time_bkp)
+        self.time_bkp = time.time()
+    
+    def update_state(self, feedback_value):
+        self.last_reading = feedback_value
+
+    def update_target(self, new_target):
+        self.target = new_target

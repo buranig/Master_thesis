@@ -358,7 +358,7 @@ class CollisionAvoidance(Node):
 
                 # Add info to csv
                 if self.write_data:
-                    self.write_csv(des_action.cmd, cmd_out, it_time)
+                    self.write_csv(des_action.cmd, cmd_out, it_time, curr_car)
                 
                 wheel_pos = -self.wheel_pos_request()
                 if self.car_i == 0 and (main_control or ca_active):
@@ -529,8 +529,8 @@ class CollisionAvoidance(Node):
         frame = "world" if self.alg == "mpc" else "body" + self.car_str
         marker.header.frame_id = frame
         marker.header.stamp = self.get_clock().now().to_msg()
-        marker.ns = "predicted_trajectory" + self.car_str
-        marker.id = 151 + self.car_i
+        marker.ns = "predicted_trajectory"
+        marker.id = 100 + self.car_i
         marker.type = Marker.LINE_STRIP
         marker.action = Marker.ADD
         
@@ -597,7 +597,8 @@ class CollisionAvoidance(Node):
             self.markers.markers.append(marker)
 
     def __update_lap(self, car_state):
-        if car_state.pos_x>-0.05 and car_state.pos_x<0.05 and car_state.pos_y > -0.8 and car_state.pos_y < 0.0:
+        # if car_state.pos_x>-0.05 and car_state.pos_x<0.05 and car_state.pos_y > -0.8 and car_state.pos_y < 0.0:
+        if car_state.pos_x>0.2 and car_state.pos_x<0.4 and car_state.pos_y > -1.75 and car_state.pos_y < -0.85:
             if not self.just_changed:
                 self.just_changed = True
                 self.lap_number +=1
@@ -611,7 +612,7 @@ class CollisionAvoidance(Node):
         #     self.just_changed = True
     
 
-    def write_csv(self, des_action, cmd_out, it_time):
+    def write_csv(self, des_action, cmd_out, it_time, curr_car):
         """
         Writes data to a CSV file.
 
@@ -631,11 +632,14 @@ class CollisionAvoidance(Node):
         if self.lap_number == 0:
             return
 
+        x = curr_car.pos_x
+        y = curr_car.pos_y
+
         cum_time = time.time() - self.start_time
         lap_time = time.time() - self.lap_time
         isd = (des_action.steering - cmd_out.steering)**2 + (des_action.throttle - cmd_out.throttle)**2
 
-        self.data_file.write(str(self.car_i) + "," +str(cum_time) + "," + str(lap_time) + "," + str(self.lap_number) + "," + str(it_time) + "," + str(isd) +  "\n")
+        self.data_file.write(str(self.car_i) + "," +str(cum_time) + "," + str(lap_time) + "," + str(self.lap_number) + "," + str(it_time) + "," + str(isd) + "," + str(x) + "," + str(y) +  "\n")
 
 def main(args=None):
     rclpy.init(args=args)

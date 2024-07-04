@@ -122,7 +122,7 @@ class CollisionAvoidance(Node):
         # Service to query state
         self.state_cli = self.create_client(EnvState, 'env_state' + self.car_str)
         self.cmd_cli = self.create_client(CarCommand, 'car_cmd')
-        self.joy_cli = self.create_client(JoySafety, 'joy_safety')
+        self.joy_cli = self.create_client(JoySafety, 'joy_safety'+self.car_str)
         self.track_cli = self.create_client(TrackState, 'track_pose')
         self.wheel_cli = self.create_client(WheelPosition, 'wheel_buffer')
         self.main_control_cli = self.create_client(MainControl, 'main_control')
@@ -211,7 +211,7 @@ class CollisionAvoidance(Node):
         rclpy.spin_until_future_complete(self, self.main_control_future)
         if not self.main_control_future.done():
             print("Timeout")
-        return self.main_control_future.result().main_control
+        return not self.main_control_future.result().main_control
 
     def wheel_pos_request(self):
         self.wheel_pos_future = self.wheel_cli.call_async(self.wheel_pos_req)
@@ -366,7 +366,7 @@ class CollisionAvoidance(Node):
                     self.PID.compute_input(wheel_pos)
                     self.PID.update_state(wheel_pos)
                     self.publish_ff(-cmd_out.steering, self.PID.signal)
-                elif self.car_i == 0 and (not main_control or not ca_active):
+                elif self.car_i == 0:
                     self.PID.update_target(0.0)
                     self.PID.compute_input(wheel_pos)
                     self.PID.update_state(wheel_pos)
@@ -528,7 +528,7 @@ class CollisionAvoidance(Node):
         marker.header = Header()
         frame = "world" if self.alg == "mpc" else "body" + self.car_str
         marker.header.frame_id = frame
-        marker.header.stamp = self.get_clock().now().to_msg()
+        # marker.header.stamp = self.get_clock().now().to_msg()
         marker.ns = "predicted_trajectory"
         marker.id = 100 + self.car_i
         marker.type = Marker.LINE_STRIP

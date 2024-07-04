@@ -25,7 +25,7 @@ class JoySafetyNode(Node):
             10
         )
         # Establish publishing service
-        self.srv = self.create_service(JoySafety, 'joy_safety', self._get_joy_state)
+        self.srv = self.create_service(JoySafety, 'joy_safety'+self.car_str, self._get_joy_state)
 
         # Establish safety variables
         self.button_pressed = False

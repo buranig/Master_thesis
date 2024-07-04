@@ -53,7 +53,7 @@ save_flag = True
 show_animation = True
 plot_flag = False
 timer_freq = json_object["timer_freq"]
-kinematic = False
+kinematic = True
 
 class RobotType(Enum):
     circle = 0
@@ -143,6 +143,12 @@ def find_nearest(array, value):
 
 def main():
     print(__file__ + " start!!")
+    print("\n######################STARTING THE TRAJECTORY GENERATION######################\n")
+    if kinematic:
+        print("###################### KINEMATIC MODEL ######################")
+    else:
+        print("###################### DYNAMIC MODEL ######################")
+    
     print("Max speed: ", max_speed)
     print("Min speed: ", min_speed)
     plt.rcParams['font.family'] = ['serif']
@@ -156,9 +162,9 @@ def main():
             print(v)
 
             if kinematic:
-                x_init = np.array([0.0, 0.0, np.radians(90.0), v])
+                x_init = np.array([0.0, 0.0, 0.0, v])
             else:
-                x_init = np.array([0.0, 0.0, np.radians(90.0), v, 0.0])
+                x_init = np.array([0.0, 0.0, 0.0, v, 0.0])
 
             traj, u_total = generate_trajectories(x_init)
             # traj, u_total = generate_trajectories_normal(x_init)

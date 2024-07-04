@@ -32,10 +32,10 @@
             "predict_time": 3,
             "to_goal_cost_gain": 1,
             "speed_cost_gain": 1,
-            "obstacle_cost_gain": 30,
+            "obstacle_cost_gain": 100,
             "heading_cost_gain": 1,
             "robot_stuck_flag_cons": 0.001,
-            "dilation_factor": 0.35,
+            "dilation_factor": 0.55,
             "emergency_brake_distance": 5
         },
     "LBP":

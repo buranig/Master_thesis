@@ -43,7 +43,7 @@ c_a = json_object["Car_model"]["c_a"]
 c_r1 = json_object["Car_model"]["c_r1"]
 WB = json_object["Controller"]["WB"] # Wheel base
 L_d = json_object["Controller"]["L_d"]  # [m] look-ahead distance
-robot_num = json_object["robot_num"]
+robot_num = 15 #json_object["robot_num"]
 safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
@@ -69,7 +69,7 @@ else:
     with open('/home/giacomo/thesis_ws/src/dwa_dev/dynamic_trajectories.json', 'r') as file:
         data = json.load(file)
 
-with open('/home/giacomo/thesis_ws/src/seeds/seed_8.json', 'r') as file:
+with open('/home/giacomo/thesis_ws/src/seeds/seed_7.json', 'r') as file:
     seed = json.load(file)
 
 def find_nearest(array, value):
@@ -160,7 +160,7 @@ def calc_obstacle_cost(trajectory, ob):
     min_distance = min(minxp, minxn, minyp, minyn)
 
     line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
-    dilated = line.buffer(dilation_factor, cap_style=3)
+    dilated = line.buffer(dilation_factor, cap_style=1)
 
     x = trajectory[:, 0]
     y = trajectory[:, 1]
@@ -407,7 +407,7 @@ class DWA_algorithm():
         for i in range(self.robot_num):
             if not self.reached_goal[i]:
                 # Step 9: Check if the distance between the current position and the target is less than 5
-                if time.time()-self.time_bkp > 100:
+                if time.time()-self.time_bkp > 30:
                     self.targets = utils.update_targets(x, self.targets)
                     self.time_bkp = time.time()
 
@@ -521,20 +521,20 @@ class DWA_algorithm():
             for a in np.arange(dw[0], dw[1]+v_resolution, v_resolution):
                 delta_keys = data[str(nearest)][str(a)].keys()
                 for delta in delta_keys:
-
+                    delta = float(delta)
                     # old_time = time.time()
                     geom = data[str(nearest)][str(a)][str(delta)]
                     geom = np.array(geom)
-                    geom[:,0:2] = (geom[:,0:2]) @ utils.rotateMatrix(np.radians(90)-x[2]) + [x[0],x[1]]
+                    geom[:,0:2] = (geom[:,0:2]) @ utils.rotateMatrix(-x[2]) + [x[0],x[1]]
                     # print(time.time()-old_time)
-                    geom[:,2] = geom[:,2] + x[2] - np.pi/2 #bringing also the yaw angle in the new frame
+                    geom[:,2] = geom[:,2] + x[2] #bringing also the yaw angle in the new frame
 
                     # trajectory = predict_trajectory(x_init, a, delta)
                     trajectory = geom
                     # calc cost
 
                     # to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory, goal)
-                    reference_input_cost = 100*calc_reference_input_cost([a, delta], self.goal_input, i)
+                    reference_input_cost = 100*calc_reference_input_cost([a, float(delta)], self.goal_input, i)
                     # speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
                     # if trajectory[-1, 3] <= 0.0:
                     #     speed_cost = 10
@@ -562,8 +562,7 @@ class DWA_algorithm():
                 trajectory_buf[:,0:2] = (trajectory_buf[:,0:2]) @ utils.rotateMatrix(utils.normalize_angle(-x[2]+trajectory_buf[0,2]))
                 trajectory_buf[:,0:2] += x[0:2]
                 trajectory_buf[:,2] += utils.normalize_angle(x[2]-trajectory_buf[0,2])
-                
-                reference_input_cost = 100* calc_reference_input_cost([a, delta], self.goal_input, i)
+                reference_input_cost = 100* calc_reference_input_cost([u_buf[0][0], u_buf[0][1]], self.goal_input, i)
                 # to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
                 # # speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
                 ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory_buf, ob)
@@ -577,10 +576,10 @@ class DWA_algorithm():
                     best_trajectory = trajectory_buf
                     u_history = u_buf
 
-            elif min_cost == np.inf:
+            if min_cost == np.inf:
                 # emergency stop
                 print(f"Emergency stop for vehicle {i}")
-                solver_failure += 1
+                self.solver_failure += 1
                 # if x[3]>0:
                 #     best_u = [min_acc, 0]
                 # else:
@@ -589,8 +588,8 @@ class DWA_algorithm():
                 best_u = [(0-x[3])/dt, 0]
                 best_u[0] = np.clip(best_u[0], min_acc, max_acc)
 
-                best_trajectory = np.array([x[0:3], x[0:3]])
-                u_history = best_u*int(predict_time/dt)
+                best_trajectory = np.array([x[0:3]]*int(predict_time/dt))
+                u_history = [best_u]*int(predict_time/dt)
 
             return best_u, best_trajectory, u_history
     

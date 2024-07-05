@@ -3,6 +3,7 @@
 import numpy as np
 from lar_msgs.msg import CarControlStamped, CarStateStamped
 from bumper_cars.classes.State import State
+from nav_msgs.msg import Path
 
 from typing import List
 from scipy.spatial.transform import Rotation as Rot
@@ -52,41 +53,6 @@ def normalize_angle(angle):
 
     return angle
 
-# def array_to_state(array):
-#     """
-#     Convert an array to a State object.
-
-#     Args:
-#         array (list): The array containing the state values.
-
-#     Returns:
-#         State: The State object with the values from the array.
-#     """
-#     state = State()
-#     state.x = array[0]
-#     state.y = array[1]
-#     state.yaw = array[2]
-#     state.v = array[3]
-#     return state
-
-# def state_to_array(state: State):
-#     """
-#     Convert a State object to a numpy array.
-
-#     Args:
-#         state (State): The State object to be converted.
-
-#     Returns:
-#         numpy.ndarray: The converted numpy array.
-#     """
-#     array = np.zeros((4,1))
-#     array[0,0] = state.x
-#     array[1,0] = state.y
-#     array[2,0] = state.yaw
-#     array[3,0] = state.v
-
-#     return array
-
 def rot_mat_2d(angle):
     """
     Create 2D rotation matrix from an angle
@@ -120,9 +86,11 @@ def rotateMatrix(a):
     Rotate a matrix by an angle.
 
     Args:
+    ----------
         a (float): Angle in radians.
 
     Returns:
+    ----------
         numpy.ndarray: Rotated matrix.
     """
     return np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
@@ -132,10 +100,12 @@ def find_nearest(array, value):
     Find the nearest value in an array.
 
     Args:
+    ----------
         array (numpy.ndarray): Input array.
         value: Value to find.
 
     Returns:
+    ----------
         float: Nearest value in the array.
     """
     array = np.asarray(array)
@@ -149,7 +119,7 @@ def carStateStamped_to_State(curr_car: CarStateStamped) -> State:
     car_state.y = curr_car.pos_y
     car_state.yaw = normalize_angle(curr_car.turn_angle) #turn angle is with respect to the car, not wheel
     car_state.omega = curr_car.turn_rate
-    car_state.v = longitudinal_velocity(curr_car.vel_x, curr_car.vel_y, car_state.omega)
+    car_state.v = longitudinal_velocity(curr_car.vel_x, curr_car.vel_y, car_state.yaw)
     return car_state
 
 
@@ -174,7 +144,24 @@ def carStateStamped_to_array(car_list: List[CarStateStamped]) -> np.array:
         car_array[i,:] = np_car_i
     return car_array
 
+def pathList_to_array(path_list: List[Path]) -> np.array:
+    """
+    Convert a list of Path objects to a numpy array.
 
+    Args:
+        path_list (List[Path]): A list of Path objects.
+
+    Returns:
+        np.array: A numpy array containing the converted paths.
+
+    """
+    path_num = len(path_list)
+    path_array = np.empty((path_num, 2))
+    for i in range(len(path_list)):
+        path_i = path_list[i]
+        np_path_i = np.array([path_i.poses[0].pose.position.x, path_i.poses[0].pose.position.y])
+        path_array[i,:] = np_path_i
+    return path_array
 
 def pure_pursuit_steer_control(target, pose, max_steer=0.5, L=1.0, Lf=0.5, max_speed=1.0):
     """

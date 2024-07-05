@@ -3,9 +3,10 @@
 import rclpy
 from rclpy.node import Node
 from lar_msgs.msg import CarStateStamped, CarControlStamped
-from bumper_msgs.srv import EnvState, CarCommand, TrackState
+from bumper_msgs.srv import EnvState, CarCommand, TrackState, TrajState
 from rclpy.qos import qos_profile_sensor_data
 from geometry_msgs.msg import Pose2D
+from nav_msgs.msg import Path
 
 class StateBufferNode(Node):
     """
@@ -44,16 +45,16 @@ class StateBufferNode(Node):
         self.srv = self.create_service(EnvState, 'env_state', self._get_env_state)
         self.cmd_srv = self.create_service(CarCommand, 'car_cmd', self._get_cmd_i)
         self.track_srv = self.create_service(TrackState, 'track_pose', self._get_track_pos)
+        self.traj_srv = self.create_service(TrajState, 'traj_srv', self._get_traj_state)
 
-        self.cmd = [CarControlStamped()] * self.car_amount
 
         # Subscribe to each car's state and commands
         self.sub_state = []
         self.sub_cmd = []
+        self.sub_traj = []
 
         self.sub_track = self.create_subscription(Pose2D, track_str,\
                                     self._received_track, qos_profile_sensor_data)
-
 
         for i in range(int(self.car_amount)):
             car_str = '' if i==0 else str(i+1)
@@ -61,12 +62,19 @@ class StateBufferNode(Node):
                                              lambda msg, car_i=i: self._received_state(msg, car_i), qos_profile_sensor_data))
             self.sub_cmd.append(self.create_subscription(CarControlStamped, topic_str + car_str + "/desired_control",\
                                              lambda msg, car_i=i: self._received_cmd(msg, car_i), qos_profile_sensor_data))
+            self.sub_traj.append(self.create_subscription(Path, topic_str + car_str + "/chosen_traj",\
+                                             lambda msg, car_i=i: self._received_cmd(msg, car_i), qos_profile_sensor_data))
         
         # Initialize states (at default) and update bit
+        self.cmd = [CarControlStamped()] * self.car_amount
+        
         self.env_state = [CarStateStamped()] * self.car_amount
         self.updated = [False] * self.car_amount
         self.track_pos = Pose2D()
         self.track_updated = False
+
+        self.chosen_traj = [Path()] * self.car_amount
+        self.updated_traj = [False] * self.car_amount
 
     def _get_env_state(self, request, response) -> EnvState.Response:
         response.env_state = self.env_state
@@ -83,6 +91,12 @@ class StateBufferNode(Node):
         response.track_state.theta = self.track_pos.theta
         response.updated = self.track_updated
         return response
+    
+    def _get_traj_state(self, request, response) -> EnvState.Response:
+        response.trajectories = self.chosen_traj
+        response.updated = self.updated_traj
+        return response
+    
 
     def _received_state(self, msg, car_i: int) -> None:
         self.updated[car_i] = True
@@ -97,6 +111,9 @@ class StateBufferNode(Node):
         self.track_pos.y = msg.y
         self.track_pos.theta = msg.theta
 
+    def _received_traj(self, msg, car_i: int) -> None:
+        self.chosen_traj[car_i] = msg.poses
+        self.updated_traj[car_i] = True
 
 
 def main(args=None):

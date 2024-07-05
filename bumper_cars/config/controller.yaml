@@ -34,7 +34,8 @@ MPPI:                             ### Model Predictive Path Integral control
 
 Controller:                       ### Controller parameters        
   dt: 0.05                        # [s] Controller time step (both for control and traj_generation)
-  ph: 1.0
+  ph: 0.50
+  communication: True             # [-] Communication between cars to exchange trajectories taken
 Simulation:                       ### Simulation parameters
   width: 4.5                      # [m] Width of the driving area    
   height: 3.5                     # [m] Height of the driving area        

@@ -118,6 +118,21 @@ class DWA_algorithm(Controller):
         self.goal.throttle = np.interp(goal.throttle, [-1, 1], [self.car_model.min_acc, self.car_model.max_acc]) * self.car_model.acc_gain
         self.goal.steering = np.interp(goal.steering, [-1, 1], [-self.car_model.max_steer, self.car_model.max_steer])
 
+    def set_traj(self, traj: np.array) -> None:
+        """
+        Sets the trajectory for the controller.
+
+        Args:
+        - traj (np.array): The trajectory for all cars.
+
+        Returns:
+        - None
+        """
+        self.dilated_traj = traj
+        for i in range(len(self.dilated_traj)):
+            traj_i = self.dilated_traj[i]
+            self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1]))
+
     def compute_traj(self) -> None:
         """
         Computes trajectories for different velocities and saves them to a JSON file.
@@ -182,7 +197,6 @@ class DWA_algorithm(Controller):
         print("\033[93mDone generating!\033[0m")
         print("\033[92mTrajectories were written to 'dwa_dev/config/trajectories.json' \033[00m")
 
-
     ################## PRIVATE METHODS
     
     def __update_others(self) -> None:
@@ -225,29 +239,29 @@ class DWA_algorithm(Controller):
             rel_y = np.sin(-ref_yaw) * dx + np.cos(-ref_yaw) * dy
             rel_yaw = dtheta
 
-            # Compute the relative velocity components
-            vx = car_state.v * np.cos(car_state.yaw)
-            vy = car_state.v * np.sin(car_state.yaw)
-            ref_vx = ref_v * np.cos(ref_yaw)
-            ref_vy = ref_v * np.sin(ref_yaw)
+            # # Compute the relative velocity components
+            # vx = car_state.v * np.cos(car_state.yaw)
+            # vy = car_state.v * np.sin(car_state.yaw)
+            # ref_vx = ref_v * np.cos(ref_yaw)
+            # ref_vy = ref_v * np.sin(ref_yaw)
 
-            rel_vx = vx - ref_vx
-            rel_vy = vy - ref_vy
+            # rel_vx = vx - ref_vx
+            # rel_vy = vy - ref_vy
 
-            # Rotate the relative velocity to the reference frame of the skipped car
-            rel_vx_transformed = np.cos(-ref_yaw) * rel_vx - np.sin(-ref_yaw) * rel_vy
-            rel_vy_transformed = np.sin(-ref_yaw) * rel_vx + np.cos(-ref_yaw) * rel_vy
+            # # # Rotate the relative velocity to the reference frame of the skipped car
+            # rel_vx_transformed = np.cos(-ref_yaw) * rel_vx - np.sin(-ref_yaw) * rel_vy
+            # rel_vy_transformed = np.sin(-ref_yaw) * rel_vx + np.cos(-ref_yaw) * rel_vy
 
-            # Calculate the magnitude of the relative velocity
-            rel_v = np.sqrt(rel_vx_transformed**2 + rel_vy_transformed**2)
-            rel_omega = car_state.omega - ref_omega
+            # # Calculate the magnitude of the relative velocity
+            # rel_v = np.sign(car_state.v) * np.sqrt(rel_vx_transformed**2 + rel_vy_transformed**2)
+            # rel_omega = car_state.omega - ref_omega
 
             # Update the car state to the relative state
             car_state.x = rel_x
             car_state.y = rel_y
             car_state.yaw = rel_yaw
-            car_state.v = rel_v
-            car_state.omega = rel_omega
+            car_state.v = car_state.v
+            car_state.omega = car_state.omega
 
             traj_i = self.__calc_trajectory(car_state, emptyControl)
             self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1]))

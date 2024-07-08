@@ -151,9 +151,6 @@ class CollisionAvoidance(Node):
         self.timer = self.create_timer(self.dt, self.timer_callback)
         self.update_time = False
 
-        # Initializing wheel controller
-        self.PID = utils.PID_controller(-self.wheel_pos_request(), 0.0)
-
         # Get track position
         track_msg = self.track_request()
         while track_msg.updated == False:
@@ -279,7 +276,7 @@ class CollisionAvoidance(Node):
             None
         """
         ca_active = True
-        main_control = False
+        main_control = True
         self.start_time = time.time()
         self.lap_time = time.time()
 
@@ -359,18 +356,11 @@ class CollisionAvoidance(Node):
                 # Add info to csv
                 if self.write_data:
                     self.write_csv(des_action.cmd, cmd_out, it_time, curr_car)
-                
-                wheel_pos = -self.wheel_pos_request()
+            
                 if self.car_i == 0 and (main_control or ca_active):
-                    self.PID.update_target(-cmd_out.steering)
-                    self.PID.compute_input(wheel_pos)
-                    self.PID.update_state(wheel_pos)
-                    self.publish_ff(-cmd_out.steering, self.PID.signal)
+                    self.publish_ff(-cmd_out.steering, 0.0)
                 elif self.car_i == 0:
-                    self.PID.update_target(0.0)
-                    self.PID.compute_input(wheel_pos)
-                    self.PID.update_state(wheel_pos)
-                    self.publish_ff(0.0, self.PID.signal)
+                    self.publish_ff(0.0, 0.0)
 
 
                 # Wait for next period

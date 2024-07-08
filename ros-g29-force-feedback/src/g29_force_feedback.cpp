@@ -20,6 +20,13 @@ private:
     int m_axis_min;
     int m_axis_max;
 
+    double last_position = 0.0;
+    double accumulator = 0.0;
+    double kp = 0.9;
+    double ki = 0.0;
+    double kd = 0.02;
+    double pid_dt = 0.1;
+
     // rosparam
     std::string m_device_name;
     double m_loop_rate;
@@ -84,6 +91,7 @@ G29ForceFeedback::G29ForceFeedback()
     declare_parameter("auto_centering_max_position", 0.2);
     declare_parameter("eps", 0.05);
     declare_parameter("auto_centering", false);
+    // declare_parameter("last_position", 0.0);
 
     get_parameter("device_name", m_device_name);
     get_parameter("loop_rate", m_loop_rate);
@@ -95,6 +103,8 @@ G29ForceFeedback::G29ForceFeedback()
     get_parameter("auto_centering_max_position", m_auto_centering_max_position);
     get_parameter("eps", m_eps);
     get_parameter("auto_centering", m_auto_centering);
+
+    // double last_position = 0.0;
 
     initDevice();
 
@@ -120,7 +130,6 @@ G29ForceFeedback::~G29ForceFeedback() {
 void G29ForceFeedback::loop() {
 
     struct input_event event;
-    double last_position = m_position;
     // get current state
     while (read(m_device_handle, &event, sizeof(event)) == sizeof(event)) {
         if (event.type == EV_ABS && event.code == m_axis_code) {
@@ -128,19 +137,9 @@ void G29ForceFeedback::loop() {
         }
     }
 
-    // if (m_is_brake_range || m_auto_centering) {
-    //     calcCenteringForce(m_torque, m_target, m_position);
-    //     m_attack_length = 0.0;
-
-    // } else {
-    //     calcRotateForce(m_torque, m_attack_length, m_target, m_position);
-    //     m_is_target_updated = false;
-    // }
-
     calcRotateForce(m_torque, m_attack_length, m_target, m_position);
     m_is_target_updated = false;
     uploadForce(m_target.position, m_torque, m_attack_length);
-    // uploadForce(m_target.position, m_target.torque, m_attack_length);
 }
 
 
@@ -150,29 +149,13 @@ void G29ForceFeedback::calcRotateForce(double &torque,
                                        const double &current_position) {
 
     double diff = target.position - current_position;
+    accumulator += diff;
     double direction = (diff > 0.0) ? 1.0 : -1.0;
-    
-    torque = target.torque * direction;
+
+    torque = kp * diff + ki * accumulator - kd * (current_position - last_position)/pid_dt;
     torque = std::max(-m_max_torque, std::min(torque, m_max_torque));
-    // if (direction > 0.0){
-    //     torque = m
-    // }
     attack_length = m_loop_rate;
-    // std::cout << "Position Difference: " << diff << ", Torque: " << torque << std::endl;
-
-    // if (fabs(diff) < m_eps) {
-    //     torque = 0.0;
-    //     attack_length = 0.0;
-
-    // } else if (fabs(diff) < m_brake_position) {
-    //     m_is_brake_range = true;
-    //     torque = target.torque * m_brake_torque * -direction;
-    //     attack_length = m_loop_rate;
-
-    // } else {
-    //     torque = target.torque * direction;
-    //     attack_length = m_loop_rate;
-    // }
+    last_position = current_position;
 }
 
 

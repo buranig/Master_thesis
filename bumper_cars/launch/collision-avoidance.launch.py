@@ -135,6 +135,8 @@ def add_car(context, ld):
         ld.add_action(joy)
         ld.add_action(joy_remap)
     
+    wheel_gain = LaunchConfiguration('wheel_gain').perform(context)
+    print(wheel_gain)
     if not eval(joy_control):
         g29_ff = Node(
             package="ros_g29_force_feedback",
@@ -142,7 +144,8 @@ def add_car(context, ld):
             name="g29_force_feedback",
             output="screen",
             parameters=[
-                {'device_name': "/dev/input/event13"}
+                {'device_name': "/dev/input/event13"},
+                {"gain": LaunchConfiguration('wheel_gain')}
             ],
         )
         ld.add_action(g29_ff)
@@ -209,6 +212,12 @@ def generate_launch_description():
         description='Ego car controlled with Joystick or Steering Wheel',
         default_value='True'
     )
+
+    wheel_gain = DeclareLaunchArgument(
+        'wheel_gain',
+        description="Strenght of the force feedback on the steering wheel",
+        default_value="25"
+    )
     
 
     ld.add_action(carNumber_arg)
@@ -221,6 +230,7 @@ def generate_launch_description():
     ld.add_action(write_csv)
     ld.add_action(control_mode)
     ld.add_action(joystick_bool)
+    ld.add_action(wheel_gain)
 
     ld.add_action(OpaqueFunction(function=add_car, args=[ld]))
 

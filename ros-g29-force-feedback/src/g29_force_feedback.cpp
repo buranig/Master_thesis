@@ -19,6 +19,7 @@ private:
     int m_axis_code = ABS_X;
     int m_axis_min;
     int m_axis_max;
+    int gain;
 
     double last_position = 0.0;
     double accumulator = 0.0;
@@ -91,6 +92,7 @@ G29ForceFeedback::G29ForceFeedback()
     declare_parameter("auto_centering_max_position", 0.2);
     declare_parameter("eps", 0.05);
     declare_parameter("auto_centering", false);
+    declare_parameter("gain", gain);
     // declare_parameter("last_position", 0.0);
 
     get_parameter("device_name", m_device_name);
@@ -103,7 +105,7 @@ G29ForceFeedback::G29ForceFeedback()
     get_parameter("auto_centering_max_position", m_auto_centering_max_position);
     get_parameter("eps", m_eps);
     get_parameter("auto_centering", m_auto_centering);
-
+    get_parameter("gain", gain);
     // double last_position = 0.0;
 
     initDevice();
@@ -156,6 +158,7 @@ void G29ForceFeedback::calcRotateForce(double &torque,
     torque = std::max(-m_max_torque, std::min(torque, m_max_torque));
     attack_length = m_loop_rate;
     last_position = current_position;
+    // std::cout << "Difference: " << diff << ", Torque: " << torque << std::endl;
 }
 
 
@@ -174,6 +177,7 @@ void G29ForceFeedback::calcCenteringForce(double &torque,
         double power = (fabs(diff) - m_eps) / (m_auto_centering_max_position - m_eps);
         double buf_torque = power * torque_range + m_min_torque;
         torque = std::min(buf_torque, m_auto_centering_max_torque) * direction;
+        // std::cout << "Difference: " << diff << ", Torque: " << torque << std::endl;
     }
 }
 
@@ -273,6 +277,17 @@ void G29ForceFeedback::initDevice() {
     if (write(m_device_handle, &event, sizeof(event)) != sizeof(event)) {
         std::cout << "failed to disable auto centering" << std::endl;
         exit(1);
+    }
+
+    // Setting right gain
+    event.type = EV_FF;
+    event.code = FF_GAIN;
+    event.value = 0xFFFFUL * gain / 100;
+
+    if (write(m_device_handle, &event, sizeof(event)) == -1)
+        perror("set gain");
+    else {
+        std::cout << "Gain set to: " << gain << std::endl;
     }
 
     // init effect and get effect id

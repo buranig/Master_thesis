@@ -26,7 +26,7 @@ class WheelJoystickRemap(Node):
         self.wheel_position = 0.0
 
         self.button_pressed = False
-        self.main_control = False
+        self.main_control = True
 
     def _get_env_state(self, _, response):
         response.wheel_position = self.wheel_position

@@ -357,9 +357,18 @@ class CollisionAvoidance(Node):
                 if self.write_data:
                     self.write_csv(des_action.cmd, cmd_out, it_time, curr_car)
             
-                if self.car_i == 0 and (main_control or ca_active):
+                if self.car_i == 0 and (main_control and ca_active):
+                    print("Both active")
                     self.publish_ff(-cmd_out.steering, 0.0)
+                elif self.car_i == 0 and main_control==False and ca_active==True:
+                    print("Only ca active")
+                    print(abs(des_action.cmd._steering-cmd_out._steering))
+                    if abs(des_action.cmd._steering-cmd_out._steering)<0.3:
+                        self.publish_ff(0.0, 0.0)
+                    else:
+                        self.publish_ff(-cmd_out.steering, 0.0)
                 elif self.car_i == 0:
+                    print("Both inactive")
                     self.publish_ff(0.0, 0.0)
 
 

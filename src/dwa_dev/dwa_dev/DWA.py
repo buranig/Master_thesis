@@ -10,6 +10,8 @@ from shapely.geometry import Point, LineString
 from shapely import distance
 import time
 
+import pickle
+
 path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
 # Opening JSON file
 with open(path, 'r') as openfile:
@@ -668,7 +670,7 @@ def random_harem():
     """
     
     print(__file__ + " start!!")
-    iterations = 3000
+    iterations = 200
     break_flag = False
     
     # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
@@ -683,8 +685,8 @@ def random_harem():
     x = np.array([x0, y, yaw, v, omega])
     u = np.zeros((2, robot_num))
 
-    trajectory = np.zeros((x.shape[0], robot_num, 1))
-    trajectory[:, :, 0] = x
+    trajectory = np.zeros((x.shape[0]+u.shape[0], robot_num, 1))
+    trajectory[:, :, 0] = np.concatenate((x,u))
 
     predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 4]))
     for i in range(robot_num):
@@ -710,13 +712,24 @@ def random_harem():
     # Step 7: Create an instance of the DWA_algorithm class
     dwa = DWA_algorithm(robot_num, paths, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist)
 
+    predicted_trajectory = {}
+    targets = {}
+
     for z in range(iterations):
         plt.cla()
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
         
         x, u, break_flag = dwa.random_harem(x, u, break_flag)
         # x, u, break_flag = dwa.go_to_goal(x, u, break_flag)
-        trajectory = np.dstack([trajectory, x])
+        trajectory = np.dstack([trajectory, np.concatenate((x,u))])
+
+
+        predicted_trajectory[z] = {}
+        targets[z] = {}
+        for i in range(robot_num):
+            predicted_trajectory[z][i] = dwa.predicted_trajectory[i]
+            targets[z][i] = dwa.targets[i]
+
             
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")
@@ -732,6 +745,13 @@ def random_harem():
             plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
         plt.pause(0.0001)
         plt.show()
+
+    print("Saving the trajectories to /dwa_dev/dwa_dev/DWA_trajectories_harem.pkl\n")
+    with open('/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_trajectories_harem.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+        pickle.dump([trajectory, targets], f) 
+    print("Saving the trajectories to /dwa_dev/dwa_dev/DWA_dilated_traj_harem.pkl")
+    with open('/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_dilated_traj_harem.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+        pickle.dump([predicted_trajectory], f)  
 
 
 def main_seed():
@@ -769,8 +789,8 @@ def main_seed():
     x = np.array([x0, y, yaw, v, omega])
     u = np.zeros((2, robot_num))
 
-    trajectory = np.zeros((x.shape[0], robot_num, 1))
-    trajectory[:, :, 0] = x
+    trajectory = np.zeros((x.shape[0]+u.shape[0], robot_num, 1))
+    trajectory[:, :, 0] = np.concatenate((x,u))
 
     predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 4]))
     for i in range(robot_num):
@@ -795,13 +815,21 @@ def main_seed():
     # Step 7: Create an instance of the DWA_algorithm class
     dwa = DWA_algorithm(robot_num, paths, paths, targets, dilated_traj, predicted_trajectory, ax, u_hist)
     
+    predicted_trajectory = {}
+
     for z in range(iterations):
         plt.cla()
         plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
         
         x, u, break_flag = dwa.run_dwa(x, u, break_flag)
         # x, u, break_flag = dwa.go_to_goal(x, u, break_flag)
-        trajectory = np.dstack([trajectory, x])
+        trajectory = np.dstack([trajectory, np.concatenate((x,u))])
+
+
+        predicted_trajectory[z] = {}
+        for i in range(robot_num):
+            predicted_trajectory[z][i] = dwa.predicted_trajectory[i]
+
             
         utils.plot_map(width=width_init, height=height_init)
         plt.axis("equal")
@@ -817,6 +845,14 @@ def main_seed():
             plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
         plt.pause(0.0001)
         plt.show()
+    
+    print("Saving the trajectories to /dwa_dev/dwa_dev/DWA_trajectories.pkl\n")
+    with open('/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_trajectories.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+        pickle.dump([trajectory, targets], f) 
+    print("Saving the trajectories to /dwa_dev/dwa_dev/DWA_dilated_traj.pkl")
+    with open('/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_dilated_traj.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+        pickle.dump([predicted_trajectory], f)  
+
        
 if __name__ == '__main__':
     # main_seed()

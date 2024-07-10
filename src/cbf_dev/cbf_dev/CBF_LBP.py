@@ -17,9 +17,11 @@ import json
 import math
 import time
 import matplotlib.pyplot as plt
+import os
 
-path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
-# Opening JSON file
+dir_path = os.path.dirname(os.path.realpath(__file__))
+path = pathlib.Path(dir_path + '/../../bumper_cars/params.json')
+
 with open(path, 'r') as openfile:
     # Reading from json file
     json_object = json.load(openfile)

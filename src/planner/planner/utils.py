@@ -15,8 +15,11 @@ import math
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
 
-# TODO: import all this parameters from a config file so that we can easily change them in one place
-path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
+import os
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+path = pathlib.Path(dir_path + '/../../bumper_cars/params.json')
+
 # path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params_small.json')
 
 # Opening JSON file

@@ -13,9 +13,11 @@ import json
 import math
 import time
 import matplotlib.pyplot as plt
+import os
 
-path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
-# Opening JSON file
+dir_path = os.path.dirname(os.path.realpath(__file__))
+path = pathlib.Path(dir_path + '/../../bumper_cars/params.json')
+
 with open(path, 'r') as openfile:
     # Reading from json file
     json_object = json.load(openfile)
@@ -53,7 +55,7 @@ linear_model = json_object["linear_model"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_33.json', 'r') as file:
+with open(dir_path + '/../../seeds/circular_seed_33.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):

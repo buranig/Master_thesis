@@ -42,7 +42,7 @@ Lr = L / 2.0  # [m]
 Lf = L - Lr
 
 WB = json_object["Controller"]["WB"] # Wheel base
-robot_num = 11 #json_object["robot_num"]
+robot_num = 15 #json_object["robot_num"]
 safety_init = json_object["safety"]
 width_init = json_object["width"]
 height_init = json_object["height"]
@@ -65,7 +65,7 @@ color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:or
 with open(dir_path + '/LBP.json', 'r') as file:
     data = json.load(file)
 
-with open(dir_path + '/../../seeds/circular_seed_30.json', 'r') as file:
+with open(dir_path + '/../../seeds/seed_7.json', 'r') as file:
     seed = json.load(file)
 
 def calc_dynamic_window(x):
@@ -91,33 +91,33 @@ def calc_dynamic_window(x):
 
 def calc_obstacle_cost(trajectory, ob):
     """
-    Calculate the obstacle cost for a given trajectory.
+    Calculate the obstacle cost.
 
-    Parameters:
-    trajectory (numpy.ndarray): The trajectory to calculate the obstacle cost for.
-    ob (list): List of obstacles.
+    Args:
+        trajectory (numpy.ndarray): Trajectory.
+        ob (list): List of obstacles.
 
     Returns:
-    float: The obstacle cost for the trajectory.
+        float: Obstacle cost.
     """
-    min_distance = np.inf
-
-    line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
-    
     minxp = min(abs(width_init/2-trajectory[:, 0]))
     minxn = min(abs(-width_init/2-trajectory[:, 0]))
     minyp = min(abs(height_init/2-trajectory[:, 1]))
     minyn = min(abs(-height_init/2-trajectory[:, 1]))
     min_distance = min(minxp, minxn, minyp, minyn)
-    dilated = line.buffer(dilation_factor, cap_style=3)
+
+    cost = 1/min_distance
+
+    line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
+    dilated = line.buffer(dilation_factor, cap_style=1)
 
     x = trajectory[:, 0]
     y = trajectory[:, 1]
 
     # check if the trajectory is out of bounds
-    if any(element < -width_init/2+WB or element > width_init/2-WB for element in x):
+    if any(element < -width_init/2+WB/2 or element > width_init/2-WB/2 for element in x):
         return np.inf
-    if any(element < -height_init/2+WB or element > height_init/2-WB for element in y):
+    if any(element < -height_init/2+WB/2 or element > height_init/2-WB/2 for element in y):
         return np.inf
 
     if ob:
@@ -126,10 +126,11 @@ def calc_obstacle_cost(trajectory, ob):
                 return np.inf # collision        
             elif distance(dilated, obstacle) < min_distance:
                 min_distance = distance(dilated, obstacle)
-                
-        return 1/distance(dilated, obstacle)
+
+        cost += 1/min_distance    
+        return cost
     else:
-        return 0.0
+        return cost
 
 def calc_to_goal_cost(trajectory, goal):
     """
@@ -674,10 +675,10 @@ def random_harem():
         plt.show()
 
     print("Saving the trajectories to /lbp_dev/lbp_dev/LBP_trajectories_harem.pkl\n")
-    with open('/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_trajectories_harem.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+    with open(dir_path + '/LBP_trajectories_harem.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
         pickle.dump([trajectory, targets], f) 
     print("Saving the trajectories to /lbp_dev/lbp_dev/LBP_dilated_traj_harem.pkl")
-    with open('/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_dilated_traj_harem.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+    with open(dir_path + '/LBP_dilated_traj_harem.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
         pickle.dump([predicted_trajectory], f)  
 
 def main_seed():

@@ -163,6 +163,8 @@ def calc_obstacle_cost(trajectory, ob):
     minyn = min(abs(-height_init/2-trajectory[:, 1]))
     min_distance = min(minxp, minxn, minyp, minyn)
 
+    cost = 1/min_distance
+
     line = LineString(zip(trajectory[:, 0], trajectory[:, 1]))
     dilated = line.buffer(dilation_factor, cap_style=1)
 
@@ -181,10 +183,11 @@ def calc_obstacle_cost(trajectory, ob):
                 return np.inf # collision        
             elif distance(dilated, obstacle) < min_distance:
                 min_distance = distance(dilated, obstacle)
-                
-        return 1/distance(dilated, obstacle)
+
+        cost += 1/min_distance    
+        return cost
     else:
-        return 0.0
+        return cost
 
 def calc_to_goal_cost(trajectory, goal):
     """
@@ -537,16 +540,15 @@ class DWA_algorithm():
                     trajectory = geom
                     # calc cost
 
+                    ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory, ob)
                     # to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory, goal)
-                    reference_input_cost = 100*calc_reference_input_cost([a, float(delta)], self.goal_input, i)
-                    # speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
                     # if trajectory[-1, 3] <= 0.0:
                     #     speed_cost = 10
                     # else:
                     #     speed_cost = 0.0
-                    ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory, ob)
-                    # # heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory, goal)
                     # final_cost = to_goal_cost + ob_cost + speed_cost # + heading_cost #+ speed_cost 
+
+                    reference_input_cost = calc_reference_input_cost([a, float(delta)], self.goal_input, i)
                     final_cost = reference_input_cost + ob_cost
 
                     # search minimum trajectory
@@ -566,14 +568,14 @@ class DWA_algorithm():
                 trajectory_buf[:,0:2] = (trajectory_buf[:,0:2]) @ utils.rotateMatrix(utils.normalize_angle(-x[2]+trajectory_buf[0,2]))
                 trajectory_buf[:,0:2] += x[0:2]
                 trajectory_buf[:,2] += utils.normalize_angle(x[2]-trajectory_buf[0,2])
-                reference_input_cost = 100* calc_reference_input_cost([u_buf[0][0], u_buf[0][1]], self.goal_input, i)
-                # to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
-                # # speed_cost = speed_cost_gain * (max_speed - trajectory[-1, 3])
-                ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory_buf, ob)
-                # heading_cost = heading_cost_gain * calc_to_goal_heading_cost(trajectory_buf, goal)
-                # final_cost = to_goal_cost + ob_cost + heading_cost #+ speed_cost 
-                final_cost = reference_input_cost + ob_cost
 
+                ob_cost = obstacle_cost_gain * calc_obstacle_cost(trajectory_buf, ob)
+                # to_goal_cost = to_goal_cost_gain * calc_to_goal_cost(trajectory_buf, goal)
+                # final_cost = to_goal_cost + ob_cost #+ speed_cost # + heading_cost #+ speed_cost 
+
+                reference_input_cost = calc_reference_input_cost([u_buf[0][0], u_buf[0][1]], self.goal_input, i)
+                final_cost = reference_input_cost + ob_cost
+                
                 if min_cost >= final_cost:
                     min_cost = final_cost
                     best_u = u_buf[0]
@@ -672,7 +674,7 @@ def random_harem():
     """
     
     print(__file__ + " start!!")
-    iterations = 200
+    iterations = 500
     break_flag = False
     
     # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
@@ -749,10 +751,10 @@ def random_harem():
         plt.show()
 
     print("Saving the trajectories to /dwa_dev/dwa_dev/DWA_trajectories_harem.pkl\n")
-    with open('/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_trajectories_harem.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+    with open(dir_path + '/DWA_trajectories_harem.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
         pickle.dump([trajectory, targets], f) 
     print("Saving the trajectories to /dwa_dev/dwa_dev/DWA_dilated_traj_harem.pkl")
-    with open('/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_dilated_traj_harem.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+    with open(dir_path + '/DWA_dilated_traj_harem.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
         pickle.dump([predicted_trajectory], f)  
 
 

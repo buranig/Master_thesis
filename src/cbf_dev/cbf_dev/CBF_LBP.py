@@ -60,7 +60,7 @@ dilation_factor = json_object["LBP"]["dilation_factor"]
 np.random.seed(1)
 
 color_dict = {0: 'r', 1: 'b', 2: 'g', 3: 'y', 4: 'm', 5: 'c', 6: 'k', 7: 'tab:orange', 8: 'tab:brown', 9: 'tab:gray', 10: 'tab:olive', 11: 'tab:pink', 12: 'tab:purple', 13: 'tab:red', 14: 'tab:blue', 15: 'tab:green'}
-with open('/home/giacomo/thesis_ws/src/seeds/circular_seed_2.json', 'r') as file:
+with open(dir_path + '/../../seeds/circular_seed_2.json', 'r') as file:
     data = json.load(file)
 
 def update_paths(paths):
@@ -137,6 +137,49 @@ class CBF_algorithm():
         for i in range(robot_num):
             self.predicted_trajectory[i] = np.full((int(predict_time/dt), 4), x[0:4,i])
         self.lbp = LBP.LBP_algorithm(self.predicted_trajectory, paths, targets, dilated_traj, self.predicted_trajectory, ax, u_hist, robot_num=robot_num)
+        self.time_bkp = time.time()
+
+    def random_harem(self, x, u, break_flag):
+        """
+        Runs the DWA algorithm.
+
+        Args:
+            x (numpy.ndarray): Current state of the robots.
+            u (numpy.ndarray): Control input for the robots.
+            break_flag (bool): Flag indicating if the algorithm should stop.
+
+        Returns:
+            tuple: Updated state, control input, and break flag.
+
+        """
+        for i in range(self.robot_num):
+            if not self.reached_goal[i]:
+                # Step 9: Check if the distance between the current position and the target is less than 5
+                if time.time()-self.time_bkp > 30:
+                    self.targets = utils.update_targets(x, self.targets)
+                    self.time_bkp = time.time()
+
+                else:
+                    t_prev = time.time()
+                    if add_noise:
+                        noise = np.concatenate([np.random.normal(0, 0.21*noise_scale_param, 2).reshape(2, 1), np.random.normal(0, np.radians(5)*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1), np.random.normal(0, 0.2*noise_scale_param, 1).reshape(1,1)], axis=0)
+                        noisy_pos = x + noise
+                        self.targets[i] = [noisy_pos[0, self.targets[i][2]], noisy_pos[1, self.targets[i][2]], self.targets[i][2]]
+                        self.control_robot(i, noisy_pos)
+                        plt.plot(noisy_pos[0,i], noisy_pos[1,i], "x", color=color_dict[i], markersize=10)
+                    else:
+                        self.targets[i] = [x[0, self.targets[i][2]], x[1, self.targets[i][2]], self.targets[i][2]]
+                        self.control_robot(i, x)
+                    self.computational_time.append(time.time()-t_prev)
+                
+                    x[:, i] = utils.nonlinear_model_numpy_stable(x[:, i], self.dxu[:, i], dt)
+
+            if show_animation:
+                utils.plot_robot_trajectory(x, self.dxu, self.predicted_trajectory, self.lbp.dilated_traj, self.targets, self.lbp.ax, i)
+        
+        if all(self.reached_goal):
+                break_flag = True
+        return x, u, break_flag
 
     def run_cbf(self, x, break_flag):
         for i in range(self.robot_num):
@@ -587,6 +630,109 @@ class CBF_algorithm():
                     x[3,i] = 0.0
         return x
 
+def random_harem():
+    """
+    Main function that controls the execution of the program.
+
+    Steps:
+    1. Initialize the necessary variables and arrays.
+    2. Generate initial robot states and trajectories.
+    3. Initialize paths, targets, and dilated trajectories.
+    4. Start the main loop for a specified number of iterations.
+    5. Update targets and robot states for each robot.
+    6. Calculate the right input using the Dynamic Window Approach method.
+    7. Predict the future trajectory using the calculated input.
+    8. Check if the goal is reached for each robot.
+    9. Plot the robot trajectories and the map.
+    11. Break the loop if the goal is reached for any robot.
+    12. Print "Done" when the loop is finished.
+    13. Plot the final trajectories if animation is enabled.
+    """
+    
+    print(__file__ + " start!!")
+    iterations = 500
+    break_flag = False
+    
+    # Step 2: Sample initial values for x0, y, yaw, v, omega, and model_type
+    initial_state = data['initial_position']
+    x0 = initial_state['x']
+    y = initial_state['y']
+    yaw = initial_state['yaw']
+    v = initial_state['v']
+    omega = [0.0]*len(initial_state['x'])
+
+    # Step 3: Create an array x with the initial values
+    x = np.array([x0, y, yaw, v, omega])
+    u = np.zeros((2, robot_num))
+
+    trajectory = np.zeros((x.shape[0]+u.shape[0], robot_num, 1))
+    trajectory[:, :, 0] = np.concatenate((x,u))
+
+    predicted_trajectory = dict.fromkeys(range(robot_num),np.zeros([int(predict_time/dt), 4]))
+    for i in range(robot_num):
+        predicted_trajectory[i] = np.full((int(predict_time/dt), 4), x[0:4,i])
+
+    # Step 4: Create paths for each robot
+    traj = data['trajectories']
+    paths = [[Coordinate(x=traj[str(idx)][i][0], y=traj[str(idx)][i][1]) for i in range(len(traj[str(idx)]))] for idx in range(robot_num)]
+
+    # Step 5: Extract the target coordinates from the paths
+    targets = [[x[0,0], x[1, 0], 0] for path in paths]
+    targets = utils.update_targets(x, targets)
+
+    # Step 6: Create dilated trajectories for each robot
+    dilated_traj = []
+    for i in range(robot_num):
+        dilated_traj.append(Point(x[0, i], x[1, i]).buffer(dilation_factor, cap_style=3))
+    
+    u_hist = dict.fromkeys(range(robot_num),{'ctrl': [0]*int(predict_time/dt), 'v_goal': 0})
+    fig = plt.figure(1, dpi=90, figsize=(10,10))
+    ax = fig.add_subplot(111)
+    
+    # Step 7: Create an instance of the DWA_algorithm class    
+    lbp = CBF_algorithm(targets, paths, x=x, dilated_traj=dilated_traj, ax=ax, u_hist=u_hist)
+
+    predicted_trajectory = {}
+    targets = {}
+
+    for z in range(iterations):
+        plt.cla()
+        plt.gcf().canvas.mpl_connect('key_release_event', lambda event: [exit(0) if event.key == 'escape' else None])
+        
+        x, u, break_flag = lbp.random_harem(x, u, break_flag)
+        # x, u, break_flag = lbp.go_to_goal(x, u, break_flag)
+        trajectory = np.dstack([trajectory, np.concatenate((x,u))])
+
+
+        predicted_trajectory[z] = {}
+        targets[z] = {}
+        for i in range(robot_num):
+            predicted_trajectory[z][i] = lbp.predicted_trajectory[i]
+            targets[z][i] = lbp.targets[i]
+
+            
+        utils.plot_map(width=width_init, height=height_init)
+        plt.axis("equal")
+        plt.grid(True)
+        plt.pause(0.0001)
+
+        if break_flag:
+            break
+
+    print("Done")
+    if show_animation:
+        for i in range(robot_num):
+            plt.plot(trajectory[0, i, :], trajectory[1, i, :], "-", color=color_dict[i])
+        plt.pause(0.0001)
+        plt.show()
+
+    print("Saving the trajectories to /lbp_dev/lbp_dev/LBP_trajectories_harem.pkl\n")
+    with open(dir_path + '/LBP_trajectories_harem.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+        pickle.dump([trajectory, targets], f) 
+    print("Saving the trajectories to /lbp_dev/lbp_dev/LBP_dilated_traj_harem.pkl")
+    with open(dir_path + '/LBP_dilated_traj_harem.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+        pickle.dump([predicted_trajectory], f)  
+
 def main(args=None):
     """
     Main function for controlling multiple robots using Model Predictive Control (MPC).
@@ -885,10 +1031,10 @@ def main_seed(args=None):
             break
     
     print("Saving the trajectories to /src/cbf_dev/cbf_dev/CBF_LBP_trajectories.pkl\n")
-    with open('/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_LBP_trajectories.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+    with open(dir_path + '/CBF_LBP_trajectories.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
         pickle.dump([trajectory, targets], f) 
     print("Saving the trajectories to /src/cbf_dev/cbf_dev/CBF_LBP_dilated_traj")
-    with open('/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_LBP_dilated_traj.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
+    with open(dir_path + '/CBF_LBP_dilated_traj.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
         pickle.dump([predicted_trajectory], f) 
 
     print("Done")
@@ -899,6 +1045,7 @@ def main_seed(args=None):
         plt.show()
 
 if __name__=='__main__':
-    main_seed()
+    # main_seed()
     # main1() 
+    random_harem()
         

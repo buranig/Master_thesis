@@ -9,11 +9,13 @@ from shapely.geometry import Point, Polygon, LineString
 from shapely.plotting import plot_polygon
 import pathlib
 import json
-
+import os
 import matplotlib
 matplotlib.use("Agg") # Uncomment to save but not visualize
 
-path = pathlib.Path('/home/giacomo/thesis_ws/src/bumper_cars/params.json')
+dir_path = os.path.dirname(os.path.realpath(__file__))
+path = pathlib.Path(dir_path + '/../../bumper_cars/params.json')
+
 # Opening JSON file
 with open(path, 'r') as openfile:
     # Reading from json file
@@ -25,6 +27,7 @@ height_init = json_object["height"]
 show_animation = json_object["show_animation"]
 add_noise = json_object["add_noise"]
 noise_scale_param = json_object["noise_scale_param"]
+linear_model = json_object["linear_model"]
 go_to_goal_bool = True
 iterations = 700
 
@@ -35,24 +38,24 @@ method = 'MPC'
 
 if method == "LBP":
     # fpath = '/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_trajectories.pkl'
-    fpath = '/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_trajectories_harem.pkl'
+    fpath = pathlib.Path(dir_path + '/../../lbp_dev/lbp_dev/LBP_trajectories_harem.pkl')
 
 elif method == "DWA":
-    fpath = '/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_trajectories_harem.pkl'
+    fpath = pathlib.Path(dir_path + '/../../dwa_dev/dwa_dev/DWA_trajectories_harem.pkl')
     # fpath = '/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_trajectories.pkl'
 
 elif method == "MPC":
-    fpath = '/home/giacomo/thesis_ws/src/mpc_dev/mpc_dev/MPC_trajectories_harem.pkl'
+    fpath = pathlib.Path(dir_path + '/../../mpc_dev/mpc_dev/MPC_trajectories_harem.pkl')
     # fpath = '/home/giacomo/thesis_ws/src/mpc_dev/mpc_dev/MPC_trajectories.pkl'
 
 elif method == 'CBF':
-    fpath = '/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_trajectories.pkl'
+    fpath = pathlib.Path(dir_path + '/../../cbf_dev/cbf_dev/CBF_trajectories.pkl')
 
 elif method == 'CBF-LBP':
-    fpath = '/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_LBP_trajectories.pkl'
+    fpath = pathlib.Path(dir_path + '/../../cbf_dev/cbf_dev/CBF_LBP_trajectories.pkl')
 
 elif method == 'CBF-MPC':
-    fpath = '/home/giacomo/thesis_ws/src/mpc_dev/mpc_dev/CBF_MPC_trajectories.pkl'
+    fpath = pathlib.Path(dir_path + '/../../mpc_dev/mpc_dev/CBF_MPC_trajectories.pkl')
 
 f = open(fpath, 'rb')
 obj = pickle.load(f)
@@ -65,19 +68,20 @@ if method == "LBP" or method == "DWA" or method == "CBF-MPC" or method == "CBF-L
     
     if method == "LBP": 
         # fpath = '/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_dilated_traj.pkl'
-        fpath = '/home/giacomo/thesis_ws/src/lbp_dev/lbp_dev/LBP_dilated_traj_harem.pkl'
+        fpath = pathlib.Path(dir_path + '/../../lbp_dev/lbp_dev/LBP_dilated_traj_harem.pkl')
     
     if method == "DWA":
-        fpath = '/home/giacomo/thesis_ws/src/dwa_dev/dwa_dev/DWA_dilated_traj_harem.pkl'
+        fpath = pathlib.Path(dir_path + '/../../dwa_dev/dwa_dev/DWA_dilated_traj_harem.pkl')
 
     if method == "MPC":
-        fpath = '/home/giacomo/thesis_ws/src/mpc_dev/mpc_dev/MPC_dilated_traj_harem.pkl'
+        fpath = pathlib.Path(dir_path + '/../../mpc_dev/mpc_dev/MPC_dilated_traj_harem.pkl')
 
     if method == "CBF-LBP":
-        fpath = '/home/giacomo/thesis_ws/src/cbf_dev/cbf_dev/CBF_LBP_dilated_traj.pkl'
+        fpath = pathlib.Path(dir_path + '/../../cbf_dev/cbf_dev/CBF_LBP_dilated_traj.pkl')
 
     if method == "CBF-MPC":
-        fpath = '/home/giacomo/thesis_ws/src/mpc_dev/mpc_dev/CBF_MPC_dilated_traj.pkl'
+        fpath = pathlib.Path(dir_path + '/../../mpc_dev/mpc_dev/CBF_MPC_dilated_traj.pkl')
+
     f = open(fpath, 'rb')
     obj = pickle.load(f)
     f.close()
@@ -96,8 +100,13 @@ def update(frame):
         lambda event: [exit(0) if event.key == 'escape' else None])
     for i in range(robot_num):
         utils.plot_robot(trajectory[0, i, z], trajectory[1, i, z], trajectory[2, i, z], i)
-        utils.plot_arrow(trajectory[0, i, z], trajectory[1, i, z], trajectory[2, i, z] + trajectory[5, i, z], length=3, width=0.5)
         utils.plot_arrow(trajectory[0, i, z], trajectory[1, i, z], trajectory[2, i, z], length=1, width=0.5)
+        if linear_model:
+            utils.plot_arrow(trajectory[0, i, z], trajectory[1, i, z], trajectory[2, i, z] + trajectory[5, i, z], length=3, width=0.5)
+        else:
+            utils.plot_arrow(trajectory[0, i, z], trajectory[1, i, z], trajectory[2, i, z] + trajectory[6, i, z], length=3, width=0.5)
+
+
         # plt.scatter(targets[i][0], targets[i][1], marker="x", color=color_dict[i], s=200)
         plt.scatter(targets[z][i][0], targets[z][i][1], marker="x", color=color_dict[i], s=200)
 
@@ -112,7 +121,9 @@ def update(frame):
     plt.xlabel("x [m]", fontdict={'size': 17, 'family': 'serif'})
     plt.ylabel("y [m]", fontdict={'size': 17, 'family': 'serif'})
     plt.title(method + ' simulation', fontdict={'size': 25, 'family': 'serif'})
-    plt.axis("equal")
+    # plt.axis("equal")
+    plt.xlim(-17,17)
+    plt.ylim(-17,17)
     plt.grid(True)
 
 
@@ -128,4 +139,5 @@ plt.show()
 writergif = animation.PillowWriter(fps=10) 
 # writergif.setup(fig, "2D_Schrodinger_Equation.gif", dpi = 300) 
 # anim.save('/home/giacomo/Video/Video/' + method + '.gif', writer=writergif, dpi="figure")
-anim.save('/home/giacomo/Video/Video/' + method + '_harem.gif', writer=writergif, dpi="figure")
+anim.save('/home/la-user/Videos/gif/' + method + '_harem.gif', writer=writergif, dpi="figure")
+# /home/la-user/Videos/gif

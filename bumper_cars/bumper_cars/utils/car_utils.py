@@ -144,7 +144,7 @@ def carStateStamped_to_array(car_list: List[CarStateStamped]) -> np.array:
         car_array[i,:] = np_car_i
     return car_array
 
-def pathList_to_array(path_list: List[Path]) -> np.array:
+def pathList_to_array(path_updated: List[bool], path_list: List[Path]) -> np.array:
     """
     Convert a list of Path objects to a numpy array.
 
@@ -159,8 +159,9 @@ def pathList_to_array(path_list: List[Path]) -> np.array:
     path_array = np.empty((path_num, 2))
     for i in range(len(path_list)):
         path_i = path_list[i]
-        np_path_i = np.array([path_i.poses[0].pose.position.x, path_i.poses[0].pose.position.y])
-        path_array[i,:] = np_path_i
+        if path_updated[i]:
+            np_path_i = np.array([path_i.poses[0].pose.position.x, path_i.poses[0].pose.position.y])
+            path_array[i,:] = np_path_i
     return path_array
 
 def pure_pursuit_steer_control(target, pose, max_steer=0.5, L=1.0, Lf=0.5, max_speed=1.0):

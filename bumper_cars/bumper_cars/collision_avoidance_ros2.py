@@ -39,6 +39,8 @@ controller_map = {
 from lar_msgs.msg import CarControlStamped
 from bumper_msgs.srv import EnvState, CarCommand, JoySafety, TrackState, WheelPosition, MainControl, TrajState
 from ros_g29_force_feedback.msg import ForceFeedback
+from nav_msgs.msg import Path
+from geometry_msgs.msg import PoseStamped
 
 class CollisionAvoidance(Node):
     """
@@ -143,10 +145,10 @@ class CollisionAvoidance(Node):
         self.main_control_req = MainControl.Request()
         self.chosen_control_req = TrajState.Request()
 
-        if self.source == 'sim':
-            self.publisher_ = self.create_publisher(CarControlStamped, '/sim/car'+self.car_str+'/set/control', 10)
-        else:
-            self.publisher_ = self.create_publisher(CarControlStamped, '/car'+self.car_str+'/set/control', 10)
+        topic_str = "/sim/car" if self.source == 'sim' else "/car"
+
+        self.publisher_ = self.create_publisher(CarControlStamped, topic_str+self.car_str+'/set/control', 10)
+        self.pub_traj = self.create_publisher(Path, topic_str+self.car_str+'/chosen_traj', 10)
         
         if self.car_i == 0:
             self.force_pub = self.create_publisher(ForceFeedback, '/ff_target', 10)
@@ -322,11 +324,9 @@ class CollisionAvoidance(Node):
                 updated_state = utils.carStateStamped_to_State(curr_car)
                 self.algorithm.set_state(updated_state)
 
-                curr_trajs = self.trajs_request()
-                print(curr_trajs.updated)
-                print(curr_trajs.trajectories)
-                updated_trajs = utils.pathList_to_array(curr_trajs.trajectories)
-                self.algorithm.set_traj(updated_trajs)
+                # curr_trajs = self.trajs_request()
+                # updated_trajs = utils.pathList_to_array(curr_trajs.updated,curr_trajs.trajectories)
+                # self.algorithm.set_traj(updated_trajs)
 
                 self.__update_lap(curr_car)
                 
@@ -380,11 +380,9 @@ class CollisionAvoidance(Node):
                 if self.debug_rviz:
                     self.markers=MarkerArray()
                     if self.alg == "dwa" or self.alg == "lbp" or self.alg == "mpc":
-                        # self.publish_trajectory(self.algorithm.trajectory)
-                        # print(self.algorithm.ob.explode())
-                        obs = [list(line.coords) for line in self.algorithm.ob.geoms]
-                        # obs = list(self.algorithm.ob.explode().coords)
-                        self.publish_trajectory(obs[0])
+                        self.publish_trajectory(self.algorithm.trajectory)
+                        # self.publish_trajectory_path(self.algorithm.des_traj)
+
                     elif self.alg == "cbf" or self.alg == "c3bf":
                         self.barrier_publisher(self.algorithm.closest_point)
                     elif self.alg=="mpc_gpu":
@@ -585,6 +583,34 @@ class CollisionAvoidance(Node):
         marker.color = color
         
         self.markers.markers.append(marker)
+
+
+    def publish_trajectory_path(self, trajectory: List[List[float]]) -> None:
+        """
+        Publishes a trajectory as a Path.
+
+        Args:
+            trajectory (List[List[float]]): The trajectory to be published. Each element in the list represents a point in the trajectory, specified as [x, y].
+
+        Returns:
+            None
+        """
+        path = Path()
+        path.header = Header()
+        frame = "world"
+        path.header.frame_id = frame
+        # path.header.stamp = self.get_clock().now().to_msg()
+
+        for point in trajectory:        
+            pose = PoseStamped()
+            pose.pose.position.x = point[0]
+            pose.pose.position.y = point[1]
+            pose.pose.position.z = 0.0
+            path.poses.append(pose)
+
+        self.pub_traj.publish(path)
+
+        
 
     def publish_trajectories(self, trajectory: List[List[List[float]]], best: int) -> None:
         """

@@ -369,23 +369,23 @@ class MPC_GPU_algorithm(Controller):
                     other_i += 1
                 
                 cost_others = self.__eval_other_cars(states, other_states)
-                cost_others2 = torch.log((cost_others - torch.min(cost_others))/torch.max(cost_others) + 1)
-                cost_others2[torch.isnan(cost_others2)] = 0.0
+                cost_others = torch.log((cost_others - torch.min(cost_others))/torch.max(cost_others) + 1)
+                cost_others[torch.isnan(cost_others)] = 0.0
 
             cost_input = self.__eval_input(input)
             cost_dist = self.__eval_distances(states)
             
-            cost_input2 = torch.log((cost_input - torch.min(cost_input))/torch.max(cost_input) + 1)
-            cost_dist2 = torch.log((cost_dist - torch.min(cost_dist))/torch.max(cost_dist) + 1)
+            cost_input = torch.log((cost_input - torch.min(cost_input))/torch.max(cost_input) + 1)
+            cost_dist = torch.log((cost_dist - torch.min(cost_dist))/torch.max(cost_dist) + 1)
             
-            cost_input2[torch.isnan(cost_input2)] = 0.0
-            cost_dist2[torch.isnan(cost_dist2)] = 0.0
+            cost_input[torch.isnan(cost_input)] = 0.0
+            cost_dist[torch.isnan(cost_dist)] = 0.0
 
             # if self.car_i == 0:
             #     print(cost_input2, cost_dist2, cost_others2)
 
 
-            cost = 100*cost_dist2 + 100*cost_others2 + 2*cost_input2 
+            cost = 100*cost_dist + 100*cost_others + 2*cost_input 
             
             min_cost, min_index = torch.min(cost, 0)
             self.best_i = min_index

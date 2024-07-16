@@ -35,7 +35,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/TrajState.srv"
   "srv/WheelPosition.srv"
   "srv/MainControl.srv"
-  DEPENDENCIES std_msgs lar_msgs geometry_msgs
+  DEPENDENCIES std_msgs lar_msgs geometry_msgs nav_msgs
 )
 
 ament_package()

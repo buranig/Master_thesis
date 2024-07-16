@@ -13,7 +13,7 @@ import yaml
 import json
 
 from shapely.geometry import Point, LineString, MultiLineString
-from shapely import distance, union
+from shapely import distance, union, affinity
 import os
 
 
@@ -95,8 +95,11 @@ class DWA_algorithm(Controller):
         # Compute control   
         u, trajectory = self.__calc_control_and_trajectory(self.curr_state[self.car_i])
         self.dilated_traj[self.car_i] = trajectory
-        # self.trajectory = trajectory.exterior.coords
+        # Traj to plot for self car
         self.trajectory = trajectory.buffer(self.car_model.width * self.dilation_factor, cap_style=3).exterior.coords
+        # Traj to store for other cars
+        self.des_traj = affinity.rotate(trajectory, self.curr_state[self.car_i][2], origin=(0, 0), use_radians=True)
+        self.des_traj = affinity.translate(self.des_traj, self.curr_state[self.car_i][0], self.curr_state[self.car_i][1]).coords
         
 
         car_cmd.throttle = np.interp(u[0], [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
@@ -128,10 +131,12 @@ class DWA_algorithm(Controller):
         Returns:
         - None
         """
-        self.dilated_traj = traj
+        # self.dilated_traj = traj
+        print(traj)
         for i in range(len(self.dilated_traj)):
-            traj_i = self.dilated_traj[i]
-            self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1]))
+            traj_i = traj[i,:]
+            # if len(traj_i) != 1:
+            #     self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1]))
 
     def compute_traj(self) -> None:
         """
@@ -239,22 +244,6 @@ class DWA_algorithm(Controller):
             rel_y = np.sin(-ref_yaw) * dx + np.cos(-ref_yaw) * dy
             rel_yaw = dtheta
 
-            # # Compute the relative velocity components
-            # vx = car_state.v * np.cos(car_state.yaw)
-            # vy = car_state.v * np.sin(car_state.yaw)
-            # ref_vx = ref_v * np.cos(ref_yaw)
-            # ref_vy = ref_v * np.sin(ref_yaw)
-
-            # rel_vx = vx - ref_vx
-            # rel_vy = vy - ref_vy
-
-            # # # Rotate the relative velocity to the reference frame of the skipped car
-            # rel_vx_transformed = np.cos(-ref_yaw) * rel_vx - np.sin(-ref_yaw) * rel_vy
-            # rel_vy_transformed = np.sin(-ref_yaw) * rel_vx + np.cos(-ref_yaw) * rel_vy
-
-            # # Calculate the magnitude of the relative velocity
-            # rel_v = np.sign(car_state.v) * np.sqrt(rel_vx_transformed**2 + rel_vy_transformed**2)
-            # rel_omega = car_state.omega - ref_omega
 
             # Update the car state to the relative state
             car_state.x = rel_x

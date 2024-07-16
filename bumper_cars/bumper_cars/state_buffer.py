@@ -63,7 +63,7 @@ class StateBufferNode(Node):
             self.sub_cmd.append(self.create_subscription(CarControlStamped, topic_str + car_str + "/desired_control",\
                                              lambda msg, car_i=i: self._received_cmd(msg, car_i), qos_profile_sensor_data))
             self.sub_traj.append(self.create_subscription(Path, topic_str + car_str + "/chosen_traj",\
-                                             lambda msg, car_i=i: self._received_cmd(msg, car_i), qos_profile_sensor_data))
+                                             lambda msg, car_i=i: self._received_traj(msg, car_i), qos_profile_sensor_data))
         
         # Initialize states (at default) and update bit
         self.cmd = [CarControlStamped()] * self.car_amount
@@ -112,7 +112,7 @@ class StateBufferNode(Node):
         self.track_pos.theta = msg.theta
 
     def _received_traj(self, msg, car_i: int) -> None:
-        self.chosen_traj[car_i] = msg.poses
+        self.chosen_traj[car_i].poses = msg.poses
         self.updated_traj[car_i] = True
 
 

@@ -324,9 +324,10 @@ class CollisionAvoidance(Node):
                 updated_state = utils.carStateStamped_to_State(curr_car)
                 self.algorithm.set_state(updated_state)
 
-                # curr_trajs = self.trajs_request()
-                # updated_trajs = utils.pathList_to_array(curr_trajs.updated,curr_trajs.trajectories)
-                # self.algorithm.set_traj(updated_trajs)
+                curr_trajs = self.trajs_request()
+                if curr_trajs.updated == True:
+                    updated_trajs = utils.pathList_to_array(curr_trajs.trajectories)
+                    self.algorithm.set_traj(updated_trajs)
 
                 self.__update_lap(curr_car)
                 
@@ -381,8 +382,7 @@ class CollisionAvoidance(Node):
                     self.markers=MarkerArray()
                     if self.alg == "dwa" or self.alg == "lbp" or self.alg == "mpc":
                         self.publish_trajectory(self.algorithm.trajectory)
-                        # self.publish_trajectory_path(self.algorithm.des_traj)
-
+                        self.publish_trajectory_path(self.algorithm.des_traj)
                     elif self.alg == "cbf" or self.alg == "c3bf":
                         self.barrier_publisher(self.algorithm.closest_point)
                     elif self.alg=="mpc_gpu":
@@ -590,7 +590,7 @@ class CollisionAvoidance(Node):
         Publishes a trajectory as a Path.
 
         Args:
-            trajectory (List[List[float]]): The trajectory to be published. Each element in the list represents a point in the trajectory, specified as [x, y].
+            trajectory (List[List[float]]): The trajectory to be published by each vehicle. Each element in the list represents a point in the trajectory, specified as [x, y] (in world coordinates).
 
         Returns:
             None

@@ -40,6 +40,7 @@ class Controller:
         # Simulation params
         self.dt = yaml_object["Controller"]["dt"]
         self.ph = yaml_object["Controller"]["ph"]
+        self.communication = yaml_object["Controller"]["communication"]
         # Size of map
         width_init = yaml_object["Simulation"]["width"]
         height_init = yaml_object["Simulation"]["height"]

@@ -325,7 +325,7 @@ class CollisionAvoidance(Node):
                 self.algorithm.set_state(updated_state)
 
                 curr_trajs = self.trajs_request()
-                if curr_trajs.updated == True:
+                if curr_trajs.updated == True and self.alg == "dwa":
                     updated_trajs = utils.pathList_to_array(curr_trajs.trajectories)
                     self.algorithm.set_traj(updated_trajs)
 

@@ -13,7 +13,7 @@ import yaml
 import json
 
 from shapely.geometry import Point, LineString, MultiLineString
-from shapely import distance, union
+from shapely import distance, union, affinity
 import os
 
 
@@ -65,6 +65,7 @@ class DWA_algorithm(Controller):
         # Empty obstacle set
         self.ob = None
         self.trajectory = None
+        self.desired_traj = None
         np.random.seed(1)
 
     ################# PUBLIC METHODS
@@ -95,9 +96,11 @@ class DWA_algorithm(Controller):
         # Compute control   
         u, trajectory = self.__calc_control_and_trajectory(self.curr_state[self.car_i])
         self.dilated_traj[self.car_i] = trajectory
-        # self.trajectory = trajectory.exterior.coords
-        self.trajectory = trajectory.buffer(self.car_model.width * self.dilation_factor, cap_style=3).exterior.coords
         
+        # Traj to plot for self car
+        self.trajectory = trajectory.buffer(self.car_model.width * self.dilation_factor, cap_style=3).exterior.coords
+        # Traj to store for other cars
+        self.des_traj = trajectory.coords
 
         car_cmd.throttle = np.interp(u[0], [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
         car_cmd.steering = np.interp(u[1], [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
@@ -117,6 +120,22 @@ class DWA_algorithm(Controller):
         self.goal = CarControlStamped()
         self.goal.throttle = np.interp(goal.throttle, [-1, 1], [self.car_model.min_acc, self.car_model.max_acc]) * self.car_model.acc_gain
         self.goal.steering = np.interp(goal.steering, [-1, 1], [-self.car_model.max_steer, self.car_model.max_steer])
+
+    def set_traj(self, traj: np.array) -> None:
+        """
+        Sets desired trajectory for other vehicles.
+
+        Args:
+        - traj (np.array): The trajectory for all cars.
+
+        Returns:
+        - None
+        """
+        empty_linestring = LineString([(0,0), (0,0)])
+        self.desired_traj = np.array([empty_linestring]*len(traj))
+        for i in range(len(self.desired_traj)):
+            traj_i = traj[i]
+            self.desired_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1]))
 
     def compute_traj(self) -> None:
         """
@@ -182,7 +201,6 @@ class DWA_algorithm(Controller):
         print("\033[93mDone generating!\033[0m")
         print("\033[92mTrajectories were written to 'dwa_dev/config/trajectories.json' \033[00m")
 
-
     ################## PRIVATE METHODS
     
     def __update_others(self) -> None:
@@ -225,32 +243,22 @@ class DWA_algorithm(Controller):
             rel_y = np.sin(-ref_yaw) * dx + np.cos(-ref_yaw) * dy
             rel_yaw = dtheta
 
-            # Compute the relative velocity components
-            vx = car_state.v * np.cos(car_state.yaw)
-            vy = car_state.v * np.sin(car_state.yaw)
-            ref_vx = ref_v * np.cos(ref_yaw)
-            ref_vy = ref_v * np.sin(ref_yaw)
-
-            rel_vx = vx - ref_vx
-            rel_vy = vy - ref_vy
-
-            # Rotate the relative velocity to the reference frame of the skipped car
-            rel_vx_transformed = np.cos(-ref_yaw) * rel_vx - np.sin(-ref_yaw) * rel_vy
-            rel_vy_transformed = np.sin(-ref_yaw) * rel_vx + np.cos(-ref_yaw) * rel_vy
-
-            # Calculate the magnitude of the relative velocity
-            rel_v = np.sqrt(rel_vx_transformed**2 + rel_vy_transformed**2)
-            rel_omega = car_state.omega - ref_omega
 
             # Update the car state to the relative state
             car_state.x = rel_x
             car_state.y = rel_y
             car_state.yaw = rel_yaw
-            car_state.v = rel_v
-            car_state.omega = rel_omega
+            car_state.v = car_state.v
+            car_state.omega = car_state.omega
 
-            traj_i = self.__calc_trajectory(car_state, emptyControl)
-            self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1]))
+            # Calculate the trajectory for the relative state
+            if self.communication and self.desired_traj is not None:
+                self.dilated_traj[i] = self.desired_traj[i]
+                self.dilated_traj[i] = affinity.rotate(self.dilated_traj[i], rel_yaw, origin=(0, 0), use_radians=True)
+                self.dilated_traj[i] = affinity.translate(self.dilated_traj[i], rel_x, rel_y)
+            else:
+                traj_i = self.__calc_trajectory(car_state, emptyControl)
+                self.dilated_traj[i] = LineString(zip(traj_i[:, 0], traj_i[:, 1]))
 
         # Also move the borders
         x_list = []
@@ -414,6 +422,7 @@ class DWA_algorithm(Controller):
         # Variables needed for faster computation
         obstacles = [self.dilated_traj[idx] for idx in range(len(self.dilated_traj)) if idx != self.car_i]
         obstacles.append(self.borders)
+
         self.ob = MultiLineString(obstacles)
 
         dw = self.__calc_dynamic_window()
@@ -440,9 +449,14 @@ class DWA_algorithm(Controller):
         if min_cost == np.inf:
             # emergency stop
             print(f"Emergency stop for vehicle {self.car_i}")
-            best_u = [(0.0 - x[3])/self.dt, 0]
-            trajectory = np.array([[0.0,0.0,0.0]] * int(self.ph/self.dt)) 
-            best_trajectory = LineString(zip(trajectory[:, 0], trajectory[:, 1]))            
+            best_a = (0.0 - x[3])/self.dt
+            best_u = [best_a, 0]
+            # evaluate all trajectory with sampled input in dynamic window
+            nearest_a = utils.find_nearest(np.arange(self.car_model.min_acc, self.car_model.max_acc+self.a_resolution, self.a_resolution), best_a)
+            # trajectory = np.array([[0.0,0.0]] * int(self.ph/self.dt)) 
+            best_trajectory = self.trajs[str(nearest)][str(nearest_a)][str(0.0)]
+
+            # best_trajectory = LineString(zip(trajectory[:, 0], trajectory[:, 1]))            
             u_traj =  np.array([best_u]*int(self.ph/self.dt))
 
         best_u = np.clip(best_u, [self.car_model.min_acc, -self.car_model.max_steer], [self.car_model.max_acc, self.car_model.max_steer])

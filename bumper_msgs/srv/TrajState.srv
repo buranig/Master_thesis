@@ -1,0 +1,3 @@
+---
+nav_msgs/Path[] trajectories
+bool updated

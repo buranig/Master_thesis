@@ -27,7 +27,7 @@ class SimpleNN(nn.Module):
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, output_size)
-        
+
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
@@ -47,7 +47,7 @@ class MPC_GPU_algorithm(Controller):
         Kv (float): Gain for the velocity term.
         closest_point (tuple): Coordinates of the closest point on the boundary.
 
-    """    
+    """
     def __init__(self, controller_path:str, car_i = 0):
         """
         Initializes the MPC_algorithm class.
@@ -75,7 +75,7 @@ class MPC_GPU_algorithm(Controller):
         self.epochs = yaml_object["MPPI"]["epochs"]
         self.batch_size = yaml_object["MPPI"]["batch_size"]
         self.sample_size = yaml_object["MPPI"]["sample_size"]
-        
+
 
         self.nn_path = os.path.dirname(os.path.realpath(__file__)) + "/../models/statePred.pt"
 
@@ -88,7 +88,8 @@ class MPC_GPU_algorithm(Controller):
         self.pred_hor = int(self.ph/self.dt)
 
         try:
-            self.device = "cpu"
+            # self.device = "cpu"
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             self.__load_model()
         except:
             print("Trained model not found. Run this with option gen_traj:=True")
@@ -116,15 +117,15 @@ class MPC_GPU_algorithm(Controller):
 
         # Compute control
         u, traj = self.__MPC_GPU(self.car_i, self.curr_state)
-        
+
         # Project it to range [-1, 1]
         car_cmd.throttle = np.interp(u[0].cpu(), [self.car_model.min_acc, self.car_model.max_acc], [-1, 1]) * self.car_model.acc_gain
         car_cmd.steering = np.interp(u[1].cpu(), [-self.car_model.max_steer, self.car_model.max_steer], [-1, 1])
-        
+
         self.trajectory = torch.zeros_like(traj, device='cpu')
         self.trajectory.copy_(traj,non_blocking=True)
-    
-        # x_traj = self.mpc.data.prediction(('_x', 'x')).flatten()   
+
+        # x_traj = self.mpc.data.prediction(('_x', 'x')).flatten()
         # y_traj = self.mpc.data.prediction(('_x', 'y')).flatten()
         # self.trajectory = zip(x_traj, y_traj)
 
@@ -170,9 +171,9 @@ class MPC_GPU_algorithm(Controller):
         self.__load_model()
         # Load model and evaluate with new data
         # self.__test_model()
-        
+
     ################# PRIVATE METHODS
-    
+
     def __load_model(self):
         self.model = SimpleNN(self.input_size, self.hidden_size, self.output_size).to(self.device)
         self.model.load_state_dict(torch.load(self.nn_path))
@@ -185,7 +186,7 @@ class MPC_GPU_algorithm(Controller):
             curr_state = self.car_model.step(car_cmd, self.dt, curr_state=curr_state)
             t += self.dt
         return curr_state
-        
+
     def __compute_track_constants(self):
         """
         Computes the track constants based on the boundary points.
@@ -198,8 +199,8 @@ class MPC_GPU_algorithm(Controller):
         b = x1 - x2
         c = y1 * (x2 - x1) - x1 * (y2 - y1)
 
-        They correspond to the constants for the straight lines that join all vertices 
-        of the square that defines the bumping arena. These lines follow convention 
+        They correspond to the constants for the straight lines that join all vertices
+        of the square that defines the bumping arena. These lines follow convention
         of the form ax + by + c = 0.
 
         Returns:
@@ -255,14 +256,14 @@ class MPC_GPU_algorithm(Controller):
         - min_indices (torch.Tensor): The indices of the minimum differences for each batch.
         """
         # Compute the difference between each element of input and goal_tensor
-        diff = self.goal_tensor - input[:, 0:2]  
+        diff = self.goal_tensor - input[:, 0:2]
         # Compute the Euclidean norm of the differences
         norm_diff = torch.norm(diff, dim=1)  # Compute the norm along the feature dimension
 
         return norm_diff
-    
+
     def __eval_distances(self, states: torch.Tensor) -> torch.Tensor:
-            
+
         x = states[:, :, 0]
         y = states[:, :, 1]
 
@@ -273,7 +274,7 @@ class MPC_GPU_algorithm(Controller):
         cost = torch.sum(cost.squeeze(), dim=2)
         cost = torch.sum(cost.squeeze(), dim=0)
         return cost
-        
+
     def __eval_other_cars(self, states: torch.Tensor, others: torch.Tensor) -> torch.Tensor:
 
         my = states[:, :, 0:2].unsqueeze_(2)
@@ -287,7 +288,7 @@ class MPC_GPU_algorithm(Controller):
 
         # Sum the squared differences along the last dimension
         sum_squared_difference = torch.sum(squared_difference, dim=-1)
-        
+
         # Take the square root to get the Euclidean distance
         distance = torch.sqrt(sum_squared_difference)
 
@@ -305,7 +306,7 @@ class MPC_GPU_algorithm(Controller):
             cost_input = torch.zeros((self.sampleNum), device=self.device)
             cost_dist = torch.zeros((self.sampleNum), device=self.device)
             cost_others = torch.zeros((self.sampleNum), device=self.device)
-            
+
             # Obstacle cars
             num_other_cars = x.shape[1]-1
 
@@ -315,7 +316,6 @@ class MPC_GPU_algorithm(Controller):
 
             gen_a = torch.clamp(gen_a, self.car_model.min_acc, self.car_model.max_acc)
             gen_delta = torch.clamp(gen_delta, -self.car_model.max_steer, self.car_model.max_steer)
-
 
             input = torch.zeros((self.sampleNum,5),device=self.device)
             input[:,0] = gen_a[:,0]
@@ -329,7 +329,7 @@ class MPC_GPU_algorithm(Controller):
             states[:,0,1] = x[1,car_i]
             states[:,0,2] = x[2,car_i]
             states[:,0,3] = x[3,car_i]
-            
+
             for i in range(self.pred_hor - 1):
                 states[:,i+1,:] = states[:,i,:] + self.model(input)
                 input[:,0] = gen_a[:,i+1]
@@ -337,10 +337,9 @@ class MPC_GPU_algorithm(Controller):
                 input[:,2] = torch.cos(states[:,i+1,2])
                 input[:,3] = torch.sin(states[:,i+1,2])
                 input[:,4] = states[:,i+1,3]
-                
 
 
-            
+
             if num_other_cars > 0:
                 other_states = torch.zeros((self.sampleNum, self.pred_hor, num_other_cars, self.output_size), device=self.device)
 
@@ -361,7 +360,7 @@ class MPC_GPU_algorithm(Controller):
                     other_input[:,3] = np.sin(x[2,i])       # Input curr yaw
                     other_input[:,4] = x[3,i]               # Input curr vel
 
-                    
+
                     for j in range(self.pred_hor - 1):
                         other_states[:,j+1,other_i,:] = other_states[:,j,other_i,:] + self.model(other_input)
                         other_input[:,2] = torch.cos(other_states[:,j+1,other_i,2])
@@ -370,27 +369,27 @@ class MPC_GPU_algorithm(Controller):
                     other_i += 1
                 
                 cost_others = self.__eval_other_cars(states, other_states)
-                cost_others2 = torch.log((cost_others - torch.min(cost_others))/torch.max(cost_others) + 1)
-                cost_others2[torch.isnan(cost_others2)] = 0.0
+                cost_others = torch.log((cost_others - torch.min(cost_others))/torch.max(cost_others) + 1)
+                cost_others[torch.isnan(cost_others)] = 0.0
 
             cost_input = self.__eval_input(input)
             cost_dist = self.__eval_distances(states)
             
-            cost_input2 = torch.log((cost_input - torch.min(cost_input))/torch.max(cost_input) + 1)
-            cost_dist2 = torch.log((cost_dist - torch.min(cost_dist))/torch.max(cost_dist) + 1)
+            cost_input = torch.log((cost_input - torch.min(cost_input))/torch.max(cost_input) + 1)
+            cost_dist = torch.log((cost_dist - torch.min(cost_dist))/torch.max(cost_dist) + 1)
             
-            cost_input2[torch.isnan(cost_input2)] = 0.0
-            cost_dist2[torch.isnan(cost_dist2)] = 0.0
+            cost_input[torch.isnan(cost_input)] = 0.0
+            cost_dist[torch.isnan(cost_dist)] = 0.0
 
             # if self.car_i == 0:
             #     print(cost_input2, cost_dist2, cost_others2)
 
 
-            cost = 100*cost_dist2 + 100*cost_others2 + 2*cost_input2 
+            cost = 100*cost_dist + 100*cost_others + 2*cost_input 
             
             min_cost, min_index = torch.min(cost, 0)
             self.best_i = min_index
-            control = input[min_index,:2]        
+            control = input[min_index,:2]
             self.prev_a = control[0].item()
             self.prev_delta = control[1].item()
 
@@ -398,9 +397,9 @@ class MPC_GPU_algorithm(Controller):
                 print("Emergency stop!")
                 control[0] =  (0.0 - x[3,car_i])/self.dt
                 self.prev_a = 0.0
-                
+
             return control.detach().clone(), states.detach().clone()
-            
+
 
     def __gen_model(self):
 
@@ -445,7 +444,7 @@ class MPC_GPU_algorithm(Controller):
         best_mse = np.inf   # init to infinity
         best_weights = None
         history = []
-        
+
         # loss function and optimizer
         loss_fn = nn.MSELoss()  # mean square error
         optimizer = optim.Adam(model.parameters(), lr=self.learning_rate)
@@ -483,7 +482,7 @@ class MPC_GPU_algorithm(Controller):
 
         # restore model and return best accuracy
         model.load_state_dict(best_weights)
-        
+
         torch.save(model.state_dict(), self.nn_path)
 
 

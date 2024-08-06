@@ -71,16 +71,16 @@ desThrottles=($(LC_ALL=C seq $dsS $desThrottle_res $dsE))
 
 # alg
 algs=("dwa" "cbf" "c3bf" "lbp" "mpc" "mpc_gpu")
-algs=("dwa" "cbf" "c3bf" "lbp" "mpc_gpu")
+algs=("mpc_gpu")
 # models
 models=("kinematic" "dynamic" "pacejka")
 models=("kinematic")
 # scenario
 scenariosS=0
-scenariosE=0
+scenariosE=3
 
 
-repetitions=5
+repetitions=2
 
 total_iterations=0
 
@@ -118,7 +118,7 @@ do
     done
 done
 
-
+genTraj="False"
 
 current_iteration=0
 echo -ne '                      (0%)\r'
@@ -149,8 +149,8 @@ do
                         
                             ((current_iteration++))
                             if [[ $genTraj == "True" ]]; then
-                                run_simulations "$carNumber" "$predHor"  "$desThrottle" "$model" "$alg" "$scenario"  "$genTraj" "$timeout_generation"
                                 genTraj="False"
+                                run_simulations "$carNumber" "$predHor"  "$desThrottle" "$model" "$alg" "$scenario"  "$genTraj" "$timeout_generation"
                             else
                                 run_simulations "$carNumber" "$predHor"  "$desThrottle" "$model" "$alg" "$scenario"  "$genTraj" "$timeout_duration"
                             fi
@@ -160,6 +160,7 @@ do
                             find ../csv/ -type f -name 'data*.csv' -exec sed -i -e "s/^/$prefix/" {} \;
                             # sed -i -e "s/^/$prefix/" ../csv/data*.csv
                             cat ../csv/data*.csv >> ../csv/all_data.csv
+                            rm ../csv/data*.csv
                         done
                     done
                 done

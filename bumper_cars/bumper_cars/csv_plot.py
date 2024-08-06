@@ -6,8 +6,9 @@ import matplotlib.pyplot as plt
 import time
 import os
 file_path = os.path.dirname(os.path.realpath(__file__))
-# file_path += "/../csv/data_0.csv" 
-file_path += "/../all_data_collision.csv" 
+file_path += "/../plots/all_data_multicar.csv" 
+file_path2 = os.path.dirname(os.path.realpath(__file__)) + "/../plots/all_data_MPPI_GPU.csv" 
+# file_path += "/../plots/TMP/CBF.csv" 
 
 import seaborn as sns
 
@@ -17,49 +18,56 @@ def main():
     # return
     # Read the CSV file into a DataFrame
     df = pd.read_csv(file_path)
+    df2 = pd.read_csv(file_path2)
     print(df.head())
 
     # change name from mpc_gpu to mppi
-    df['alg'] = df['alg'].replace('mpc_gpu', 'mppi')
+    df['alg'] = df['alg'].replace('mpc_gpu', 'mppi_cpu')
+    df2['alg'] = df2['alg'].replace('mpc_gpu', 'mppi_gpu')
 
-    # carNumber,predHorizon,desiredThrottle,alg,model,scenario,car_i,cum_time,lap_time,lap_number,it_time,isd
+    new_df = pd.concat([df, df2], axis=0)
+
+    # carNumber,predHorizon,desiredThrottle,alg,model,scenario,car_i,cum_time,lap_time,lap_number,it_time,isd,pos_x,pos_y
     algs = df['alg'].unique()
     pHs = df['predHorizon'].unique()
     desThrottles = df['desiredThrottle'].unique()
     models = df['model'].unique()
     scenarios = df['scenario'].unique()
-    laps = df['lap_number'].unique()
+    # carNumbers = df['carNumber'].unique()
+
     if 'iteration' in df.columns:
         iterations = df['iteration'].unique()
     else:
         iterations = [True]
     # Define colors for each predHorizon
-    colors_pHs = sns.color_palette("husl", len(pHs))  # You can also use another palette like "viridis"
+    # colors_pHs = sns.color_palette("husl", len(pHs))  # You can also use another palette like "viridis"
     
     #####################################################################################
 
-    # # Computation time vs desired throttle for each prediction horizon 
+    # Computation time vs desired throttle for each prediction horizon 
     # for i in range(0, len(algs)):
-    #     plt.figure(i)
-    #     mask = (df['alg'] == algs[i])
-    #     sns.violinplot(data=df[mask], 
-    #                    x="desiredThrottle", y="it_time", 
-    #                    hue="predHorizon", inner="quart", 
-    #                    palette = 'Set2', legend='full',
-    #                    fill=False)
-    #     # sns.boxplot(x = df[df['alg']==algs[i]]['desiredThrottle'], 
-    #     #             y = df[df['alg']==algs[i]]['it_time'], 
-    #     #             hue = df[df['alg']==algs[i]]['predHorizon'],
-    #     #             palette = 'Set2',
-    #     #             legend='full') 
-        
-    #     plt.grid(True)
-    #     plt.legend(title='Prediction Horizon (s)', loc='upper right')
-    #     plt.xlabel("Desired throttle "+ r'$\left[\frac{m}{s^2}\right]$')
-    #     plt.ylabel("Control computation time "+ r'$\left[s\right]$ ')
-    #     plt.title("Control computation time vs desired throttle for " + algs[i].upper() + " algorithm")
-    #     plt.show()
-        
+    plt.figure(0)
+    # mask = (new_df['alg'] == 'mppi_cpu') | (new_df['alg'] == 'mppi_gpu')
+    print(new_df.head())
+    sns.violinplot(data=new_df, 
+                    x="carNumber", y="it_time", 
+                    hue="alg", inner="quart", 
+                    palette = 'Set2', legend=True,
+                    fill=False)
+# sns.boxplot(x = df[df['alg']==algs[i]]['desiredThrottle'], 
+#             y = df[df['alg']==algs[i]]['it_time'], 
+#             hue = df[df['alg']==algs[i]]['predHorizon'],
+#             palette = 'Set2',
+#             legend='full') 
+
+    plt.grid(True)
+    # plt.legend(title='Prediction Horizon (s)', loc='upper right')
+    plt.xlabel("Car number "+ r'$\left[-\right]$ ')
+    plt.ylabel("Control computation time "+ r'$\left[s\right]$ ')
+    plt.ylim([0.0, 0.1])
+    plt.title("Control computation time vs desired throttle")
+    plt.show()
+            
 
     #####################################################################################
 
@@ -116,41 +124,61 @@ def main():
 
     #####################################################################################
 
-    # Plot the time for each lap vs prediction horizon
-    for i in range(0, len(algs)):
-        data_times = {'pH':[], 'time':[], 'desThrottle':[]}
-        for j, pH in enumerate(pHs):
-            for desThrottle in desThrottles:
-                for model in models:
-                    for scenario in scenarios:
-                        # for iteration in iterations:
-                            mask = (df['alg'] == algs[i]) & (df['predHorizon'] == pH) & (df['desiredThrottle'] == desThrottle) & (df['model'] == model) & (df['scenario'] == scenario) 
-                            if any(mask):
-                                prev_time = 0.0
-                                for lap_time in df[mask]['lap_time'].values:
-                                    if lap_time < prev_time:
-                                        data_times['desThrottle'].append(desThrottle)
-                                        data_times['pH'].append(pH)
-                                        data_times['time'].append(prev_time)
-                                    prev_time = lap_time
+    # # Plot the time for each lap vs prediction horizon
+    # for i in range(0, len(algs)):
+    #     data_times = {'scenario':[], 'time':[], 'carNumber':[]}
+    #     for carNumber in carNumbers:
+    #             for scenario in scenarios:
+    #                 for iteration in iterations:
+    #                     mask = (df['alg'] == algs[i]) & (df['carNumber'] == carNumber) & (df['scenario'] == scenario) & (df['iteration'] == iteration)
+    #                     if any(mask):
+    #                         prev_time = 0.0
+    #                         for lap_time in df[mask]['lap_time'].values:
+    #                             if lap_time < prev_time:
+    #                                 if prev_time > 2.5:
+    #                                     data_times['carNumber'].append(carNumber)
+    #                                     data_times['scenario'].append(scenario)
+    #                                     data_times['time'].append(prev_time)
+    #                             prev_time = lap_time
                
-        df_aux = pd.DataFrame(data_times)
-        plt.figure(i)
-        sns.boxplot(x = df_aux['desThrottle'], 
-                    y = df_aux['time'], 
-                    color='black',
-                    # palette = 'Set2',
-                    # inner="quart", 
-                    # hue=df_aux['pH'],
-                    legend='full',
-                    fill=False
-                    ) 
+    #     df_aux = pd.DataFrame(data_times)
+    #     plt.figure(i)
+    #     sns.boxplot(x = df_aux['carNumber'], 
+    #                 y = df_aux['time'], 
+    #                 palette = 'Set2',
+    #                 # inner="quart", 
+    #                 hue=df_aux['scenario'],
+    #                 legend='full',
+    #                 fill=False
+    #                 ) 
 
-        plt.grid(True)
-        plt.xlabel("Desired throttle "+ r'$\left[\frac{m}{s^2}\right]$')
-        plt.ylabel("Lap time "+ r'$\left[s\right]$ ')
-        plt.title("Lap time vs desired throttle for " + algs[i].upper() + " algorithm")
-        plt.show()
+    #     plt.grid(True)
+    #     plt.xlabel("Car number "+ r'$\left[-\right]$')
+    #     plt.ylabel("Lap time "+ r'$\left[s\right]$ ')
+    #     plt.title("Lap time vs car number for " + algs[i].upper() + " algorithm")
+    #     plt.show()
+
+    #####################################################################################
+
+    # Plot the position of the vehicle in each time instant
+    plt.figure(0)
+
+    mask = (df['car_i'] == 0)
+    plt.plot(df[mask]['pos_x'].astype('float').values, df[mask]['pos_y'].astype('float').values, color='orange', alpha=0.7)
+    mask = (df['car_i'] == 1)
+    plt.plot(df[mask]['pos_x'].astype('float').values, df[mask]['pos_y'].astype('float').values, color='blue', alpha=0.7)
+    
+    #  Collisions
+    # plt.plot(-0.181, 1.0, 'o', color='red', alpha=0.3, markersize=50, markeredgewidth=2, markerfacecolor='none')
+    # plt.plot(0.438, 0.276, 'o', color='red', alpha=0.3, markersize=50, markeredgewidth=2, markerfacecolor='none')
+    # plt.plot(0.282, -1.4, 'o', color='red', alpha=0.3, markersize=100, markeredgewidth=2, markerfacecolor='none')
+
+
+    plt.grid(True)
+    plt.xlabel("X position "+ r'$\left[m\right]$')
+    plt.ylabel("Y position "+ r'$\left[m\right]$')
+    plt.title("Vehicle trajectory for two moving vehicles")
+    plt.show()
 
 
 def main_normal():

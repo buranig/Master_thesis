@@ -40,6 +40,7 @@ class Controller:
         # Simulation params
         self.dt = yaml_object["Controller"]["dt"]
         self.ph = yaml_object["Controller"]["ph"]
+        self.communication = yaml_object["Controller"]["communication"]
         # Size of map
         width_init = yaml_object["Simulation"]["width"]
         height_init = yaml_object["Simulation"]["height"]
@@ -86,6 +87,17 @@ class Controller:
         On those algorithms that require it, pre-computes the possible trajectories.
         """
         print("Selected algorithm does not implement 'compute_traj' function")
+        pass
+
+    def set_traj(self, traj: np.array) -> None:
+        """
+        Sets the trajectory for the controller.
+
+        Args:
+        ----------
+            traj (np.array): The trajectory for all cars.
+        """
+        print("Selected algorithm does not implement 'set_traj' function")
         pass
 
     def set_goal(self, goal: CarControlStamped) -> None:

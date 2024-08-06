@@ -5,6 +5,7 @@ import rclpy
 import yaml
 from rclpy.node import Node
 from bumper_cars.utils import car_utils as utils
+from lar_msgs.msg import CarControlStamped
 
 # Plot goal in Rviz
 from visualization_msgs.msg import Marker, MarkerArray
@@ -36,8 +37,10 @@ controller_map = {
 }
 
 from lar_msgs.msg import CarControlStamped
-from bumper_msgs.srv import EnvState, CarCommand, JoySafety, TrackState, WheelPosition, MainControl
+from bumper_msgs.srv import EnvState, CarCommand, JoySafety, TrackState, WheelPosition, MainControl, TrajState
 from ros_g29_force_feedback.msg import ForceFeedback
+from nav_msgs.msg import Path
+from geometry_msgs.msg import PoseStamped
 
 class CollisionAvoidance(Node):
     """
@@ -126,6 +129,8 @@ class CollisionAvoidance(Node):
         self.track_cli = self.create_client(TrackState, 'track_pose')
         self.wheel_cli = self.create_client(WheelPosition, 'wheel_buffer')
         self.main_control_cli = self.create_client(MainControl, 'main_control')
+        self.chosen_control_cli = self.create_client(TrajState, 'traj_srv')
+        
 
         while not self.state_cli.wait_for_service(timeout_sec=1.0) or not self.cmd_cli.wait_for_service(timeout_sec=1.0) or not self.wheel_cli.wait_for_service(timeout_sec=1.0) or not self.main_control_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
@@ -138,11 +143,12 @@ class CollisionAvoidance(Node):
         self.track_req = TrackState.Request()
         self.wheel_pos_req = WheelPosition.Request()
         self.main_control_req = MainControl.Request()
+        self.chosen_control_req = TrajState.Request()
 
-        if self.source == 'sim':
-            self.publisher_ = self.create_publisher(CarControlStamped, '/sim/car'+self.car_str+'/set/control', 10)
-        else:
-            self.publisher_ = self.create_publisher(CarControlStamped, '/car'+self.car_str+'/set/control', 10)
+        topic_str = "/sim/car" if self.source == 'sim' else "/car"
+
+        self.publisher_ = self.create_publisher(CarControlStamped, topic_str+self.car_str+'/set/control', 10)
+        self.pub_traj = self.create_publisher(Path, topic_str+self.car_str+'/chosen_traj', 10)
         
         if self.car_i == 0:
             self.force_pub = self.create_publisher(ForceFeedback, '/ff_target', 10)
@@ -230,7 +236,21 @@ class CollisionAvoidance(Node):
         if not self.future.done():
             print("Timeout")
         return self.future.result()
-        
+
+    def trajs_request(self) -> TrajState.Response:
+        """
+        Sends a request to get the current trajectories.
+        Args:
+            None
+        Returns:
+            TrajState.Response: The response from the trajectory state service.
+        """
+        self.traj_future = self.chosen_control_cli.call_async(self.chosen_control_req)
+        rclpy.spin_until_future_complete(self, self.traj_future)
+        if not self.traj_future.done():
+            print("Timeout")
+        return self.traj_future.result()
+
     def cmd_request(self) -> CarCommand.Response:
         """
         Sends a request to get the desired command for a car.
@@ -285,6 +305,11 @@ class CollisionAvoidance(Node):
         self.lap_number = 0
         self.just_changed = True
 
+        # Reverse setting for Micro-ros agent
+        # self.braking = False
+        # self.prev_control = CarControlStamped()
+
+
         while rclpy.ok():
             try:
                 # Update the current state of the car (and do rcply spin to update timer)
@@ -295,6 +320,11 @@ class CollisionAvoidance(Node):
                 curr_car = curr_state.env_state[self.car_i] # Select desired car
                 updated_state = utils.carStateStamped_to_State(curr_car)
                 self.algorithm.set_state(updated_state)
+
+                curr_trajs = self.trajs_request()
+                if curr_trajs.updated == True and self.alg == "dwa":
+                    updated_trajs = utils.pathList_to_array(curr_trajs.trajectories)
+                    self.algorithm.set_traj(updated_trajs)
 
                 self.__update_lap(curr_car)
                 
@@ -322,6 +352,8 @@ class CollisionAvoidance(Node):
                     cmd_out = des_action.cmd
                     it_time = 0.0
 
+                # cmd_out = self.__check_reverse(cmd_out=cmd_out)
+                # self.prev_control = cmd_out
                 # Send command to car
                 v_long = curr_state.env_state[self.car_i].vel_x*np.cos(curr_state.env_state[self.car_i].turn_angle) + curr_state.env_state[self.car_i].vel_y*np.sin(curr_state.env_state[self.car_i].turn_angle)
                 
@@ -347,6 +379,7 @@ class CollisionAvoidance(Node):
                     self.markers=MarkerArray()
                     if self.alg == "dwa" or self.alg == "lbp" or self.alg == "mpc":
                         self.publish_trajectory(self.algorithm.trajectory)
+                        self.publish_trajectory_path(self.algorithm.des_traj)
                     elif self.alg == "cbf" or self.alg == "c3bf":
                         self.barrier_publisher(self.algorithm.closest_point)
                     elif self.alg=="mpc_gpu":
@@ -484,7 +517,7 @@ class CollisionAvoidance(Node):
         marker = Marker()
         marker.header = Header()
         marker.header.frame_id = "world"
-        marker.header.stamp = self.get_clock().now().to_msg()
+        # marker.header.stamp = self.get_clock().now().to_msg()
 
         marker.ns = "barrier"
         marker.id = 51 + self.car_i
@@ -550,6 +583,34 @@ class CollisionAvoidance(Node):
         
         self.markers.markers.append(marker)
 
+
+    def publish_trajectory_path(self, trajectory: List[List[float]]) -> None:
+        """
+        Publishes a trajectory as a Path.
+
+        Args:
+            trajectory (List[List[float]]): The trajectory to be published by each vehicle. Each element in the list represents a point in the trajectory, specified as [x, y] (in world coordinates).
+
+        Returns:
+            None
+        """
+        path = Path()
+        path.header = Header()
+        frame = "world"
+        path.header.frame_id = frame
+        # path.header.stamp = self.get_clock().now().to_msg()
+
+        for point in trajectory:        
+            pose = PoseStamped()
+            pose.pose.position.x = point[0]
+            pose.pose.position.y = point[1]
+            pose.pose.position.z = 0.0
+            path.poses.append(pose)
+
+        self.pub_traj.publish(path)
+
+        
+
     def publish_trajectories(self, trajectory: List[List[List[float]]], best: int) -> None:
         """
         Publishes all trajectoreis as a line strip marker.
@@ -567,7 +628,7 @@ class CollisionAvoidance(Node):
             marker.header = Header()
             frame = "world"
             marker.header.frame_id = frame
-            marker.header.stamp = self.get_clock().now().to_msg()
+            # marker.header.stamp = self.get_clock().now().to_msg()
             marker.ns = "predicted_trajectory"
             marker.type = Marker.LINE_STRIP
             marker.action = Marker.ADD
@@ -604,11 +665,6 @@ class CollisionAvoidance(Node):
         else:
             self.just_changed = False
 
-        # if car_state.turn_angle % (2*3.14) > 0.5:
-        #     self.just_changed = False
-        # elif car_state.turn_angle % (2*3.14) <= 0.5 and not self.just_changed:
-        #     self.lap_number +=1
-        #     self.just_changed = True
     
 
     def write_csv(self, des_action, cmd_out, it_time, curr_car):
@@ -638,7 +694,20 @@ class CollisionAvoidance(Node):
         lap_time = time.time() - self.lap_time
         isd = (des_action.steering - cmd_out.steering)**2 + (des_action.throttle - cmd_out.throttle)**2
 
-        self.data_file.write(str(self.car_i) + "," +str(cum_time) + "," + str(lap_time) + "," + str(self.lap_number) + "," + str(it_time) + "," + str(isd) + "," + str(x) + "," + str(y) +  "\n")
+        self.data_file.write(str(self.car_i) + "," +str(cum_time) + "," + str(lap_time) + "," + str(self.lap_number) + "," + str(it_time) + "," + str(isd) +  "\n")
+
+    def __check_reverse(self, cmd_out):
+        """
+        This function serves as a bypass to the manual way of breaking/going reverse
+        """
+        if cmd_out.throttle < 0.001:
+            if self.prev_control.throttle<0.001:
+                if not self.braking:
+                    self.braking = True
+                    cmd_out.throttle = 0.0
+        else:
+            self.braking = False
+        return cmd_out
 
 def main(args=None):
     rclpy.init(args=args)

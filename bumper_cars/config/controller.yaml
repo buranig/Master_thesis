@@ -1,10 +1,10 @@
 CBF:                              ### Collision Barrier Functions
   safety_radius: 0.2              # [m] Radius of each barrier function
-  barrier_gain: 10.0           # [-] Gain of barrier function
+  barrier_gain: 1.0           # [-] Gain of barrier function
   Kv: 0.2                         # [-] Gain of the barrier depending on car's velocity
 C3BF:                             ### Collision Cone Control Barrier Functions      
   safety_radius: 0.2              # [m] Radius of each barrier function
-  barrier_gain: 100.0           # [-] Gain of barrier function
+  barrier_gain: 1000.0           # [-] Gain of barrier function
   Kv: 0.2                         # [-] Gain of the barrier depending on car's velocity
 DWA:                              ### Dynamic Window Approach             
   a_resolution: 0.01              # [m/s^2] Resolution for the sampled acceleration
@@ -34,7 +34,8 @@ MPPI:                             ### Model Predictive Path Integral control
 
 Controller:                       ### Controller parameters        
   dt: 0.05                        # [s] Controller time step (both for control and traj_generation)
-  ph: 1.0
+  ph: 1.5                         # [s] Prediction horizon
+  communication: True             # [-] Communication between cars to exchange trajectories taken
 Simulation:                       ### Simulation parameters
   width: 4.5                      # [m] Width of the driving area    
   height: 3.5                     # [m] Height of the driving area        

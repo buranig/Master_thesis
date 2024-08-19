@@ -13,6 +13,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(lar_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -35,7 +36,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/TrajState.srv"
   "srv/WheelPosition.srv"
   "srv/MainControl.srv"
-  DEPENDENCIES std_msgs lar_msgs geometry_msgs nav_msgs
+  "srv/JoyBuffer.srv"
+  DEPENDENCIES std_msgs lar_msgs geometry_msgs nav_msgs sensor_msgs
 )
 
 ament_package()

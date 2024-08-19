@@ -24,16 +24,16 @@ from dwa_dev.DWA import DWA_algorithm as DWA
 from cbf_dev.CBF import CBF_algorithm as CBF
 from cbf_dev.C3BF import C3BF_algorithm as C3BF
 from lbp_dev.LBP import LBP_algorithm as LBP
-from mpc_dev.MPC import MPC_algorithm as MPC
-from mpc_dev.MPC_GPU import MPC_GPU_algorithm as MPC_GPU
+# from mpc_dev.MPC import MPC_algorithm as MPC
+# from mpc_dev.MPC_GPU import MPC_GPU_algorithm as MPC_GPU
 
 controller_map = {
     "dwa": DWA,
     "c3bf": C3BF,
     "cbf": CBF,
     "lbp": LBP,
-    "mpc": MPC,
-    "mpc_gpu": MPC_GPU
+    # "mpc": MPC,
+    # "mpc_gpu": MPC_GPU
 }
 
 from lar_msgs.msg import CarControlStamped
@@ -391,17 +391,16 @@ class CollisionAvoidance(Node):
                     self.write_csv(des_action.cmd, cmd_out, it_time, curr_car)
             
                 if self.car_i == 0 and (main_control and ca_active):
-                    print("Both active")
+                    # print("Both active")
                     self.publish_ff(-cmd_out.steering, 0.0)
                 elif self.car_i == 0 and main_control==False and ca_active==True:
-                    print("Only ca active")
-                    print(abs(des_action.cmd._steering-cmd_out._steering))
+                    # print("Only ca active")
                     if abs(des_action.cmd._steering-cmd_out._steering)<0.3:
                         self.publish_ff(0.0, 0.0)
                     else:
                         self.publish_ff(-cmd_out.steering, 0.0)
                 elif self.car_i == 0:
-                    print("Both inactive")
+                    # print("Both inactive")
                     self.publish_ff(0.0, 0.0)
 
 

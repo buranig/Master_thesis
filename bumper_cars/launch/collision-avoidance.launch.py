@@ -106,17 +106,34 @@ def add_car(context, ld):
         )
 
         # Joy Node
-        joy = Node(
-            package='joy',
-            executable='joy_node',
-            name='joy'+car_str+'_node',
-            parameters=[
-                    {'device_id': car_num},
-            ],
-            remappings=[('/joy', '/joy'+str(car_i)) ],
-            emulate_tty=True,
-            output='both'
-        )
+        if car_i != 0:
+            joy = Node(
+                package='joy',
+                executable='joy_node',
+                name='joy'+car_str+'_node',
+                parameters=[
+                        {'device_id': car_num},
+                ],
+                remappings=[('/joy', '/joy'+str(car_i)) ],
+                emulate_tty=True,
+                output='both'
+            )
+            ld.add_action(joy)
+            
+            wheel_gain = LaunchConfiguration('wheel_gain').perform(context)
+            print(wheel_gain)
+            if not eval(joy_control):
+                g29_ff = Node(
+                    package="ros_g29_force_feedback",
+                    executable="g29_force_feedback",
+                    name="g29_force_feedback",
+                    output="screen",
+                    parameters=[
+                        {'device_name': "/dev/input/event12"},
+                        {"gain": LaunchConfiguration('wheel_gain')}
+                    ],
+                )
+                ld.add_action(g29_ff)
 
         joy_remap = Node(
             package='bumper_cars',
@@ -132,23 +149,8 @@ def add_car(context, ld):
         )
 
         ld.add_action(joySafety_node)
-        ld.add_action(joy)
         ld.add_action(joy_remap)
     
-    wheel_gain = LaunchConfiguration('wheel_gain').perform(context)
-    print(wheel_gain)
-    if not eval(joy_control):
-        g29_ff = Node(
-            package="ros_g29_force_feedback",
-            executable="g29_force_feedback",
-            name="g29_force_feedback",
-            output="screen",
-            parameters=[
-                {'device_name': "/dev/input/event13"},
-                {"gain": LaunchConfiguration('wheel_gain')}
-            ],
-        )
-        ld.add_action(g29_ff)
 
 
 def generate_launch_description():
@@ -216,7 +218,7 @@ def generate_launch_description():
     wheel_gain = DeclareLaunchArgument(
         'wheel_gain',
         description="Strenght of the force feedback on the steering wheel",
-        default_value="25"
+        default_value="65"
     )
     
 

@@ -2,7 +2,7 @@ import numpy as np
 
 # To perform mpc
 from casadi import *
-import do_mpc
+# import do_mpc
 
 import time
 

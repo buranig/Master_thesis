@@ -6,6 +6,7 @@ import yaml
 from rclpy.node import Node
 from bumper_cars.utils import car_utils as utils
 from lar_msgs.msg import CarControlStamped
+from rclpy.qos import qos_profile_sensor_data
 
 # Plot goal in Rviz
 from visualization_msgs.msg import Marker, MarkerArray
@@ -147,7 +148,8 @@ class CollisionAvoidance(Node):
 
         topic_str = "/sim/car" if self.source == 'sim' else "/car"
 
-        self.publisher_ = self.create_publisher(CarControlStamped, topic_str+self.car_str+'/set/control', 10)
+        self.publisher_ = self.create_publisher(CarControlStamped, topic_str+self.car_str+'/set/control', qos_profile_sensor_data)
+        # self.publisher_ESP32_ = self.create_publisher(CarControlStamped, topic_str+self.car_str+'/set/controlESP32', qos_profile_sensor_data)
         self.pub_traj = self.create_publisher(Path, topic_str+self.car_str+'/chosen_traj', 10)
         
         if self.car_i == 0:
@@ -362,7 +364,6 @@ class CollisionAvoidance(Node):
                     self.publisher_.publish(cmd_out)
                     self.send_once = False
                 elif cmd_out.throttle<=-0.01 and v_long<0.001 and v_long>-0.001:
-                    # self.publisher_.publish(cmd_out)
                     if not self.send_once:
                         throttle_buf = cmd_out.throttle
                         cmd_out.throttle = 0.0

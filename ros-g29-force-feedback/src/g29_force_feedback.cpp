@@ -255,6 +255,7 @@ void G29ForceFeedback::initDevice() {
         std::cout << "ERROR: cannot get axis range" << std::endl;
         exit(1);
     }
+
     m_axis_max = abs_info.maximum;
     m_axis_min = abs_info.minimum;
     if (m_axis_min >= m_axis_max) {

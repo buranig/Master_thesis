@@ -120,20 +120,20 @@ def add_car(context, ld):
             )
             ld.add_action(joy)
             
-            wheel_gain = LaunchConfiguration('wheel_gain').perform(context)
-            print(wheel_gain)
-            if not eval(joy_control):
-                g29_ff = Node(
-                    package="ros_g29_force_feedback",
-                    executable="g29_force_feedback",
-                    name="g29_force_feedback",
-                    output="screen",
-                    parameters=[
-                        {'device_name': "/dev/input/event12"},
-                        {"gain": LaunchConfiguration('wheel_gain')}
-                    ],
-                )
-                ld.add_action(g29_ff)
+        #     wheel_gain = LaunchConfiguration('wheel_gain').perform(context)
+        #     print(wheel_gain)
+        #     if not eval(joy_control):
+        #         g29_ff = Node(
+        #             package="ros_g29_force_feedback",
+        #             executable="g29_force_feedback",
+        #             name="g29_force_feedback",
+        #             output="screen",
+        #             parameters=[
+        #                 {'device_name': "/dev/input/event12"},
+        #                 {"gain": LaunchConfiguration('wheel_gain')}
+        #             ],
+        #         )
+        #         ld.add_action(g29_ff)
 
         joy_remap = Node(
             package='bumper_cars',

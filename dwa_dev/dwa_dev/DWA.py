@@ -372,14 +372,20 @@ class DWA_algorithm(Controller):
         if dilated is None:
             dilated = self.trajs[nearest][a][delta] 
 
-        min_distance = np.inf
+        min_distance = distance(dilated, LineString(self.borders))
+        if min_distance < self.dilation_factor * self.car_model.width:
+            return np.inf  # collision
+        else:
+            distance_cost = 1 / (min_distance)
+        
+        # min_distance = np.inf
         if self.ob:
             dist = distance(dilated, self.ob)
             if dist < self.dilation_factor * self.car_model.width:
                 return np.inf  # collision        
             elif dist < min_distance:
                 min_distance = dist
-            distance_cost = 1 / (min_distance * 10)
+            distance_cost += 1 / (min_distance)
         else:
             distance_cost = 0.0
         return distance_cost
@@ -421,7 +427,7 @@ class DWA_algorithm(Controller):
 
         # Variables needed for faster computation
         obstacles = [self.dilated_traj[idx] for idx in range(len(self.dilated_traj)) if idx != self.car_i]
-        obstacles.append(self.borders)
+        # obstacles.append(self.borders)
 
         self.ob = MultiLineString(obstacles)
 

@@ -26,7 +26,7 @@ class WheelJoystickRemap(Node):
         self.wheel_position = 0.0
 
         self.button_pressed = False
-        self.main_control = True
+        self.main_control = False
 
     def _get_env_state(self, _, response):
         response.wheel_position = self.wheel_position
@@ -38,13 +38,12 @@ class WheelJoystickRemap(Node):
     
     def joy_callback(self, msg: Joy):
         if len(msg.axes)>6:
-            self.publisher_.publish(msg)
-
             if msg.buttons[4]==1 and self.button_pressed==False:
                 self.button_pressed = True
                 self.main_control = not self.main_control
             elif msg.buttons[4] == 0:
                 self.button_pressed = False
+            self.publisher_.publish(msg)
 
         else:
             if msg.buttons[5]==1 and self.button_pressed==False:

@@ -260,8 +260,12 @@ class C3BF_algorithm(Controller):
         if status == PIQP_SOLVED:
             self.dxu[:] = np.reshape(solver.result.x, (M,))
             self.dxu[1] = self.__beta_to_delta(self.dxu[1])
+            print(f'G: {G}')
+            print(f'H: {H}\n')
         else:
             print(f"QP solver failed for robot {i}! Emergency stop.") 
+            print(f'G: {G}')
+            print(f'H: {H}\n')
             self.dxu[0] = (0 - x[3,i])/self.dt 
         return self.dxu
         

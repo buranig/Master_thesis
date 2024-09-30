@@ -6,7 +6,7 @@ In this branch, the code from the ```master``` branch has been adapted as a ROS2
 # Dependencies
 
 ```
-pip3 install shapely piqp torch
+pip3 install shapely piqp torch seaborn
 ```
 
 ## Installation instructions

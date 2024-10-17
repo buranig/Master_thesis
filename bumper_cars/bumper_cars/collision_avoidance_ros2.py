@@ -359,6 +359,7 @@ class CollisionAvoidance(Node):
                 # Send command to car
                 v_long = curr_state.env_state[self.car_i].vel_x*np.cos(curr_state.env_state[self.car_i].turn_angle) + curr_state.env_state[self.car_i].vel_y*np.sin(curr_state.env_state[self.car_i].turn_angle)
                 
+                cmd_out.header.stamp = self.get_clock().now().to_msg()
                 if cmd_out.throttle<=-0.01 and v_long>0.001:
                     cmd_out.throttle = 0.0
                     self.publisher_.publish(cmd_out)
@@ -370,6 +371,7 @@ class CollisionAvoidance(Node):
                         self.publisher_.publish(cmd_out)
                         self.send_once = True
                     cmd_out.throttle = throttle_buf
+                    cmd_out.header.stamp = self.get_clock().now().to_msg()
                     self.publisher_.publish(cmd_out)
                 else:
                     self.publisher_.publish(cmd_out)
@@ -415,8 +417,7 @@ class CollisionAvoidance(Node):
 
     def publish_ff(self, steering, torque):
         msg = ForceFeedback()
-        msg.header.stamp.sec = 0
-        msg.header.stamp.nanosec = 0
+        msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = ''
         msg.position = steering
         msg.torque = torque
@@ -433,7 +434,7 @@ class CollisionAvoidance(Node):
         marker = Marker()
         marker.header = Header()
         marker.header.frame_id = "world"
-        marker.header.stamp = self.get_clock().now().to_msg()
+        # marker.header.stamp = self.get_clock().now().to_msg()
 
         marker.ns = "world_map"
         marker.id = 0
@@ -474,7 +475,7 @@ class CollisionAvoidance(Node):
         marker = Marker()
         marker.header = Header()
         marker.header.frame_id = "body" + self.car_str
-        marker.header.stamp = self.get_clock().now().to_msg()
+        # marker.header.stamp = self.get_clock().now().to_msg()
 
         marker.ns = "car_radius"
         marker.id = 1 + self.car_i

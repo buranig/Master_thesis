@@ -86,7 +86,7 @@ def add_car(context, ld):
             ],
                 remappings=[('/sim/car'+car_str+'/set/control', '/sim/car'+car_str+'/desired_control'),
                             ('/car'+car_str+'/set/control', '/car'+car_str+'/desired_control'),
-                            ('/joy', '/joy'+car_str) ],
+                            ('/joy', '/joy'+car_str+'_remap') ],
             emulate_tty=True,
             output='both'
         )
@@ -106,19 +106,19 @@ def add_car(context, ld):
         )
 
         # Joy Node
-        if car_i != 0:
-            joy = Node(
-                package='joy',
-                executable='joy_node',
-                name='joy'+car_str+'_node',
-                parameters=[
-                        {'device_id': car_num},
-                ],
-                remappings=[('/joy', '/joy'+str(car_i)) ],
-                emulate_tty=True,
-                output='both'
-            )
-            ld.add_action(joy)
+        # if car_i != 0:
+        joy = Node(
+            package='joy',
+            executable='joy_node',
+            name='joy'+car_str+'_node',
+            parameters=[
+                    {'device_id': car_num},
+            ],
+            remappings=[('/joy', '/joy'+car_str+'_pre') ],
+            emulate_tty=True,
+            output='both'
+        )
+        ld.add_action(joy)
             
         #     wheel_gain = LaunchConfiguration('wheel_gain').perform(context)
         #     print(wheel_gain)
@@ -142,8 +142,8 @@ def add_car(context, ld):
             parameters=[
                     {'car_i': car_i}       
             ],
-            remappings=[('/joy', '/joy'+str(car_i)),
-                        ('/joy_remap', '/joy'+car_str) ],
+            remappings=[('/joy', '/joy'+car_str+'_pre'),
+                        ('/joy_remap', '/joy'+car_str+'_remap') ],
             emulate_tty=True,
             output='both'
         )

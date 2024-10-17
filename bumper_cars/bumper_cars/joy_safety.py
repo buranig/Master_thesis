@@ -20,7 +20,7 @@ class JoySafetyNode(Node):
 
         self.subscription = self.create_subscription(
             Joy,
-            '/joy'+self.car_str,
+            '/joy'+self.car_str+'_remap',
             self.joy_callback,
             10
         )
